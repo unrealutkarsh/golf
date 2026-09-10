@@ -264,10 +264,10 @@ export class Renderer {
   }
 
   private drawRough(ctx: CanvasRenderingContext2D, hole: Hole): void {
-    const pattern = this.grain(ctx, `rough-${hole.number}`, ["#2f6a32", "#245828", "#3d7a38", "#1d4a22", "#4a8a40"], hashString(`rough-${hole.number}`));
+    const pattern = this.grain(ctx, `rough-${hole.number}`, ["#245628", "#1b4520", "#326a30", "#16381a", "#3d7a36"], hashString(`rough-${hole.number}`));
     for (const poly of hole.rough) {
       this.pathPoly(ctx, poly);
-      ctx.fillStyle = "#2c6230";
+      ctx.fillStyle = "#1f4d24";
       ctx.fill();
       ctx.fillStyle = pattern;
       ctx.globalAlpha = 0.72;
@@ -328,7 +328,7 @@ export class Renderer {
     ctx.rotate(heading);
     for (let i = -28; i < 28; i++) {
       const even = i % 2 === 0;
-      ctx.fillStyle = even ? "rgba(255, 248, 200, 0.26)" : "rgba(16, 62, 26, 0.2)";
+      ctx.fillStyle = even ? "rgba(255, 250, 190, 0.34)" : "rgba(12, 52, 22, 0.28)";
       ctx.fillRect(i * stripeW - span, -span, stripeW, span * 2);
     }
     const sheen = ctx.createLinearGradient(-span, 0, span, 0);
@@ -361,9 +361,9 @@ export class Renderer {
     ctx.save();
     ctx.globalCompositeOperation = "soft-light";
     const g = ctx.createLinearGradient(hole.bounds.x, hole.bounds.y, hole.bounds.x + hole.bounds.w, hole.bounds.y + hole.bounds.h);
-    g.addColorStop(0, "rgba(255, 232, 170, 0.7)");
-    g.addColorStop(0.55, "rgba(200, 220, 180, 0.2)");
-    g.addColorStop(1, "rgba(30, 50, 70, 0.45)");
+    g.addColorStop(0, "rgba(255, 232, 170, 0.38)");
+    g.addColorStop(0.55, "rgba(200, 220, 180, 0.1)");
+    g.addColorStop(1, "rgba(30, 50, 70, 0.22)");
     ctx.fillStyle = g;
     ctx.fillRect(hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
     ctx.restore();
@@ -501,24 +501,29 @@ export class Renderer {
   }
 
   private drawTree(ctx: CanvasRenderingContext2D, t: Tree): void {
+    const rng = mulberry32(hashString(`tree-${t.x.toFixed(1)}-${t.y.toFixed(1)}`));
     ctx.save();
-    ctx.fillStyle = "rgba(8, 16, 10, 0.32)";
+    ctx.fillStyle = "rgba(8, 16, 10, 0.34)";
     ctx.beginPath();
-    ctx.ellipse(t.x + 5.2, t.y + 4.6, t.r * 1.05, t.r * 0.42, 0.35, 0, Math.PI * 2);
+    ctx.ellipse(t.x + 5.4, t.y + 4.8, t.r * 1.1, t.r * 0.4, 0.38, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#5a3820";
-    ctx.fillRect(t.x - 1.15, t.y - 1, 2.3, t.r * 0.58);
-    ctx.fillStyle = "#14532d";
+    ctx.fillStyle = "#4a2e18";
+    ctx.fillRect(t.x - 1.2, t.y - 0.4, 2.4, t.r * 0.62);
+    ctx.fillStyle = "#0f3f22";
     ctx.beginPath();
-    ctx.arc(t.x, t.y - t.r * 0.18, t.r, 0, Math.PI * 2);
+    ctx.arc(t.x, t.y - t.r * 0.2, t.r * (0.92 + rng() * 0.12), 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#1f7a3a";
+    ctx.fillStyle = "#1c6d34";
     ctx.beginPath();
-    ctx.arc(t.x - t.r * 0.28, t.y - t.r * 0.38, t.r * 0.58, 0, Math.PI * 2);
+    ctx.arc(t.x - t.r * (0.22 + rng() * 0.12), t.y - t.r * 0.42, t.r * 0.56, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#3a9a52";
+    ctx.fillStyle = "#2f8f48";
     ctx.beginPath();
-    ctx.arc(t.x + t.r * 0.18, t.y - t.r * 0.42, t.r * 0.4, 0, Math.PI * 2);
+    ctx.arc(t.x + t.r * (0.12 + rng() * 0.12), t.y - t.r * 0.5, t.r * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(180, 230, 150, 0.16)";
+    ctx.beginPath();
+    ctx.arc(t.x - t.r * 0.18, t.y - t.r * 0.48, t.r * 0.22, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -855,11 +860,23 @@ export class Renderer {
       ty = hole.bounds.y + hole.bounds.h * 0.5;
       zoomTarget = fit * 0.88;
     } else if (session.swingPhase === "flight" || session.swingPhase === "settle") {
-      tx = visual.x + session.ball.vel.x * 0.18;
-      ty = visual.y + session.ball.vel.y * 0.18;
-      const frame = 58 + session.ball.z * 3.1;
-      zoomTarget = clamp(Math.min(this.w, this.h) / frame, 2.7, putting ? 8 : 6.1);
-      follow = 0.00012;
+      let minX = Math.min(session.lastShotPos.x, visual.x, session.ball.pos.x);
+      let maxX = Math.max(session.lastShotPos.x, visual.x, session.ball.pos.x);
+      let minY = Math.min(session.lastShotPos.y, visual.y, session.ball.pos.y);
+      let maxY = Math.max(session.lastShotPos.y, visual.y, session.ball.pos.y);
+      for (const sample of session.shotArc) {
+        const air = airbornePos(sample.pos, sample.z);
+        minX = Math.min(minX, sample.pos.x, air.x);
+        maxX = Math.max(maxX, sample.pos.x, air.x);
+        minY = Math.min(minY, sample.pos.y, air.y);
+        maxY = Math.max(maxY, sample.pos.y, air.y);
+      }
+      tx = (minX + maxX) / 2;
+      ty = (minY + maxY) / 2;
+      const spanX = maxX - minX + 36;
+      const spanY = maxY - minY + 40;
+      zoomTarget = clamp(Math.min(this.w / spanX, this.h / spanY) * 0.82, 2.1, putting ? 8 : 5.4);
+      follow = 0.00018;
     } else if (putting) {
       tx = (session.ball.pos.x + hole.pin.x) / 2;
       ty = (session.ball.pos.y + hole.pin.y) / 2;
@@ -986,7 +1003,7 @@ export class Renderer {
     }
     ctx.restore();
 
-    if (session.swingPhase === "accuracy" || session.lockedAccuracy) {
+    if (session.swingPhase !== "flight" && session.swingPhase !== "settle" && (session.swingPhase === "accuracy" || session.lockedAccuracy)) {
       const bx = this.w / 2 - 130;
       const by = this.h - 118;
       ctx.fillStyle = "rgba(8, 16, 12, 0.7)";
