@@ -512,14 +512,15 @@ export class CourseScene {
     const key = `${n}:${last.pos.x.toFixed(1)}:${last.pos.y.toFixed(1)}:${last.z.toFixed(1)}`;
     if (key !== this.pathKey) {
       this.pathKey = key;
-      this.setFlightTube(pts);
+      const radius = session.club().id === "putter" ? 0.04 : 0.13;
+      this.setFlightTube(pts, radius);
     }
     const warn = nearOb(hole, last.pos) || lieAt(hole, last.pos) === "ob";
     this.landing.position.set(last.pos.x, groundHeight(hole, last.pos.x, last.pos.y) + 0.05, last.pos.y);
     (this.landing.material as THREE.MeshBasicMaterial).color.set(warn ? 0xc62828 : 0xf0d78a);
   }
 
-  private setFlightTube(pts: THREE.Vector3[]): void {
+  private setFlightTube(pts: THREE.Vector3[], radius: number): void {
     if (this.flightMesh) {
       this.flightMesh.geometry.dispose();
       this.scene.remove(this.flightMesh);
@@ -527,7 +528,7 @@ export class CourseScene {
     }
     if (pts.length < 2) return;
     const curve = new THREE.CatmullRomCurve3(pts);
-    const geo = new THREE.TubeGeometry(curve, Math.min(90, pts.length * 2), 0.13, 7, false);
+    const geo = new THREE.TubeGeometry(curve, Math.min(90, pts.length * 2), radius, 7, false);
     this.flightMesh = new THREE.Mesh(geo, this.flightMat);
     this.scene.add(this.flightMesh);
   }
