@@ -283,7 +283,7 @@ export class UI {
           <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
           <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
           <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
-          <span class="shape-hint">${session.canShape() ? "Z fade · X draw" : "Off on the green"}</span>
+          <span class="shape-hint">${session.club().id === "putter" || session.lie === "green" ? "Off on the green" : "Z fade · X draw"}</span>
         </div>
         <div class="clubs">
           ${CLUBS.map(
