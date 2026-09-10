@@ -100,4 +100,58 @@ describe("shot physics", () => {
     expect(mid.z).toBeGreaterThan(4);
     expect(wedge.filter((s) => s.z > 0.5).length).toBeGreaterThan(driver.filter((s) => s.z > 0.5).length);
   });
+
+  it("curves a draw left of a straight shot", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.tee.x + 24, y: hole.tee.y };
+    const aim = 0;
+    const wind = { speed: 0, dir: 0 };
+    const shot = {
+      aim,
+      power: 0.92,
+      accuracy: 0,
+      club: clubById("iron7"),
+      lie: "fairway" as const,
+      wind,
+    };
+    const straight = sampleFlightPath(from, { ...shot, shape: 0 }, hole);
+    const draw = sampleFlightPath(from, { ...shot, shape: 1 }, hole);
+    const fade = sampleFlightPath(from, { ...shot, shape: -1 }, hole);
+    const mid = (path: typeof straight) => path[Math.floor(path.length * 0.6)];
+    expect(mid(draw).pos.y).toBeGreaterThan(mid(straight).pos.y + 3);
+    expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 3);
+  });
+
+  it("lets a missed putt come to rest instead of creeping on the break", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 8.5, y: hole.pin.y + 3.2 };
+    const wind = { speed: 0, dir: 0 };
+    const club = clubById("putter");
+    let ball = launchBall(from, {
+      aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x) + 0.7,
+      power: 0.32,
+      accuracy: 0,
+      club,
+      lie: "green",
+      wind,
+    });
+    let holed = false;
+    let stopped = false;
+    for (let i = 0; i < 480; i++) {
+      const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+      ball = step.ball;
+      if (step.holed) {
+        holed = true;
+        break;
+      }
+      if (!step.flying) {
+        stopped = true;
+        break;
+      }
+    }
+    expect(holed).toBe(false);
+    expect(stopped).toBe(true);
+    expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
+  });
 });
+

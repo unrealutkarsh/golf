@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HARBOR_DUNES, lieAt } from "./course";
+import { HARBOR_DUNES, PLAYABLE_MARGIN, lieAt, nearOb } from "./course";
 import { dist } from "./math";
 
 describe("Harbor Dunes", () => {
@@ -21,5 +21,15 @@ describe("Harbor Dunes", () => {
       expect(hole.yards).toBeGreaterThan(140);
       expect(Math.round(dist(hole.tee, hole.pin))).toBe(hole.yards);
     }
+  });
+
+  it("keeps slight misses and tree lies in play instead of OB", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    expect(lieAt(hole, { x: hole.tee.x, y: hole.tee.y - 48 })).not.toBe("ob");
+    const tree = hole.trees[0];
+    expect(lieAt(hole, { x: tree.x + tree.r + 3, y: tree.y })).toBe("rough");
+    expect(lieAt(hole, { x: hole.tee.x, y: hole.tee.y - 220 })).toBe("ob");
+    expect(PLAYABLE_MARGIN).toBeGreaterThanOrEqual(16);
+    expect(nearOb(hole, { x: hole.tee.x, y: hole.tee.y - 220 })).toBe(false);
   });
 });

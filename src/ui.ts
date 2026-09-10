@@ -2,6 +2,7 @@ import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
 import { surfaceLabel, windLabel } from "./physics";
+import { shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
 import { PLAYER_CARD } from "./tour";
 import type { ScreenId } from "./types";
@@ -133,13 +134,15 @@ export class UI {
       <div class="panel help">
         <h2>How to play</h2>
         <ol>
-          <li><b>Aim</b> with the mouse or finger. Arrow keys nudge the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the accuracy window.</li>
+          <li><b>Aim</b> with the mouse or finger. Arrow keys or A / D nudge the line.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
+          <li><b>Shape</b> the ball with Z fade / X draw. The preview ribbon shows the curve.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
-          <li>Wind pushes the ball in the air. Rough, sand, and water all cost you.</li>
-          <li>Stroke play vs par. Water is a drop plus one. Out of bounds is stroke and distance.</li>
+          <li><b>Camera</b> with V or the View button: auto, player, follow, or putting perspective.</li>
+          <li>On the green, look down the putt toward the pin. G toggles the break grid.</li>
+          <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
-        <p class="keys">C scorecard · H help · M mute · Esc cancel swing / menus</p>
+        <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
         <button class="btn primary" data-action="close-help">Got it</button>
       </div>`;
   }
@@ -265,6 +268,8 @@ export class UI {
         <span>${surfaceLabel(session.lie)}</span>
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
+        <span>${shapeLabel(session.shape)}</span>
+        <span>${session.resolvedCam()}</span>
         <span class="grow"></span>
         <span>${escapeHtml(session.profile.name)}</span>
         <span>Str ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
@@ -281,6 +286,11 @@ export class UI {
         </div>
         <div class="tools">
           <span class="phase">${phase}</span>
+          <button data-action="camera">View · ${session.camMode}</button>
+          <button class="${session.puttGrid ? "on" : ""}" data-action="grid">Grid</button>
+          <button class="${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1">Fade</button>
+          <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0">Straight</button>
+          <button class="${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1">Draw</button>
           <button data-action="scorecard">Card</button>
           <button data-action="help">Help</button>
           <button data-action="mute">${session.audio.muted ? "Muted" : "Sound"}</button>

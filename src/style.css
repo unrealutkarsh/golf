@@ -27,11 +27,25 @@ body {
 }
 
 #app,
+#gl,
 #view {
   position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+#gl {
+  z-index: 0;
+}
+
+#view {
+  z-index: 1;
+  pointer-events: none;
+}
+
+body.has-3d #view {
+  background: transparent;
 }
 
 #overlay {
@@ -353,8 +367,9 @@ td.empty {
   background: rgba(8, 16, 12, 0.42);
   color: var(--ink);
   border-radius: 8px;
-  padding: 6px 7px;
-  font-size: 11px;
+  padding: 10px 11px;
+  font-size: 12px;
+  min-width: 40px;
   cursor: pointer;
 }
 
@@ -377,9 +392,14 @@ td.empty {
   background: rgba(8, 16, 12, 0.4);
   color: var(--ink);
   border-radius: 999px;
-  padding: 6px 11px;
+  padding: 9px 14px;
   font: inherit;
   cursor: pointer;
+}
+
+.tools button.on {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: rgba(240, 215, 138, 0.55);
 }
 
 .phase {
@@ -403,7 +423,7 @@ td.empty {
 }
 
 .tip {
-  top: 58px;
+  top: 62px;
 }
 
 .toast {
