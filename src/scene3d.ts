@@ -6,11 +6,14 @@ import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
 import {
   bladeHeight,
+  bladeKeepChance,
   bladeWidth,
+  grassBudget,
   groundHeight,
   isPuttingSituation,
   resolveCamView,
   surfaceColor,
+  turfLush,
   type ResolvedCam,
 } from "./terrain";
 import type { Hole } from "./types";
@@ -20,11 +23,14 @@ const BLADE_COUNT = 11000;
 
 const TURF_VERT = /* glsl */ `
   attribute vec3 color;
+  attribute float lush;
   varying vec3 vColor;
   varying vec3 vWorld;
   varying vec3 vNormal;
+  varying float vLush;
   void main() {
     vColor = color;
+    vLush = lush;
     vec4 world = modelMatrix * vec4(position, 1.0);
     vWorld = world.xyz;
     vNormal = normalize(mat3(modelMatrix) * normal);
@@ -41,16 +47,17 @@ const TURF_FRAG = /* glsl */ `
   varying vec3 vColor;
   varying vec3 vWorld;
   varying vec3 vNormal;
+  varying float vLush;
   void main() {
     vec3 n = normalize(vNormal);
     vec3 viewDir = normalize(cameraPos - vWorld);
-    float stripe = 0.94 + 0.08 * sin(vWorld.x * 1.05 + vWorld.z * 0.06);
-    float mottling = 0.9 + 0.12 * texture2D(grassMap, vWorld.xz * 0.42).r;
-    float blades = 0.88 + 0.16 * texture2D(grassMap, vWorld.xz * 1.15).g;
+    float stripe = mix(0.975 + 0.03 * sin(vWorld.x * 1.45 + vWorld.z * 0.1), 0.94 + 0.08 * sin(vWorld.x * 1.05 + vWorld.z * 0.06), vLush);
+    float mottling = mix(0.985, 0.9 + 0.12 * texture2D(grassMap, vWorld.xz * 0.42).r, vLush);
+    float blades = mix(0.99, 0.88 + 0.16 * texture2D(grassMap, vWorld.xz * 1.15).g, vLush);
     float ndl = max(dot(n, sunDir), 0.0);
     float wrap = ndl * 0.55 + 0.45;
     vec3 halfV = normalize(sunDir + viewDir);
-    float spec = pow(max(dot(n, halfV), 0.0), 36.0) * 0.22 * (0.35 + ndl);
+    float spec = pow(max(dot(n, halfV), 0.0), 36.0) * mix(0.12, 0.22, vLush) * (0.35 + ndl);
     float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 3.0) * 0.12;
     vec3 col = vColor * stripe * mottling * blades;
     vec3 lit = col * (ambient + sunColor * wrap) + sunColor * spec + vec3(0.55, 0.7, 0.45) * rim;
@@ -206,8 +213,13 @@ export class CourseScene {
     this.scene.add(this.puttAim);
 
     this.ball = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 28, 20),
-      new THREE.MeshStandardMaterial({ color: 0xf7f4ec, roughness: 0.22, metalness: 0.08 }),
+      makeGolfBallGeometry(0.16),
+      new THREE.MeshStandardMaterial({
+        color: 0xf4f1e8,
+        roughness: 0.34,
+        metalness: 0.04,
+        vertexColors: true,
+      }),
     );
     this.ball.castShadow = true;
     this.scene.add(this.ball);
@@ -303,6 +315,7 @@ export class CourseScene {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
+    const lushes = new Float32Array(pos.count);
     const ox = b.x + b.w / 2;
     const oz = b.y + b.h / 2;
     for (let i = 0; i < pos.count; i++) {
@@ -313,8 +326,10 @@ export class CourseScene {
       colors[i * 3] = c[0];
       colors[i * 3 + 1] = c[1];
       colors[i * 3 + 2] = c[2];
+      lushes[i] = turfLush(lieAt(hole, { x, y: z }));
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute("lush", new THREE.BufferAttribute(lushes, 1));
     geo.computeVertexNormals();
     const terrain = new THREE.Mesh(geo, this.turfMat);
     terrain.receiveShadow = true;
@@ -568,12 +583,13 @@ export class CourseScene {
     if (this.blades && dist(focus, this.grassAt) < 1.8) return;
     this.grassAt = { ...focus };
     if (this.blades) this.scene.remove(this.blades);
-    const mesh = new THREE.InstancedMesh(this.bladeGeo, this.bladeMat, BLADE_COUNT);
+    const budget = grassBudget(lieAt(hole, focus), BLADE_COUNT);
+    const mesh = new THREE.InstancedMesh(this.bladeGeo, this.bladeMat, budget);
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
     let written = 0;
-    for (let i = 0; i < BLADE_COUNT * 4 && written < BLADE_COUNT; i++) {
-      const close = written < BLADE_COUNT * 0.5;
+    for (let i = 0; i < budget * 6 && written < budget; i++) {
+      const close = written < budget * 0.5;
       const span = view === "putt" ? (close ? 3.6 : 8.5) : view === "player" ? (close ? 6 : 15) : (close ? 5 : 11);
       const a = fbm(focus.x * 0.3 + i * 1.7, focus.y * 0.3 + i) * Math.PI * 2;
       const r = Math.sqrt(fbm(i * 0.37, focus.x + i * 0.11)) * span;
@@ -582,14 +598,15 @@ export class CourseScene {
       const lie = lieAt(hole, { x, y: z });
       const h = bladeHeight(lie);
       if (h <= 0) continue;
+      if (fbm(x * 5.3 + 2.1, z * 5.3) > bladeKeepChance(lie)) continue;
       dummy.position.set(x, groundHeight(hole, x, z), z);
-      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.38 : 0.12));
-      const lean = 0.82 + fbm(x * 2, z * 2) * 0.4;
+      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.38 : lie === "green" ? 0.04 : 0.12));
+      const lean = lie === "green" ? 0.94 + fbm(x * 2, z * 2) * 0.08 : 0.82 + fbm(x * 2, z * 2) * 0.4;
       dummy.scale.set(bladeWidth(lie), h * lean, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(written, dummy.matrix);
       const c = surfaceColor(hole, x, z);
-      if (lie === "green") color.setRGB(0.34, 0.72, 0.4);
+      if (lie === "green") color.setRGB(0.2, 0.46, 0.3);
       else if (lie === "rough") color.setRGB(0.32 + c[0] * 0.2, 0.42 + c[1] * 0.15, 0.16);
       else color.setRGB(Math.min(1, c[0] * 0.85 + 0.06), Math.min(1, c[1] * 1.18), c[2] * 0.8);
       mesh.setColorAt(written, color);
@@ -650,6 +667,61 @@ export class CourseScene {
     this.camera.fov += (fov - this.camera.fov) * 0.12;
     this.camera.updateProjectionMatrix();
   }
+}
+
+const DIMPLE_COUNT = 336;
+const DIMPLE_RADIUS = 0.09;
+const DIMPLE_DEPTH_RATIO = 0.078;
+
+function fibonacciSphere(count: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - ((i + 0.5) / count) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const theta = golden * i;
+    pts.push(new THREE.Vector3(Math.cos(theta) * r, y, Math.sin(theta) * r));
+  }
+  return pts;
+}
+
+/** Spherical-cap indent in [0, 1] for a unit-sphere sample against packed dimple centers. */
+export function dimpleIndent(nx: number, ny: number, nz: number, centers: Array<Pick<THREE.Vector3, "x" | "y" | "z">>, dimpleR = DIMPLE_RADIUS): number {
+  let dent = 0;
+  const minDot = 1 - (dimpleR * dimpleR) * 0.5;
+  for (const c of centers) {
+    const dot = nx * c.x + ny * c.y + nz * c.z;
+    if (dot < minDot) continue;
+    const dist = Math.hypot(nx - c.x, ny - c.y, nz - c.z);
+    if (dist >= dimpleR) continue;
+    const t = dist / dimpleR;
+    const bowl = 0.5 + 0.5 * Math.cos(Math.PI * t);
+    dent = Math.max(dent, bowl * bowl);
+  }
+  return dent;
+}
+
+export function makeGolfBallGeometry(radius = 0.16): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(radius, 144, 96);
+  const pos = geo.attributes.position;
+  const dimples = fibonacciSphere(DIMPLE_COUNT);
+  const depth = radius * DIMPLE_DEPTH_RATIO;
+  const colors = new Float32Array(pos.count * 3);
+  const n = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    n.set(pos.getX(i), pos.getY(i), pos.getZ(i)).normalize();
+    const dent = dimpleIndent(n.x, n.y, n.z, dimples);
+    const r = radius - dent * depth;
+    pos.setXYZ(i, n.x * r, n.y * r, n.z * r);
+    const shade = 1 - dent * 0.16;
+    colors[i * 3] = 0.97 * shade;
+    colors[i * 3 + 1] = 0.955 * shade;
+    colors[i * 3 + 2] = 0.91 * shade;
+  }
+  pos.needsUpdate = true;
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function makeCrossBladeGeo(): THREE.BufferGeometry {

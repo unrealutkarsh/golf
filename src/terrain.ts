@@ -74,7 +74,7 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
 export function bladeHeight(lie: Lie): number {
   switch (lie) {
     case "green":
-      return 0.15;
+      return 0.036;
     case "tee":
       return 0.16;
     case "fairway":
@@ -89,7 +89,7 @@ export function bladeHeight(lie: Lie): number {
 export function bladeWidth(lie: Lie): number {
   switch (lie) {
     case "green":
-      return 0.7;
+      return 0.28;
     case "tee":
     case "fairway":
       return 1;
@@ -98,6 +98,41 @@ export function bladeWidth(lie: Lie): number {
     default:
       return 0;
   }
+}
+
+/** How meadow-like the ground shader should look. Greens stay tight and even. */
+export function turfLush(lie: Lie): number {
+  switch (lie) {
+    case "green":
+      return 0.08;
+    case "tee":
+      return 0.48;
+    case "fairway":
+      return 0.84;
+    case "rough":
+      return 1;
+    default:
+      return 0.12;
+  }
+}
+
+/** Fraction of candidate blades to keep. Greens are a short, sparse cut. */
+export function bladeKeepChance(lie: Lie): number {
+  switch (lie) {
+    case "green":
+      return 0.14;
+    case "tee":
+      return 0.72;
+    case "fairway":
+    case "rough":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+export function grassBudget(focusLie: Lie, full: number): number {
+  return focusLie === "green" ? Math.floor(full * 0.16) : full;
 }
 
 export function yardsBetween(a: Vec2, b: Vec2): number {
