@@ -78,6 +78,8 @@ export class GameSession {
   seed = 2026;
   audio = new AudioBus();
   shotArc: FlightSample[] = [];
+  /** Smoothed power used only for aim/power preview lines — HUD meter stays live. */
+  visualPower = 0.3;
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -139,10 +141,16 @@ export class GameSession {
     this.shape = clamp(value, -1, 1);
   }
 
+  private previewTargetPower(): number {
+    if (this.swingPhase === "aim") return this.suggestedPower();
+    if (this.swingPhase === "power") return Math.max(this.meter, 0.2);
+    return this.power;
+  }
+
   private previewShot() {
     return {
       aim: this.aim,
-      power: this.swingPhase === "aim" ? this.suggestedPower() : this.swingPhase === "power" ? Math.max(this.meter, 0.2) : this.power,
+      power: this.swingPhase === "aim" || this.swingPhase === "power" ? this.visualPower : this.swingPhase === "accuracy" ? this.power : this.visualPower,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
@@ -191,6 +199,7 @@ export class GameSession {
     this.gir = false;
     this.wind = this.windForHole(index);
     this.autoClub();
+    this.visualPower = this.suggestedPower();
     this.cam.x = (hole.tee.x + hole.pin.x) / 2;
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
@@ -296,6 +305,9 @@ export class GameSession {
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     if (this.screen !== "play") return;
+    const target = this.previewTargetPower();
+    const follow = this.swingPhase === "power" ? 0.018 : 0.00035;
+    this.visualPower += (target - this.visualPower) * (1 - Math.pow(follow, Math.max(dt, 0.001)));
 
     if (this.swingPhase === "power") {
       this.meter += this.meterDir * dt * 0.72;
@@ -387,6 +399,7 @@ export class GameSession {
       this.power = suggestedPuttPower(this.toPin());
       this.shape = 0;
     }
+    this.visualPower = this.suggestedPower();
   }
 
   isHoled(): boolean {

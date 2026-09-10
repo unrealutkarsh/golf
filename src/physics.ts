@@ -53,11 +53,16 @@ const FRICTION: Record<Lie, number> = {
   tee: 0.986,
   fairway: 0.984,
   rough: 0.955,
-  green: 0.978,
+  green: 0.963,
   bunker: 0.88,
   water: 0.4,
   ob: 0.97,
 };
+
+const GREEN_SLIDE_FRICTION = 0.9;
+const GREEN_DIE_FRICTION = 0.93;
+const GREEN_DIE_SPEED = 2.4;
+const GREEN_CATCH = 0.55;
 
 const RESTITUTION: Record<Lie, number> = {
   tee: 0.36,
@@ -95,7 +100,8 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
     const speed = roll * 1.62;
-    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0, curve: 0 };
+    // Putts start rolling, not sliding — unmatched spin is what makes the ball skate.
+    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: speed, curve: 0 };
   }
 
   const carry = shot.club.carry * power * lieMul;
@@ -104,6 +110,25 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const horiz = carry / flightTime;
   const vz = (flightTime * GRAVITY) / 2;
   return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve };
+}
+
+/** Grass grab on the putting surface: sliding friction bites harder than rolling. */
+export function applyGreenGrip(ball: Ball, dt: number): { vel: Vec2; spinning: number } {
+  const speed = len(ball.vel);
+  if (speed < 1e-6) return { vel: { x: 0, y: 0 }, spinning: 0 };
+  const rolling = Math.min(Math.max(ball.spinning, 0), speed);
+  const slipping = speed - rolling;
+  const rollKeep = Math.pow(FRICTION.green, dt * 60);
+  const slideKeep = Math.pow(GREEN_SLIDE_FRICTION, dt * 60);
+  const keep = (rolling * rollKeep + slipping * slideKeep) / speed;
+  let vel = scale(ball.vel, keep);
+  let nextSpeed = len(vel);
+  const spinning = rolling + slipping * (1 - Math.pow(GREEN_CATCH, dt * 60));
+  if (nextSpeed < GREEN_DIE_SPEED) {
+    vel = scale(vel, Math.pow(GREEN_DIE_FRICTION, dt * 60));
+    nextSpeed = len(vel);
+  }
+  return { vel, spinning: Math.min(nextSpeed * 1.05, spinning) };
 }
 
 export function windAccel(wind: Wind, z: number): Vec2 {
@@ -186,14 +211,20 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
       events.push({ type: "bounce", pos: clone(next.pos) });
     } else {
       next.vz = 0;
-      next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
-      // Break only while the ball is still rolling. Applying it at rest
-      // kept putts creeping forever and blocked the next stroke.
-      if (lie === "green" && len(next.vel) > STOP_SPEED * 1.2) {
-        next.vel = add(next.vel, scale(hole.greenBreak, dt * 2.4));
-      }
-      if (lie === "bunker") {
-        next.vel = scale(next.vel, Math.pow(0.82, dt * 60));
+      if (lie === "green") {
+        const gripped = applyGreenGrip(next, dt);
+        next.vel = gripped.vel;
+        next.spinning = gripped.spinning;
+        // Break only while the ball is still rolling. Applying it at rest
+        // kept putts creeping forever and blocked the next stroke.
+        if (len(next.vel) > STOP_SPEED * 1.2) {
+          next.vel = add(next.vel, scale(hole.greenBreak, dt * 2.4));
+        }
+      } else {
+        next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
+        if (lie === "bunker") {
+          next.vel = scale(next.vel, Math.pow(0.82, dt * 60));
+        }
       }
     }
   }
