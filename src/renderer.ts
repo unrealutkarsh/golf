@@ -1,4 +1,5 @@
 import type { GameSession } from "./game";
+import { grassTile, hashNoise, patternFrom, SUN } from "./look";
 import { CUP_RADIUS, type FlightSample } from "./physics";
 import { angleTo, clamp, dist, fromAngle, hashString, mulberry32, type Vec2 } from "./math";
 import type { Ellipse, Hole, Tree } from "./types";
@@ -111,13 +112,10 @@ export class Renderer {
     this.updateCamera(session, dt);
     ctx.save();
     this.applyCamera(ctx, session);
-    ctx.drawImage(
-      this.staticCanvas,
-      hole.bounds.x,
-      hole.bounds.y,
-      hole.bounds.w,
-      hole.bounds.h,
-    );
+    this.drawGroundscape(ctx, hole);
+    ctx.drawImage(this.staticCanvas, hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
+    this.drawFairwaySheen(ctx, session, hole);
+    this.drawNearGrass(ctx, session, hole);
     this.drawWater(ctx, hole);
     this.drawGreen(ctx, hole);
     this.drawPin(ctx, hole);
@@ -128,7 +126,7 @@ export class Renderer {
     this.drawParticles(ctx);
     this.drawBall(ctx, session);
     ctx.restore();
-    this.drawVignette(ctx);
+    this.drawAtmosphere(ctx);
     if (session.screen === "play") {
       this.drawMinimap(ctx, session);
       this.drawMeters(ctx, session);
@@ -157,12 +155,10 @@ export class Renderer {
         this.trail.push({ x: b.pos.x, y: b.pos.y, z: b.z });
         if (this.trail.length > 110) this.trail.shift();
       }
-      if (this.trail.length === 1 && b.z < 1.2) {
-        this.burst(b.pos, "#c6d89a", 12, 16);
-      }
+      if (this.trail.length === 1 && b.z < 1.2) this.burst(b.pos, "#c6d89a", 14, 16);
       if (this.prevZ > 2.2 && b.z <= 0.08) {
-        this.burst(b.pos, "#d8e8b0", 16, 14);
-        this.rings.push({ x: b.pos.x, y: b.pos.y, life: 0.55, max: 0.55 });
+        this.burst(b.pos, "#d8e8b0", 18, 14);
+        this.rings.push({ x: b.pos.x, y: b.pos.y, life: 0.6, max: 0.6 });
       }
       this.prevZ = b.z;
     } else if (this.trail.length && session.swingPhase === "aim") {
@@ -177,120 +173,135 @@ export class Renderer {
 
   private drawSky(ctx: CanvasRenderingContext2D): void {
     const g = ctx.createLinearGradient(0, 0, 0, this.h);
-    g.addColorStop(0, "#16324a");
-    g.addColorStop(0.38, "#24586a");
-    g.addColorStop(0.72, "#2f6a4a");
-    g.addColorStop(1, "#163221");
+    g.addColorStop(0, "#1a3d68");
+    g.addColorStop(0.28, "#3d7ca8");
+    g.addColorStop(0.55, "#8ec4d4");
+    g.addColorStop(0.72, "#d8c48a");
+    g.addColorStop(1, "#6a8a4a");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, this.w, this.h);
 
-    const sunX = this.w * 0.78;
-    const sunY = this.h * 0.16;
-    const sun = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, this.w * 0.42);
-    sun.addColorStop(0, "rgba(255, 228, 160, 0.55)");
-    sun.addColorStop(0.18, "rgba(255, 200, 110, 0.18)");
-    sun.addColorStop(1, "rgba(255, 200, 110, 0)");
-    ctx.fillStyle = sun;
+    const sunX = this.w * 0.8;
+    const sunY = this.h * 0.18;
+    const bloom = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, this.w * 0.5);
+    bloom.addColorStop(0, "rgba(255, 236, 190, 0.85)");
+    bloom.addColorStop(0.12, "rgba(255, 200, 120, 0.28)");
+    bloom.addColorStop(1, "rgba(255, 200, 120, 0)");
+    ctx.fillStyle = bloom;
     ctx.fillRect(0, 0, this.w, this.h);
-
-    ctx.fillStyle = "rgba(255, 236, 190, 0.9)";
+    ctx.fillStyle = "#fff6d2";
     ctx.beginPath();
-    ctx.arc(sunX, sunY, 16, 0, Math.PI * 2);
+    ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(236, 246, 255, 0.1)";
-    this.drawCloud(ctx, this.w * 0.18, this.h * 0.12, 70);
-    this.drawCloud(ctx, this.w * 0.42, this.h * 0.08, 90);
-    this.drawCloud(ctx, this.w * 0.88, this.h * 0.2, 54);
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    this.drawCloud(ctx, this.w * 0.16, this.h * 0.14, 86);
+    this.drawCloud(ctx, this.w * 0.4, this.h * 0.1, 110);
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    this.drawCloud(ctx, this.w * 0.9, this.h * 0.2, 64);
+
+    ctx.fillStyle = "#4a6a38";
+    ctx.beginPath();
+    ctx.moveTo(0, this.h * 0.62);
+    ctx.quadraticCurveTo(this.w * 0.2, this.h * 0.54, this.w * 0.38, this.h * 0.6);
+    ctx.quadraticCurveTo(this.w * 0.58, this.h * 0.66, this.w, this.h * 0.58);
+    ctx.lineTo(this.w, this.h);
+    ctx.lineTo(0, this.h);
+    ctx.fill();
+    ctx.fillStyle = "#3a582c";
+    ctx.beginPath();
+    ctx.moveTo(0, this.h * 0.7);
+    ctx.quadraticCurveTo(this.w * 0.3, this.h * 0.64, this.w * 0.55, this.h * 0.72);
+    ctx.quadraticCurveTo(this.w * 0.78, this.h * 0.78, this.w, this.h * 0.68);
+    ctx.lineTo(this.w, this.h);
+    ctx.lineTo(0, this.h);
+    ctx.fill();
   }
 
   private drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
     ctx.beginPath();
-    ctx.ellipse(x, y, r, r * 0.38, 0, 0, Math.PI * 2);
-    ctx.ellipse(x - r * 0.45, y + 4, r * 0.55, r * 0.28, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + r * 0.4, y + 6, r * 0.48, r * 0.24, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y, r, r * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - r * 0.42, y + 5, r * 0.52, r * 0.26, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + r * 0.38, y + 6, r * 0.46, r * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  private drawGroundscape(ctx: CanvasRenderingContext2D, hole: Hole): void {
+    const b = hole.bounds;
+    const g = ctx.createRadialGradient(b.x + b.w * 0.5, b.y + b.h * 0.5, 20, b.x + b.w * 0.5, b.y + b.h * 0.5, Math.max(b.w, b.h) * 0.9);
+    g.addColorStop(0, "#2a4a24");
+    g.addColorStop(1, "#1a3018");
+    ctx.fillStyle = g;
+    ctx.fillRect(b.x - 180, b.y - 140, b.w + 360, b.h + 280);
+  }
+
+  private grain(key: string, colors: string[], specks = 2200): CanvasPattern {
+    const cached = this.grainCache.get(key);
+    if (cached) return cached;
+    const pattern = patternFrom(this.staticCtx, grassTile(key, colors, 128, specks));
+    this.grainCache.set(key, pattern);
+    return pattern;
   }
 
   private ensureStatic(hole: Hole): void {
     if (this.staticHole === hole.number) return;
     this.staticHole = hole.number;
-    const pad = 6;
-    const scale = hole.bounds.w < 300 ? 7 : 5.5;
+    const pad = 8;
+    const scale = hole.bounds.w < 280 ? 9 : hole.bounds.w < 420 ? 7.5 : 6.4;
     this.staticCanvas.width = Math.max(64, Math.ceil(hole.bounds.w * scale));
     this.staticCanvas.height = Math.max(64, Math.ceil(hole.bounds.h * scale));
     const ctx = this.staticCtx;
     ctx.setTransform(scale, 0, 0, scale, -hole.bounds.x * scale, -hole.bounds.y * scale);
-    this.drawOutOfBounds(ctx, hole, pad);
+    this.drawScrub(ctx, hole, pad);
     this.drawRough(ctx, hole);
     this.drawFairway(ctx, hole);
     this.drawTee(ctx, hole);
-    for (const b of hole.bunkers) this.drawBunker(ctx, b, hole.number);
-    for (const t of hole.trees) this.drawTree(ctx, t);
-    this.drawLightWash(ctx, hole);
+    for (const bunker of hole.bunkers) this.drawBunker(ctx, bunker, hole.number);
+    for (const tree of hole.trees) this.drawTree(ctx, tree);
   }
 
-  private drawOutOfBounds(ctx: CanvasRenderingContext2D, hole: Hole, pad: number): void {
+  private drawScrub(ctx: CanvasRenderingContext2D, hole: Hole, pad: number): void {
     const g = ctx.createLinearGradient(hole.bounds.x, hole.bounds.y, hole.bounds.x, hole.bounds.y + hole.bounds.h);
-    g.addColorStop(0, "#102016");
-    g.addColorStop(1, "#0a160f");
+    g.addColorStop(0, "#24381c");
+    g.addColorStop(1, "#1a2a14");
     ctx.fillStyle = g;
     ctx.fillRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
+    ctx.fillStyle = this.grain(`scrub-${hole.number}`, ["#24381c", "#1b2e16", "#334a22", "#162210"], 1600);
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
+    ctx.globalAlpha = 1;
   }
 
-  private grain(ctx: CanvasRenderingContext2D, key: string, colors: string[], seed: number): CanvasPattern {
-    const cached = this.grainCache.get(key);
-    if (cached) return cached;
-    const tile = document.createElement("canvas");
-    tile.width = 64;
-    tile.height = 64;
-    const t = tile.getContext("2d");
-    if (!t) throw new Error("Grain canvas unavailable");
-    const rng = mulberry32(seed);
-    t.fillStyle = colors[0];
-    t.fillRect(0, 0, 64, 64);
-    for (let i = 0; i < 520; i++) {
-      t.globalAlpha = 0.12 + rng() * 0.38;
-      t.fillStyle = colors[1 + Math.floor(rng() * (colors.length - 1))];
-      const w = 0.7 + rng() * 2.2;
-      const h = 0.5 + rng() * 1.8;
-      t.fillRect(rng() * 64, rng() * 64, w, h);
+  private clipPolys(ctx: CanvasRenderingContext2D, polys: Vec2[][]): void {
+    ctx.beginPath();
+    for (const poly of polys) {
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath();
     }
-    t.globalAlpha = 1;
-    const pattern = ctx.createPattern(tile, "repeat");
-    if (!pattern) throw new Error("Grain pattern unavailable");
-    this.grainCache.set(key, pattern);
-    return pattern;
+    ctx.clip();
   }
 
   private drawRough(ctx: CanvasRenderingContext2D, hole: Hole): void {
-    const pattern = this.grain(ctx, `rough-${hole.number}`, ["#245628", "#1b4520", "#326a30", "#16381a", "#3d7a36"], hashString(`rough-${hole.number}`));
     for (const poly of hole.rough) {
       this.pathPoly(ctx, poly);
-      ctx.fillStyle = "#1f4d24";
+      ctx.fillStyle = "#1c4020";
       ctx.fill();
-      ctx.fillStyle = pattern;
-      ctx.globalAlpha = 0.72;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = "#1c3f20";
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
     }
-    const rng = mulberry32(hashString(`tuft-${hole.number}`));
     ctx.save();
-    for (const poly of hole.rough) {
-      this.pathPoly(ctx, poly);
-      ctx.clip();
-    }
-    ctx.strokeStyle = "rgba(20, 48, 22, 0.28)";
-    ctx.lineWidth = 0.35;
-    for (let i = 0; i < 220; i++) {
+    this.clipPolys(ctx, hole.rough);
+    ctx.fillStyle = this.grain(`rough-${hole.number}`, ["#1c4020", "#143218", "#2a5a28", "#0e2412", "#3a6a30"], 2800);
+    ctx.fillRect(hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
+    const rng = mulberry32(hashString(`tuft-${hole.number}`));
+    ctx.strokeStyle = "rgba(8, 28, 12, 0.4)";
+    ctx.lineWidth = 0.42;
+    ctx.lineCap = "round";
+    for (let i = 0; i < 420; i++) {
       const x = hole.bounds.x + rng() * hole.bounds.w;
       const y = hole.bounds.y + rng() * hole.bounds.h;
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.lineTo(x + (rng() - 0.5) * 2.4, y - 1.1 - rng());
+      ctx.lineTo(x + (rng() - 0.5) * 2.8, y - 1.6 - rng() * 1.4);
       ctx.stroke();
     }
     ctx.restore();
@@ -298,75 +309,122 @@ export class Renderer {
 
   private drawFairway(ctx: CanvasRenderingContext2D, hole: Hole): void {
     const heading = angleTo(hole.tee, hole.pin);
-    const pattern = this.grain(ctx, `fw-${hole.number}`, ["#6fbf5f", "#8ed46c", "#57a852", "#79c864", "#9adf78"], hashString(`fw-${hole.number}`));
     for (const poly of hole.fairway) {
       this.pathPoly(ctx, poly);
       const minX = Math.min(...poly.map((p) => p.x));
       const maxX = Math.max(...poly.map((p) => p.x));
       const minY = Math.min(...poly.map((p) => p.y));
       const maxY = Math.max(...poly.map((p) => p.y));
-      const base = ctx.createLinearGradient(minX, minY, maxX, maxY);
-      base.addColorStop(0, "#5eae55");
-      base.addColorStop(0.45, "#86d06a");
-      base.addColorStop(1, "#4e9a4c");
+      const base = ctx.createLinearGradient(minX, minY, maxX + 20, maxY + 10);
+      base.addColorStop(0, "#4f9a46");
+      base.addColorStop(0.4, "#7ed45f");
+      base.addColorStop(1, "#3f8640");
       ctx.fillStyle = base;
       ctx.fill();
-      ctx.fillStyle = pattern;
-      ctx.globalAlpha = 0.55;
-      ctx.fill();
-      ctx.globalAlpha = 1;
     }
 
     ctx.save();
-    for (const poly of hole.fairway) {
-      this.pathPoly(ctx, poly);
-      ctx.clip();
+    this.clipPolys(ctx, hole.fairway);
+    ctx.fillStyle = this.grain(`fw-${hole.number}`, ["#68b85a", "#8ed66c", "#4e9a48", "#a8e878", "#3f8a40"], 2600);
+    ctx.globalAlpha = 0.62;
+    ctx.fillRect(hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
+    ctx.globalAlpha = 1;
+
+    const rng = mulberry32(hashString(`mottle-${hole.number}`));
+    for (let i = 0; i < 28; i++) {
+      const x = hole.bounds.x + rng() * hole.bounds.w;
+      const y = hole.bounds.y + rng() * hole.bounds.h;
+      const mott = ctx.createRadialGradient(x, y, 0.4, x, y, 8 + rng() * 10);
+      mott.addColorStop(0, rng() > 0.5 ? "rgba(255, 230, 140, 0.16)" : "rgba(20, 70, 30, 0.16)");
+      mott.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = mott;
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fill();
     }
-    const stripeW = 6.4;
-    const span = Math.hypot(hole.bounds.w, hole.bounds.h) + 80;
+
+    const stripeW = 7.2;
+    const span = Math.hypot(hole.bounds.w, hole.bounds.h) + 90;
     ctx.translate((hole.tee.x + hole.pin.x) / 2, (hole.tee.y + hole.pin.y) / 2);
     ctx.rotate(heading);
-    for (let i = -28; i < 28; i++) {
-      const even = i % 2 === 0;
-      ctx.fillStyle = even ? "rgba(255, 250, 190, 0.34)" : "rgba(12, 52, 22, 0.28)";
-      ctx.fillRect(i * stripeW - span, -span, stripeW, span * 2);
+    for (let i = -32; i < 32; i++) {
+      const x0 = i * stripeW;
+      const band = ctx.createLinearGradient(x0, 0, x0 + stripeW, 0);
+      if (i % 2 === 0) {
+        band.addColorStop(0, "rgba(255, 244, 180, 0.42)");
+        band.addColorStop(0.4, "rgba(200, 230, 140, 0.08)");
+        band.addColorStop(1, "rgba(18, 64, 28, 0.3)");
+      } else {
+        band.addColorStop(0, "rgba(16, 52, 24, 0.34)");
+        band.addColorStop(0.55, "rgba(70, 120, 50, 0.05)");
+        band.addColorStop(1, "rgba(255, 236, 170, 0.26)");
+      }
+      ctx.fillStyle = band;
+      ctx.fillRect(x0, -span, stripeW, span * 2);
     }
-    const sheen = ctx.createLinearGradient(-span, 0, span, 0);
-    sheen.addColorStop(0, "rgba(10, 40, 18, 0.22)");
-    sheen.addColorStop(0.42, "rgba(255, 236, 170, 0.22)");
-    sheen.addColorStop(1, "rgba(12, 42, 20, 0.24)");
-    ctx.fillStyle = sheen;
-    ctx.fillRect(-span, -span, span * 2, span * 2);
     ctx.restore();
 
     ctx.save();
-    ctx.shadowColor = "rgba(12, 32, 14, 0.45)";
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = "rgba(28, 72, 32, 0.55)";
-    ctx.lineWidth = 2.4;
+    ctx.shadowColor = "rgba(10, 28, 12, 0.5)";
+    ctx.shadowBlur = 14;
+    ctx.strokeStyle = "rgba(22, 58, 26, 0.0)";
+    ctx.lineWidth = 4.5;
     for (const poly of hole.fairway) {
       this.pathPoly(ctx, poly);
       ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = "rgba(170, 210, 120, 0.28)";
-    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = "rgba(30, 70, 32, 0.35)";
+    ctx.lineWidth = 2.2;
     for (const poly of hole.fairway) {
       this.pathPoly(ctx, poly);
       ctx.stroke();
     }
   }
 
-  private drawLightWash(ctx: CanvasRenderingContext2D, hole: Hole): void {
+  private drawFairwaySheen(ctx: CanvasRenderingContext2D, session: GameSession, hole: Hole): void {
+    if (!hole.fairway.length) return;
+    const heading = angleTo(hole.tee, hole.pin);
+    const view = Math.atan2(session.cam.y - (hole.tee.y + hole.pin.y) * 0.5, session.cam.x - (hole.tee.x + hole.pin.x) * 0.5);
+    const slide = Math.cos(heading - view + this.time * 0.12) * 0.5 + 0.5;
     ctx.save();
-    ctx.globalCompositeOperation = "soft-light";
-    const g = ctx.createLinearGradient(hole.bounds.x, hole.bounds.y, hole.bounds.x + hole.bounds.w, hole.bounds.y + hole.bounds.h);
-    g.addColorStop(0, "rgba(255, 232, 170, 0.38)");
-    g.addColorStop(0.55, "rgba(200, 220, 180, 0.1)");
-    g.addColorStop(1, "rgba(30, 50, 70, 0.22)");
-    ctx.fillStyle = g;
-    ctx.fillRect(hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
+    this.clipPolys(ctx, hole.fairway);
+    ctx.translate((hole.tee.x + hole.pin.x) / 2, (hole.tee.y + hole.pin.y) / 2);
+    ctx.rotate(heading + 0.08);
+    const span = Math.hypot(hole.bounds.w, hole.bounds.h);
+    const sheen = ctx.createLinearGradient(-span, 0, span, 0);
+    sheen.addColorStop(0, "rgba(10, 40, 16, 0.1)");
+    sheen.addColorStop(clamp(0.25 + slide * 0.35, 0.1, 0.8), "rgba(255, 236, 170, 0.16)");
+    sheen.addColorStop(1, "rgba(12, 40, 20, 0.12)");
+    ctx.fillStyle = sheen;
+    ctx.fillRect(-span, -span, span * 2, span * 2);
     ctx.restore();
+  }
+
+  private drawNearGrass(ctx: CanvasRenderingContext2D, session: GameSession, hole: Hole): void {
+    const zoom = session.cam.zoom;
+    if (zoom < 4.2) return;
+    const halfW = this.w / zoom / 2;
+    const halfH = this.h / zoom / 2;
+    const minX = session.cam.x - halfW;
+    const minY = session.cam.y - halfH;
+    const density = zoom > 8 ? 220 : 120;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (let i = 0; i < density; i++) {
+      const x = minX + hashNoise(i * 1.7, session.cam.x * 0.01) * halfW * 2;
+      const y = minY + hashNoise(i * 3.1 + 4, session.cam.y * 0.01) * halfH * 2;
+      const n = hashNoise(x * 0.35, y * 0.35);
+      ctx.globalAlpha = 0.12 + n * 0.22;
+      ctx.strokeStyle = n > 0.55 ? "rgba(210, 240, 150, 0.8)" : "rgba(20, 60, 24, 0.75)";
+      ctx.lineWidth = 0.12 + (zoom - 4) * 0.02;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (n - 0.5) * 1.4, y - 0.8 - n * 0.8);
+      ctx.stroke();
+    }
+    ctx.restore();
+    void hole;
   }
 
   private pathPoly(ctx: CanvasRenderingContext2D, poly: Vec2[]): void {
@@ -380,13 +438,16 @@ export class Renderer {
     ctx.save();
     ctx.translate(hole.tee.x, hole.tee.y);
     ctx.rotate(angleTo(hole.tee, hole.pin));
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    this.roundRect(ctx, -9.4, -6.2, 19, 14, 3);
+    ctx.fill();
     const tee = ctx.createLinearGradient(-10, -8, 10, 8);
-    tee.addColorStop(0, "#7ad46f");
-    tee.addColorStop(1, "#4fa24c");
+    tee.addColorStop(0, "#8ee070");
+    tee.addColorStop(1, "#4ea04a");
     ctx.fillStyle = tee;
     this.roundRect(ctx, -9, -6.5, 18, 13, 3);
     ctx.fill();
-    ctx.fillStyle = "rgba(255, 245, 200, 0.18)";
+    ctx.fillStyle = "rgba(255, 250, 210, 0.2)";
     ctx.fillRect(-8, -5.5, 16, 4);
     ctx.fillStyle = "#d4af37";
     ctx.fillRect(-6.2, -1.4, 2.4, 2.8);
@@ -403,66 +464,54 @@ export class Renderer {
     ctx.translate(g.cx, g.cy);
     ctx.rotate(g.rotation);
 
-    ctx.fillStyle = "#5d8f3c";
+    ctx.fillStyle = "rgba(20, 40, 16, 0.28)";
     ctx.beginPath();
-    ctx.ellipse(0, 0, g.rx + 3.1, g.ry + 2.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.8, 1.1, g.rx + 3.6, g.ry + 3.1, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#7aad4e";
+
+    const collar = ctx.createRadialGradient(-2, -2, 2, 0, 0, Math.max(g.rx, g.ry) + 3);
+    collar.addColorStop(0, "#6a9a40");
+    collar.addColorStop(1, "#3d6a2c");
+    ctx.fillStyle = collar;
     ctx.beginPath();
-    ctx.ellipse(0, 0, g.rx + 2.15, g.ry + 1.95, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, g.rx + 3.4, g.ry + 3.0, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(40, 80, 28, 0.4)";
-    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = "rgba(30, 70, 24, 0.45)";
+    ctx.lineWidth = 0.55;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.ellipse(0, 0, g.rx, g.ry, 0, 0, Math.PI * 2);
     ctx.clip();
-    const highX = -bx * g.rx * 0.55;
-    const highY = -by * g.ry * 0.55;
-    const lowX = bx * g.rx * 0.7;
-    const lowY = by * g.ry * 0.7;
-    const body = ctx.createLinearGradient(highX, highY, lowX, lowY);
-    body.addColorStop(0, "#b6f09a");
-    body.addColorStop(0.38, "#62c868");
-    body.addColorStop(1, "#246e3c");
+    const highX = -bx * g.rx * 0.6;
+    const highY = -by * g.ry * 0.6;
+    const body = ctx.createLinearGradient(highX, highY, bx * g.rx * 0.75, by * g.ry * 0.75);
+    body.addColorStop(0, "#8fd89a");
+    body.addColorStop(0.4, "#3faf6a");
+    body.addColorStop(1, "#1d6a42");
     ctx.fillStyle = body;
     ctx.fillRect(-g.rx - 2, -g.ry - 2, g.rx * 2 + 4, g.ry * 2 + 4);
 
-    const bowl = ctx.createRadialGradient(highX * 0.4, highY * 0.4, 1.2, 0, 0, Math.max(g.rx, g.ry));
-    bowl.addColorStop(0, "rgba(210, 255, 190, 0.22)");
-    bowl.addColorStop(0.55, "rgba(80, 160, 90, 0.04)");
-    bowl.addColorStop(1, "rgba(10, 50, 24, 0.28)");
+    const bowl = ctx.createRadialGradient(highX * 0.35, highY * 0.35, 1, 0, 0, Math.max(g.rx, g.ry));
+    bowl.addColorStop(0, "rgba(220, 255, 210, 0.18)");
+    bowl.addColorStop(0.55, "rgba(40, 120, 70, 0.04)");
+    bowl.addColorStop(1, "rgba(8, 40, 22, 0.32)");
     ctx.fillStyle = bowl;
     ctx.fillRect(-g.rx - 2, -g.ry - 2, g.rx * 2 + 4, g.ry * 2 + 4);
 
-    ctx.globalAlpha = 0.16;
-    ctx.fillStyle = this.grain(ctx, `green-${hole.number}`, ["#6fc86a", "#8edc80", "#4aa058", "#b8f0a4"], hashString(`green-${hole.number}`));
+    ctx.fillStyle = this.grain(`green-${hole.number}`, ["#3faf6a", "#7ed88a", "#2a8a55", "#b8f0c0"], 3000);
+    ctx.globalAlpha = 0.22;
     ctx.fillRect(-g.rx - 2, -g.ry - 2, g.rx * 2 + 4, g.ry * 2 + 4);
     ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = "rgba(255,255,255,0.16)";
-    ctx.lineWidth = 0.28;
-    for (let i = 1; i <= 5; i++) {
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 0.16;
+    for (let i = -18; i <= 18; i++) {
       ctx.beginPath();
-      ctx.ellipse(bx * i * 1.15, by * i * 1.15, g.rx * (1 - i * 0.13), g.ry * (1 - i * 0.13), 0, 0, Math.PI * 2);
+      ctx.moveTo(-g.rx, i * 1.05 + bx * 0.8);
+      ctx.lineTo(g.rx, i * 1.05 - bx * 0.4);
       ctx.stroke();
     }
-    ctx.strokeStyle = "rgba(20, 60, 30, 0.12)";
-    for (let i = -4; i <= 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(-g.rx, i * 2.1);
-      ctx.lineTo(g.rx, i * 2.1 + bx * 1.4);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(230, 250, 200, 0.22)";
-    ctx.lineWidth = 0.45;
-    ctx.beginPath();
-    ctx.ellipse(g.cx, g.cy, g.rx, g.ry, g.rotation, 0, Math.PI * 2);
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -470,60 +519,67 @@ export class Renderer {
     ctx.save();
     ctx.translate(b.cx, b.cy);
     ctx.rotate(b.rotation);
-    ctx.fillStyle = "rgba(90, 70, 32, 0.35)";
+    ctx.fillStyle = "rgba(40, 28, 10, 0.4)";
     ctx.beginPath();
-    ctx.ellipse(0.6, 0.8, b.rx + 1.1, b.ry + 0.9, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.8, 1.1, b.rx + 1.4, b.ry + 1.15, 0, 0, Math.PI * 2);
     ctx.fill();
-    const sand = ctx.createRadialGradient(-b.rx * 0.25, -b.ry * 0.3, 1, 0, 0, Math.max(b.rx, b.ry));
-    sand.addColorStop(0, "#f3e4b8");
-    sand.addColorStop(0.65, "#e0c888");
+    ctx.fillStyle = "#8a6a32";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, b.rx + 0.85, b.ry + 0.75, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const sand = ctx.createRadialGradient(-b.rx * 0.3, -b.ry * 0.35, 1, 0, 0, Math.max(b.rx, b.ry));
+    sand.addColorStop(0, "#f6e6bc");
+    sand.addColorStop(0.6, "#e2c888");
     sand.addColorStop(1, "#c4a05a");
     ctx.fillStyle = sand;
     ctx.beginPath();
     ctx.ellipse(0, 0, b.rx, b.ry, 0, 0, Math.PI * 2);
     ctx.fill();
     const rng = mulberry32(hashString(`bunker-${holeNumber}-${b.cx}-${b.cy}`));
-    ctx.strokeStyle = "rgba(176, 140, 80, 0.35)";
-    ctx.lineWidth = 0.28;
-    for (let i = 0; i < 7; i++) {
-      const y = (i / 6 - 0.5) * b.ry * 1.5;
+    ctx.strokeStyle = "rgba(170, 130, 70, 0.35)";
+    ctx.lineWidth = 0.26;
+    for (let i = 0; i < 8; i++) {
+      const y = (i / 7 - 0.5) * b.ry * 1.55;
       ctx.beginPath();
-      ctx.moveTo(-b.rx * 0.85, y);
-      ctx.quadraticCurveTo(0, y + (rng() - 0.5) * 2.2, b.rx * 0.85, y + (rng() - 0.5));
+      ctx.moveTo(-b.rx * 0.88, y);
+      ctx.quadraticCurveTo(0, y + (rng() - 0.5) * 2.4, b.rx * 0.88, y + (rng() - 0.5));
       ctx.stroke();
     }
-    ctx.strokeStyle = "#a8884a";
-    ctx.lineWidth = 0.55;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, b.rx, b.ry, 0, 0, Math.PI * 2);
-    ctx.stroke();
     ctx.restore();
   }
 
   private drawTree(ctx: CanvasRenderingContext2D, t: Tree): void {
     const rng = mulberry32(hashString(`tree-${t.x.toFixed(1)}-${t.y.toFixed(1)}`));
     ctx.save();
-    ctx.fillStyle = "rgba(8, 16, 10, 0.34)";
+    ctx.fillStyle = "rgba(8, 14, 8, 0.28)";
     ctx.beginPath();
-    ctx.ellipse(t.x + 5.4, t.y + 4.8, t.r * 1.1, t.r * 0.4, 0.38, 0, Math.PI * 2);
+    ctx.ellipse(t.x + SUN.x * t.r * 1.15, t.y + SUN.y * t.r * 1.15, t.r * 1.15, t.r * 0.38, 0.4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#4a2e18";
-    ctx.fillRect(t.x - 1.2, t.y - 0.4, 2.4, t.r * 0.62);
-    ctx.fillStyle = "#0f3f22";
+
+    ctx.fillStyle = "#3d2816";
+    ctx.fillRect(t.x - 1.05, t.y - 0.2, 2.1, t.r * 0.55);
+
+    const lobes = 4 + Math.floor(rng() * 3);
+    for (let i = 0; i < lobes; i++) {
+      const ox = (rng() - 0.5) * t.r * 0.7;
+      const oy = -t.r * 0.25 - rng() * t.r * 0.35;
+      const rr = t.r * (0.42 + rng() * 0.42);
+      const inner = rng() > 0.5 ? "rgba(46, 120, 58, 0.95)" : "rgba(22, 78, 38, 0.95)";
+      const grad = ctx.createRadialGradient(t.x + ox - rr * 0.2, t.y + oy - rr * 0.25, rr * 0.1, t.x + ox, t.y + oy, rr);
+      grad.addColorStop(0, inner);
+      grad.addColorStop(0.7, "rgba(16, 58, 28, 0.88)");
+      grad.addColorStop(1, "rgba(10, 36, 18, 0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(t.x + ox, t.y + oy, rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const hi = ctx.createRadialGradient(t.x - t.r * 0.2, t.y - t.r * 0.5, 0.2, t.x, t.y - t.r * 0.3, t.r * 0.45);
+    hi.addColorStop(0, "rgba(190, 230, 150, 0.22)");
+    hi.addColorStop(1, "rgba(190, 230, 150, 0)");
+    ctx.fillStyle = hi;
     ctx.beginPath();
-    ctx.arc(t.x, t.y - t.r * 0.2, t.r * (0.92 + rng() * 0.12), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#1c6d34";
-    ctx.beginPath();
-    ctx.arc(t.x - t.r * (0.22 + rng() * 0.12), t.y - t.r * 0.42, t.r * 0.56, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#2f8f48";
-    ctx.beginPath();
-    ctx.arc(t.x + t.r * (0.12 + rng() * 0.12), t.y - t.r * 0.5, t.r * 0.38, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(180, 230, 150, 0.16)";
-    ctx.beginPath();
-    ctx.arc(t.x - t.r * 0.18, t.y - t.r * 0.48, t.r * 0.22, 0, Math.PI * 2);
+    ctx.arc(t.x - t.r * 0.15, t.y - t.r * 0.42, t.r * 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -538,37 +594,35 @@ export class Renderer {
       const minY = Math.min(...water.map((p) => p.y));
       const maxY = Math.max(...water.map((p) => p.y));
       const g = ctx.createLinearGradient(minX, minY, maxX, maxY);
-      g.addColorStop(0, "#1a7eae");
-      g.addColorStop(0.45, "#0f5a86");
-      g.addColorStop(1, "#0a3d62");
+      g.addColorStop(0, "#1d86b8");
+      g.addColorStop(0.45, "#0c4f7a");
+      g.addColorStop(1, "#08344f");
       ctx.fillStyle = g;
       ctx.fill();
-      ctx.strokeStyle = "rgba(210, 240, 255, 0.2)";
-      ctx.lineWidth = 0.4;
-      for (let y = minY; y < maxY; y += 3.4) {
+      ctx.strokeStyle = "rgba(210, 240, 255, 0.16)";
+      ctx.lineWidth = 0.38;
+      for (let y = minY; y < maxY; y += 3.2) {
         ctx.beginPath();
-        for (let x = minX; x <= maxX; x += 2.6) {
-          const yy = y + Math.sin(x * 0.2 + this.time * 2.2 + y * 0.12) * 1.05;
+        for (let x = minX; x <= maxX; x += 2.4) {
+          const yy = y + Math.sin(x * 0.2 + this.time * 2.1 + y * 0.12) * 1.05;
           if (x === minX) ctx.moveTo(x, yy);
           else ctx.lineTo(x, yy);
         }
         ctx.stroke();
       }
-      ctx.fillStyle = "rgba(255,255,255,0.16)";
-      for (let i = 0; i < 6; i++) {
-        const sx = minX + ((i * 37 + this.time * 18) % Math.max(8, maxX - minX));
-        const sy = minY + ((i * 19 + this.time * 9) % Math.max(8, maxY - minY));
-        ctx.beginPath();
-        ctx.ellipse(sx, sy, 1.6, 0.45, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const spec = ctx.createLinearGradient(minX, minY, maxX, minY + 12);
+      spec.addColorStop(0.35, "rgba(255,255,255,0)");
+      spec.addColorStop(0.5, "rgba(255,255,255,0.22)");
+      spec.addColorStop(0.65, "rgba(255,255,255,0)");
+      ctx.fillStyle = spec;
+      ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
       ctx.restore();
-      ctx.strokeStyle = "rgba(220, 240, 255, 0.4)";
-      ctx.lineWidth = 0.85;
+      ctx.strokeStyle = "rgba(230, 245, 255, 0.4)";
+      ctx.lineWidth = 0.9;
       this.pathPoly(ctx, water);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(180, 210, 160, 0.28)";
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = "rgba(190, 220, 160, 0.3)";
+      ctx.lineWidth = 2.1;
       this.pathPoly(ctx, water);
       ctx.stroke();
     }
@@ -577,42 +631,43 @@ export class Renderer {
   private drawPin(ctx: CanvasRenderingContext2D, hole: Hole): void {
     const p = hole.pin;
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.beginPath();
-    ctx.ellipse(p.x + 1.6, p.y + 1.3, 2.4, 1.15, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(p.x + 1.8, p.y + 1.4, 2.6, 1.15, 0.2, 0, Math.PI * 2);
     ctx.fill();
 
-    const cup = ctx.createRadialGradient(p.x - 0.15, p.y - 0.2, 0.15, p.x, p.y, CUP_RADIUS * 0.95);
-    cup.addColorStop(0, "#1a1a1a");
-    cup.addColorStop(0.65, "#0b0b0b");
-    cup.addColorStop(1, "#d7c7a1");
+    const cup = ctx.createRadialGradient(p.x - 0.2, p.y - 0.25, 0.12, p.x, p.y, CUP_RADIUS * 1.05);
+    cup.addColorStop(0, "#111");
+    cup.addColorStop(0.62, "#070707");
+    cup.addColorStop(0.82, "#cbb892");
+    cup.addColorStop(1, "#efe4c4");
     ctx.fillStyle = cup;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, CUP_RADIUS * 0.72, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, CUP_RADIUS * 0.78, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(244, 236, 210, 0.85)";
-    ctx.lineWidth = 0.28;
+    ctx.strokeStyle = "rgba(255, 246, 220, 0.9)";
+    ctx.lineWidth = 0.26;
     ctx.stroke();
 
-    ctx.strokeStyle = "#f7f3e8";
-    ctx.lineWidth = 0.42;
+    ctx.strokeStyle = "#f8f4ea";
+    ctx.lineWidth = 0.4;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x, p.y - 12.4);
+    ctx.lineTo(p.x, p.y - 13);
     ctx.stroke();
-    const wave = Math.sin(this.time * 3.1) * 0.85;
-    ctx.fillStyle = "#c62828";
+    const wave = Math.sin(this.time * 3.1) * 0.9;
+    ctx.fillStyle = "#d32f2f";
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 12.4);
-    ctx.lineTo(p.x + 7.1 + wave, p.y - 10.1);
-    ctx.lineTo(p.x, p.y - 7.7);
+    ctx.moveTo(p.x, p.y - 13);
+    ctx.lineTo(p.x + 7.4 + wave, p.y - 10.4);
+    ctx.lineTo(p.x, p.y - 7.8);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#8e1c1c";
+    ctx.fillStyle = "#8e1f1f";
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y - 10.1);
-    ctx.lineTo(p.x + 7.1 + wave, p.y - 10.1);
-    ctx.lineTo(p.x, p.y - 7.7);
+    ctx.moveTo(p.x, p.y - 10.5);
+    ctx.lineTo(p.x + 7.4 + wave, p.y - 10.4);
+    ctx.lineTo(p.x, p.y - 7.8);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
@@ -626,30 +681,19 @@ export class Renderer {
     const preview = session.previewLanding();
     const path = session.previewFlight();
     ctx.save();
-    ctx.strokeStyle = "rgba(244, 241, 232, 0.55)";
+    ctx.strokeStyle = "rgba(244, 241, 232, 0.45)";
     ctx.setLineDash([2.2, 1.6]);
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = 0.45;
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
-    ctx.lineTo(from.x + dir.x * 34, from.y + dir.y * 34);
+    ctx.lineTo(from.x + dir.x * 28, from.y + dir.y * 28);
     ctx.stroke();
     ctx.setLineDash([]);
 
     if (path.length > 1 && session.club().id !== "putter") {
-      this.strokeFlight(ctx, path, "rgba(0,0,0,0.22)", true, 1.2);
-      this.strokeFlight(ctx, path, "rgba(255, 232, 140, 0.95)", false, 1.15);
-      const apex = path.reduce((best, s) => (s.z > best.z ? s : best), path[0]);
-      const ap = airbornePos(apex.pos, apex.z);
-      ctx.fillStyle = "rgba(255, 248, 210, 0.9)";
-      ctx.beginPath();
-      ctx.arc(ap.x, ap.y, 1.05, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.28)";
-      ctx.lineWidth = 0.28;
-      ctx.beginPath();
-      ctx.moveTo(apex.pos.x, apex.pos.y);
-      ctx.lineTo(ap.x, ap.y);
-      ctx.stroke();
+      this.drawRibbon(ctx, path, 0.14);
+      this.strokeFlight(ctx, path, "rgba(0,0,0,0.2)", true, 1.1);
+      this.strokeFlight(ctx, path, "rgba(255, 228, 130, 0.95)", false, 1.2);
     } else {
       ctx.strokeStyle = "rgba(212, 175, 55, 0.85)";
       ctx.lineWidth = 0.7;
@@ -658,21 +702,16 @@ export class Renderer {
       ctx.lineTo(preview.x, preview.y);
       ctx.stroke();
     }
-
-    ctx.fillStyle = "#d4af37";
+    ctx.fillStyle = "#f0d78a";
     ctx.beginPath();
-    ctx.arc(preview.x, preview.y, 1.35, 0, Math.PI * 2);
+    ctx.arc(preview.x, preview.y, 1.25, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.45)";
-    ctx.lineWidth = 0.28;
-    ctx.stroke();
     if (session.lie === "green") {
-      const b = hole.greenBreak;
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 0.4;
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 0.35;
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
-      ctx.lineTo(from.x + b.x * 8, from.y + b.y * 8);
+      ctx.lineTo(from.x + hole.greenBreak.x * 8, from.y + hole.greenBreak.y * 8);
       ctx.stroke();
     }
     ctx.restore();
@@ -682,25 +721,40 @@ export class Renderer {
     if (session.swingPhase !== "flight" && session.swingPhase !== "settle") return;
     if (session.shotArc.length < 2) return;
     ctx.save();
-    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.28)", true, 1.45);
-    this.strokeFlight(ctx, session.shotArc, "rgba(255, 226, 120, 0.95)", false, 1.55);
+    this.drawRibbon(ctx, session.shotArc, 0.2);
+    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.24)", true, 1.3);
+    this.strokeFlight(ctx, session.shotArc, "rgba(255, 228, 130, 0.96)", false, 1.7);
     const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
     if (apex.z > 3) {
       const ap = airbornePos(apex.pos, apex.z);
-      ctx.strokeStyle = "rgba(255,255,255,0.32)";
-      ctx.lineWidth = 0.28;
-      ctx.setLineDash([0.8, 0.55]);
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 0.26;
+      ctx.setLineDash([0.75, 0.5]);
       ctx.beginPath();
       ctx.moveTo(apex.pos.x, apex.pos.y);
       ctx.lineTo(ap.x, ap.y);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(255, 248, 210, 0.95)";
+      ctx.fillStyle = "rgba(255, 250, 220, 0.95)";
       ctx.beginPath();
-      ctx.arc(ap.x, ap.y, 1.15, 0, Math.PI * 2);
+      ctx.arc(ap.x, ap.y, 1.2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  private drawRibbon(ctx: CanvasRenderingContext2D, path: FlightSample[], alpha: number): void {
+    if (path.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(path[0].pos.x, path[0].pos.y);
+    for (const sample of path) {
+      const air = airbornePos(sample.pos, sample.z);
+      ctx.lineTo(air.x, air.y);
+    }
+    for (let i = path.length - 1; i >= 0; i--) ctx.lineTo(path[i].pos.x, path[i].pos.y);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255, 214, 110, ${alpha})`;
+    ctx.fill();
   }
 
   private strokeFlight(ctx: CanvasRenderingContext2D, path: FlightSample[], color: string, ground: boolean, width: number): void {
@@ -723,22 +777,23 @@ export class Renderer {
     const ground = b.pos;
     const vis = airbornePos(ground, air);
     const flying = air > 0.08;
-
     if (this.trail.length > 1 && (session.swingPhase === "flight" || session.swingPhase === "settle" || this.trail.some((p) => p.z > 0.2))) {
       this.drawTrail(ctx);
     }
 
     ctx.save();
-    const shadowAlpha = clamp(0.34 - air * 0.012, 0.1, 0.34);
-    ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+    const shadow = ctx.createRadialGradient(ground.x + air * 0.1, ground.y + 0.4, 0.2, ground.x, ground.y, 2.4 + air * 0.12);
+    shadow.addColorStop(0, `rgba(0,0,0,${clamp(0.4 - air * 0.012, 0.12, 0.4)})`);
+    shadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = shadow;
     ctx.beginPath();
-    ctx.ellipse(ground.x + 0.9 + air * 0.12, ground.y + 1.05 + air * 0.08, 1.55 + air * 0.09, 0.72 + air * 0.02, 0, 0, Math.PI * 2);
+    ctx.ellipse(ground.x + 0.7, ground.y + 0.9, 1.8 + air * 0.1, 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
 
     if (flying) {
-      ctx.strokeStyle = "rgba(255,255,255,0.28)";
-      ctx.lineWidth = 0.22;
-      ctx.setLineDash([0.7, 0.55]);
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      ctx.lineWidth = 0.2;
+      ctx.setLineDash([0.65, 0.5]);
       ctx.beginPath();
       ctx.moveTo(ground.x, ground.y);
       ctx.lineTo(vis.x, vis.y);
@@ -746,25 +801,23 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    const r = 1.18 + air * 0.055;
-    const grad = ctx.createRadialGradient(vis.x - r * 0.35, vis.y - r * 0.4, r * 0.12, vis.x, vis.y, r);
+    const r = 1.22 + air * 0.06;
+    const grad = ctx.createRadialGradient(vis.x - r * 0.38, vis.y - r * 0.42, r * 0.08, vis.x, vis.y, r);
     grad.addColorStop(0, "#ffffff");
-    grad.addColorStop(0.55, "#f2efe6");
-    grad.addColorStop(1, "#c8c3b6");
+    grad.addColorStop(0.45, "#f4f0e6");
+    grad.addColorStop(1, "#b8b2a4");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(vis.x, vis.y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(40,40,40,0.28)";
-    ctx.lineWidth = 0.14;
+    ctx.strokeStyle = "rgba(40,40,40,0.22)";
+    ctx.lineWidth = 0.12;
     ctx.stroke();
-    if (flying) {
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 0.18;
-      ctx.beginPath();
-      ctx.arc(vis.x, vis.y, r + 0.35, 0, Math.PI * 1.2);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 0.1;
+    ctx.beginPath();
+    ctx.arc(vis.x - r * 0.15, vis.y - r * 0.1, r * 0.55, 0.2, 2.2);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -773,36 +826,18 @@ export class Renderer {
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    ctx.strokeStyle = "rgba(0,0,0,0.16)";
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    this.trail.forEach((p, i) => {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
-
     for (let i = 1; i < this.trail.length; i++) {
       const a = this.trail[i - 1];
       const b = this.trail[i];
       const pa = airbornePos(a, a.z);
       const pb = airbornePos(b, b.z);
       const t = i / this.trail.length;
-      ctx.strokeStyle = `rgba(255, 236, 170, ${0.15 + t * 0.7})`;
-      ctx.lineWidth = 0.45 + t * 1.15;
+      ctx.strokeStyle = `rgba(255, 236, 180, ${0.08 + t * 0.55})`;
+      ctx.lineWidth = 0.35 + t * 0.9;
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(pb.x, pb.y);
       ctx.stroke();
-    }
-
-    const apex = this.trail.reduce((best, p) => (p.z > best.z ? p : best), this.trail[0]);
-    if (apex.z > 4) {
-      const ap = airbornePos(apex, apex.z);
-      ctx.fillStyle = "rgba(255, 250, 220, 0.55)";
-      ctx.beginPath();
-      ctx.arc(ap.x, ap.y, 1.4, 0, Math.PI * 2);
-      ctx.fill();
     }
     ctx.restore();
   }
@@ -810,8 +845,8 @@ export class Renderer {
   private drawRings(ctx: CanvasRenderingContext2D): void {
     for (const ring of this.rings) {
       const t = 1 - ring.life / ring.max;
-      ctx.strokeStyle = `rgba(220, 240, 180, ${0.45 * (1 - t)})`;
-      ctx.lineWidth = 0.45;
+      ctx.strokeStyle = `rgba(220, 240, 180, ${0.4 * (1 - t)})`;
+      ctx.lineWidth = 0.4;
       ctx.beginPath();
       ctx.ellipse(ring.x, ring.y, 1.2 + t * 7, 0.7 + t * 3.6, 0, 0, Math.PI * 2);
       ctx.stroke();
@@ -846,6 +881,7 @@ export class Renderer {
   }
 
   private updateCamera(session: GameSession, dt: number): void {
+    if (session.camHold) return;
     const hole = session.hole();
     const putting = session.lie === "green";
     const fit = Math.min(this.w / (hole.bounds.w + 36), this.h / (hole.bounds.h + 72));
@@ -894,27 +930,37 @@ export class Renderer {
     session.cam.zoom += (zoomTarget - session.cam.zoom) * k;
   }
 
+  private drawAtmosphere(ctx: CanvasRenderingContext2D): void {
+    const haze = ctx.createLinearGradient(0, 0, 0, this.h);
+    haze.addColorStop(0, "rgba(180, 210, 230, 0.1)");
+    haze.addColorStop(0.45, "rgba(180, 210, 230, 0)");
+    haze.addColorStop(1, "rgba(20, 30, 16, 0.12)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, this.w, this.h);
+    const vig = ctx.createRadialGradient(this.w / 2, this.h / 2, this.h * 0.2, this.w / 2, this.h / 2, this.w * 0.78);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(0,0,0,0.28)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
   private drawMinimap(ctx: CanvasRenderingContext2D, session: GameSession): void {
     const hole = session.hole();
-    const mw = 196;
-    const mh = 118;
-    const x = this.w - mw - 18;
-    const y = 86;
+    const mw = 148;
+    const mh = 88;
+    const x = this.w - mw - 22;
+    const y = 58;
     ctx.save();
-    ctx.fillStyle = "rgba(8, 16, 12, 0.78)";
-    this.roundRect(ctx, x - 8, y - 8, mw + 16, mh + 16, 10);
+    ctx.fillStyle = "rgba(6, 12, 10, 0.48)";
+    this.roundRect(ctx, x - 6, y - 6, mw + 12, mh + 12, 8);
     ctx.fill();
-    ctx.strokeStyle = "rgba(212, 175, 55, 0.35)";
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1;
     ctx.stroke();
-    const sx = mw / hole.bounds.w;
-    const sy = mh / hole.bounds.h;
-    const s = Math.min(sx, sy);
-    const ox = x + (mw - hole.bounds.w * s) / 2 - hole.bounds.x * s;
-    const oy = y + (mh - hole.bounds.h * s) / 2 - hole.bounds.y * s;
-    ctx.translate(ox, oy);
+    const s = Math.min(mw / hole.bounds.w, mh / hole.bounds.h);
+    ctx.translate(x + (mw - hole.bounds.w * s) / 2 - hole.bounds.x * s, y + (mh - hole.bounds.h * s) / 2 - hole.bounds.y * s);
     ctx.scale(s, s);
-    ctx.fillStyle = "#2a5c2e";
+    ctx.fillStyle = "#1f4a28";
     for (const poly of hole.rough) {
       this.pathPoly(ctx, poly);
       ctx.fill();
@@ -924,63 +970,46 @@ export class Renderer {
       this.pathPoly(ctx, poly);
       ctx.fill();
     }
-    ctx.fillStyle = "#0f5a86";
+    ctx.fillStyle = "#0c4f7a";
     for (const water of hole.water) {
       this.pathPoly(ctx, water);
       ctx.fill();
     }
-    ctx.fillStyle = "#e0c888";
+    ctx.fillStyle = "#e2c888";
     for (const b of hole.bunkers) {
       ctx.beginPath();
       ctx.ellipse(b.cx, b.cy, b.rx, b.ry, b.rotation, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.fillStyle = "#6a9a48";
-    ctx.beginPath();
-    ctx.ellipse(hole.green.cx, hole.green.cy, hole.green.rx + 2, hole.green.ry + 2, hole.green.rotation, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#7ed67c";
+    ctx.fillStyle = "#3faf6a";
     ctx.beginPath();
     ctx.ellipse(hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#c62828";
     ctx.beginPath();
-    ctx.arc(hole.pin.x, hole.pin.y, 2.4 / s, 0, Math.PI * 2);
+    ctx.arc(hole.pin.x, hole.pin.y, 2.2 / s, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.arc(session.ball.pos.x, session.ball.pos.y, 2.6 / s, 0, Math.PI * 2);
+    ctx.arc(session.ball.pos.x, session.ball.pos.y, 2.3 / s, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    ctx.fillStyle = "#d4af37";
-    ctx.font = "600 10px 'Trebuchet MS', sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`HOLE ${hole.number} MAP`, x, y - 14);
-  }
-
-  private drawVignette(ctx: CanvasRenderingContext2D): void {
-    const g = ctx.createRadialGradient(this.w / 2, this.h / 2, this.h * 0.18, this.w / 2, this.h / 2, this.w * 0.74);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(0.72, "rgba(0,0,0,0.08)");
-    g.addColorStop(1, "rgba(0,0,0,0.42)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, this.w, this.h);
   }
 
   private drawMeters(ctx: CanvasRenderingContext2D, session: GameSession): void {
-    const x = this.w - 54;
-    const y = this.h * 0.22;
-    const h = Math.min(280, this.h * 0.42);
+    const x = this.w - 36;
+    const y = this.h * 0.28;
+    const h = Math.min(240, this.h * 0.36);
     ctx.save();
-    ctx.fillStyle = "rgba(8, 16, 12, 0.62)";
-    this.roundRect(ctx, x - 18, y - 28, 50, h + 64, 10);
+    ctx.fillStyle = "rgba(6, 12, 10, 0.35)";
+    this.roundRect(ctx, x - 10, y - 18, 28, h + 36, 8);
     ctx.fill();
-    ctx.fillStyle = "#d4af37";
-    ctx.font = "600 11px 'Trebuchet MS', sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = "600 9px 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("POWER", x + 7, y - 10);
-    ctx.fillStyle = "#1a1a1a";
-    this.roundRect(ctx, x, y, 14, h, 6);
+    ctx.fillText("PWR", x + 4, y - 6);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    this.roundRect(ctx, x, y, 8, h, 4);
     ctx.fill();
     const g = ctx.createLinearGradient(0, y + h, 0, y);
     g.addColorStop(0, "#2e7d32");
@@ -988,45 +1017,32 @@ export class Renderer {
     g.addColorStop(1, "#c62828");
     ctx.fillStyle = g;
     const fill = session.swingPhase === "aim" ? 0 : session.swingPhase === "power" ? session.meter : session.power;
-    this.roundRect(ctx, x + 1, y + h - h * fill, 12, h * fill, 5);
+    this.roundRect(ctx, x + 1, y + h - h * fill, 6, h * fill, 3);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillRect(x - 3, y + 8, 20, 3);
-    if (session.swingPhase === "power" || session.swingPhase === "accuracy") {
-      const my = y + h - h * (session.swingPhase === "power" ? session.meter : session.power);
-      ctx.fillStyle = "#f4f1e8";
-      ctx.beginPath();
-      ctx.moveTo(x - 8, my);
-      ctx.lineTo(x - 2, my - 4);
-      ctx.lineTo(x - 2, my + 4);
-      ctx.fill();
-    }
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(x - 2, y + 8, 12, 2);
     ctx.restore();
 
     if (session.swingPhase !== "flight" && session.swingPhase !== "settle" && (session.swingPhase === "accuracy" || session.lockedAccuracy)) {
-      const bx = this.w / 2 - 130;
-      const by = this.h - 118;
-      ctx.fillStyle = "rgba(8, 16, 12, 0.7)";
-      this.roundRect(ctx, bx - 10, by - 18, 280, 46, 8);
+      const bx = this.w / 2 - 120;
+      const by = this.h - 92;
+      ctx.fillStyle = "rgba(6, 12, 10, 0.45)";
+      this.roundRect(ctx, bx - 8, by - 8, 256, 28, 8);
       ctx.fill();
-      ctx.fillStyle = "#d4af37";
-      ctx.font = "600 11px 'Trebuchet MS', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("ACCURACY", this.w / 2, by - 4);
       ctx.fillStyle = "#222";
-      this.roundRect(ctx, bx, by + 6, 260, 12, 6);
+      this.roundRect(ctx, bx, by, 240, 10, 5);
       ctx.fill();
       ctx.fillStyle = "#2e7d32";
-      ctx.fillRect(bx + 118, by + 6, 24, 12);
+      ctx.fillRect(bx + 108, by, 24, 10);
       ctx.fillStyle = "#d4af37";
-      ctx.fillRect(bx + 126, by + 6, 8, 12);
+      ctx.fillRect(bx + 116, by, 8, 10);
       const t = session.swingPhase === "accuracy" ? session.meter * 2 - 1 : session.accuracy;
-      const mx = bx + 130 + t * 130;
+      const mx = bx + 120 + t * 120;
       ctx.fillStyle = "#f4f1e8";
       ctx.beginPath();
-      ctx.moveTo(mx, by + 2);
-      ctx.lineTo(mx - 5, by + 22);
-      ctx.lineTo(mx + 5, by + 22);
+      ctx.moveTo(mx, by - 3);
+      ctx.lineTo(mx - 4, by + 16);
+      ctx.lineTo(mx + 4, by + 16);
       ctx.fill();
     }
   }

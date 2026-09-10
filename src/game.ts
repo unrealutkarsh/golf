@@ -60,6 +60,7 @@ export class GameSession {
   reachedGreen = false;
   gir = false;
   cam: Camera = { x: 200, y: 150, zoom: 3 };
+  camHold = false;
   tipVisible = true;
   helpOpen = false;
   scorecardOpen = false;
@@ -144,6 +145,7 @@ export class GameSession {
     this.cam.x = (hole.tee.x + hole.pin.x) / 2;
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
+    this.camHold = false;
     this.shotArc = [];
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";

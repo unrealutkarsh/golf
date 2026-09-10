@@ -254,29 +254,25 @@ export class UI {
             ? "Ball in air"
             : "Aim and swing";
     return `
-      <div class="hud-top">
-        <div class="bug">
-          <span class="net">${PLAYER_CARD.tour}</span>
-          <strong>HOLE ${hole.number}</strong>
-          <span>PAR ${hole.par}</span>
-          <span>${hole.yards} YDS</span>
-        </div>
-        <div class="bug player">
-          <strong>${escapeHtml(session.profile.name)}</strong>
-          <span>Stroke ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
-          <span>Round ${running}</span>
-        </div>
-      </div>
-      <div class="hud-mid">
-        <div class="stat"><label>To pin</label><b>${Math.round(session.toPin())} yds</b></div>
-        <div class="stat"><label>Lie</label><b>${surfaceLabel(session.lie)}</b></div>
-        <div class="stat"><label>Wind</label><b>${wind.mph} ${wind.arrow}</b></div>
-        <div class="stat"><label>Club</label><b>${club.shortName} · ${club.id === "putter" ? club.roll : club.carry}y</b></div>
-        <div class="stat"><label>Hole</label><b>${escapeHtml(hole.name)}</b></div>
+      <div class="ticker">
+        <span class="brand">${PLAYER_CARD.tour}</span>
+        <span class="dot"></span>
+        <b>H${hole.number}</b>
+        <span>Par ${hole.par}</span>
+        <span>${hole.yards}</span>
+        <span class="dot"></span>
+        <span class="live">${Math.round(session.toPin())} yds</span>
+        <span>${surfaceLabel(session.lie)}</span>
+        <span>${wind.mph} ${wind.arrow}</span>
+        <span class="club-chip">${club.shortName}</span>
+        <span class="grow"></span>
+        <span>${escapeHtml(session.profile.name)}</span>
+        <span>Str ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
+        <span class="score">${running}</span>
       </div>
       ${tip}
       ${msg}
-      <div class="hud-bottom">
+      <div class="hud-dock">
         <div class="clubs">
           ${CLUBS.map(
             (c, i) =>

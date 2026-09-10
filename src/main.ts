@@ -132,9 +132,21 @@ const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
   session.playThroughForTest();
-} else if (qa === "fairway") {
+} else if (qa === "fairway" || qa === "tee") {
   session.startTournament();
   session.tipVisible = false;
+} else if (qa === "fairwayClose") {
+  session.startTournament();
+  session.tipVisible = false;
+  const hole = session.hole();
+  session.ball.pos = { x: hole.tee.x + 92, y: hole.tee.y - 2 };
+  session.ball.vel = { x: 0, y: 0 };
+  session.lie = "fairway";
+  session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
+  session.cam.x = session.ball.pos.x + 16;
+  session.cam.y = session.ball.pos.y;
+  session.cam.zoom = 9.2;
+  session.camHold = true;
 } else if (qa === "flight") {
   session.startTournament();
   session.power = 1;
@@ -147,9 +159,10 @@ if (qa === "round") {
   session.ball.pos = { ...apex.pos };
   session.ball.z = apex.z;
   session.ball.vz = 0;
-  session.cam.x = apex.pos.x;
-  session.cam.y = apex.pos.y - apex.z * 0.55;
-  session.cam.zoom = 4.6;
+  session.cam.x = (session.lastShotPos.x + apex.pos.x) / 2;
+  session.cam.y = apex.pos.y - apex.z * 1.1;
+  session.cam.zoom = 3.3;
+  session.camHold = true;
   session.update = () => undefined;
 } else if (qa === "green") {
   session.startTournament();
@@ -163,7 +176,8 @@ if (qa === "round") {
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
   session.cam.x = hole.green.cx;
   session.cam.y = hole.green.cy;
-  session.cam.zoom = 12;
+  session.cam.zoom = 13;
+  session.camHold = true;
 }
 
 (window as unknown as { __ptg: GameSession }).__ptg = session;
