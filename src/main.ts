@@ -1,3 +1,4 @@
+import { clubIndex } from "./clubs";
 import { GameSession } from "./game";
 import { Renderer } from "./renderer";
 import { createCourseScene } from "./scene3d";
@@ -152,6 +153,25 @@ function frame(now: number): void {
 
 requestAnimationFrame(frame);
 
+function poseShapedShot(session: GameSession, shape: number): void {
+  session.startTournament();
+  session.wind = { speed: 0, dir: 0 };
+  session.tipVisible = false;
+  session.clubIndex = clubIndex("iron7");
+  session.shape = shape;
+  session.power = 1;
+  session.accuracy = 0;
+  session.swingPhase = "accuracy";
+  session.meter = 0.5;
+  session.camMode = "follow";
+  session.tap();
+  const mid = session.shotArc[Math.floor(session.shotArc.length * 0.58)] ?? session.shotArc[0];
+  session.ball.pos = { ...mid.pos };
+  session.ball.z = mid.z;
+  session.ball.vz = 0;
+  session.update = () => undefined;
+}
+
 const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
@@ -183,21 +203,8 @@ if (qa === "round") {
   session.ball.z = apex.z;
   session.ball.vz = 0;
   session.update = () => undefined;
-} else if (qa === "shape") {
-  session.startTournament();
-  session.power = 1;
-  session.accuracy = 0;
-  session.shape = 1;
-  session.swingPhase = "accuracy";
-  session.meter = 0.5;
-  session.tipVisible = false;
-  session.camMode = "follow";
-  session.tap();
-  const mid = session.shotArc[Math.floor(session.shotArc.length * 0.55)] ?? session.shotArc[0];
-  session.ball.pos = { ...mid.pos };
-  session.ball.z = mid.z;
-  session.ball.vz = 0;
-  session.update = () => undefined;
+} else if (qa === "shape" || qa === "fade") {
+  poseShapedShot(session, qa === "fade" ? -1 : 1);
 } else if (qa === "green") {
   session.startTournament();
   session.tipVisible = false;

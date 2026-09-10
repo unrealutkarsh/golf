@@ -118,8 +118,8 @@ describe("shot physics", () => {
     const draw = sampleFlightPath(from, { ...shot, shape: 1 }, hole);
     const fade = sampleFlightPath(from, { ...shot, shape: -1 }, hole);
     const mid = (path: typeof straight) => path[Math.floor(path.length * 0.6)];
-    expect(mid(draw).pos.y).toBeGreaterThan(mid(straight).pos.y + 3);
-    expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 3);
+    expect(mid(draw).pos.y).toBeGreaterThan(mid(straight).pos.y + 8);
+    expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 8);
   });
 
   it("lets a missed putt come to rest instead of creeping on the break", () => {

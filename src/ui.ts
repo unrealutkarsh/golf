@@ -136,7 +136,7 @@ export class UI {
         <ol>
           <li><b>Aim</b> with the mouse or finger. Arrow keys or A / D nudge the line.</li>
           <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
-          <li><b>Shape</b> the ball with Z fade / X draw. The preview ribbon shows the curve.</li>
+          <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
           <li><b>Camera</b> with V or View: auto, player, follow. On the green the view is always over the shoulder, looking at the pin.</li>
           <li>G toggles the break grid. The gold line is the putt at the hole.</li>
@@ -268,7 +268,7 @@ export class UI {
         <span>${surfaceLabel(session.lie)}</span>
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
-        <span>${shapeLabel(session.shape)}</span>
+        <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>
         <span>${session.resolvedCam()}</span>
         <span class="grow"></span>
         <span>${escapeHtml(session.profile.name)}</span>
@@ -278,6 +278,13 @@ export class UI {
       ${tip}
       ${msg}
       <div class="hud-dock">
+        <div class="shape-rail ${session.canShape() || session.swingPhase === "flight" ? "" : "off"}">
+          <span>Shot shape</span>
+          <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
+          <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
+          <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
+          <span class="shape-hint">${session.canShape() ? "Z fade · X draw" : "Off on the green"}</span>
+        </div>
         <div class="clubs">
           ${CLUBS.map(
             (c, i) =>
@@ -288,9 +295,6 @@ export class UI {
           <span class="phase">${phase}</span>
           <button data-action="camera">View · ${session.camMode}</button>
           <button class="${session.puttGrid ? "on" : ""}" data-action="grid">Grid</button>
-          <button class="${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1">Fade</button>
-          <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0">Straight</button>
-          <button class="${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1">Draw</button>
           <button data-action="scorecard">Card</button>
           <button data-action="help">Help</button>
           <button data-action="mute">${session.audio.muted ? "Muted" : "Sound"}</button>

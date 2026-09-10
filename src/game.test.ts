@@ -62,6 +62,23 @@ describe("tour session", () => {
     expect(game.putting()).toBe(true);
   });
 
+  it("lets the player set draw or fade except on the green", () => {
+    const game = new GameSession(6);
+    game.startTournament();
+    expect(game.canShape()).toBe(true);
+    game.setShape(1);
+    expect(game.shape).toBe(1);
+    game.setShape(-1);
+    expect(game.shape).toBe(-1);
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 4, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    game.setShape(1);
+    expect(game.shape).toBe(0);
+    expect(game.canShape()).toBe(false);
+  });
+
   it("holes a tap-in from the putting view", () => {
     const game = new GameSession(5);
     game.startTournament();

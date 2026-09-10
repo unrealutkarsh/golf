@@ -508,6 +508,8 @@ export class CourseScene {
     this.landing.visible = show && aiming;
     if (this.flightMesh) this.flightMesh.visible = show;
     if (!show) return;
+    const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
+    this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xffb060 : 0xf3d27a);
     const hole = session.hole();
     const n = Math.min(path.length, MAX_PATH);
     const pts: THREE.Vector3[] = [];
@@ -622,8 +624,10 @@ export class CourseScene {
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.4 ? Math.atan2(v.y, v.x) : session.aim;
-      const back = fromAngle(heading + Math.PI, 14);
-      desired.set(ball.x + back.x, bh + 5.2 + session.ball.z * 0.18, ball.y + back.y);
+      const back = fromAngle(heading + Math.PI, 13);
+      const curve = session.ball.curve || session.shape * 24;
+      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 9);
+      desired.set(ball.x + back.x + side.x, bh + 5.6 + session.ball.z * 0.18, ball.y + back.y + side.y);
       look.set(ball.x, bh + 0.9, ball.y);
       fov = 52;
     } else {

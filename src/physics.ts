@@ -90,7 +90,7 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const spray = (1 - shot.club.accuracy) * acc * 0.22 + acc * 0.045;
   const aim = shot.aim + spray;
   const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
-  const curve = shape * (0.55 + shot.club.loft / 48) * (0.5 + power * 0.75) * 18;
+  const curve = shape * (0.7 + shot.club.loft / 40) * (0.55 + power * 0.7) * 32;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
