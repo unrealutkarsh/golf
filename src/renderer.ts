@@ -228,11 +228,16 @@ export class Renderer {
 
   private drawGroundscape(ctx: CanvasRenderingContext2D, hole: Hole): void {
     const b = hole.bounds;
-    const g = ctx.createRadialGradient(b.x + b.w * 0.5, b.y + b.h * 0.5, 20, b.x + b.w * 0.5, b.y + b.h * 0.5, Math.max(b.w, b.h) * 0.9);
-    g.addColorStop(0, "#2a4a24");
-    g.addColorStop(1, "#1a3018");
+    const cx = b.x + b.w * 0.5;
+    const cy = b.y + b.h * 0.5;
+    const g = ctx.createRadialGradient(cx, cy, 30, cx, cy, Math.max(b.w, b.h) * 1.15);
+    g.addColorStop(0, "#35562c");
+    g.addColorStop(0.45, "#2a4524");
+    g.addColorStop(1, "#1c3018");
     ctx.fillStyle = g;
-    ctx.fillRect(b.x - 180, b.y - 140, b.w + 360, b.h + 280);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, b.w * 0.82, b.h * 0.95, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private grain(key: string, colors: string[], specks = 2200): CanvasPattern {
@@ -252,24 +257,12 @@ export class Renderer {
     this.staticCanvas.height = Math.max(64, Math.ceil(hole.bounds.h * scale));
     const ctx = this.staticCtx;
     ctx.setTransform(scale, 0, 0, scale, -hole.bounds.x * scale, -hole.bounds.y * scale);
-    this.drawScrub(ctx, hole, pad);
+    ctx.clearRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
     this.drawRough(ctx, hole);
     this.drawFairway(ctx, hole);
     this.drawTee(ctx, hole);
     for (const bunker of hole.bunkers) this.drawBunker(ctx, bunker, hole.number);
     for (const tree of hole.trees) this.drawTree(ctx, tree);
-  }
-
-  private drawScrub(ctx: CanvasRenderingContext2D, hole: Hole, pad: number): void {
-    const g = ctx.createLinearGradient(hole.bounds.x, hole.bounds.y, hole.bounds.x, hole.bounds.y + hole.bounds.h);
-    g.addColorStop(0, "#24381c");
-    g.addColorStop(1, "#1a2a14");
-    ctx.fillStyle = g;
-    ctx.fillRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
-    ctx.fillStyle = this.grain(`scrub-${hole.number}`, ["#24381c", "#1b2e16", "#334a22", "#162210"], 1600);
-    ctx.globalAlpha = 0.55;
-    ctx.fillRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
-    ctx.globalAlpha = 1;
   }
 
   private clipPolys(ctx: CanvasRenderingContext2D, polys: Vec2[][]): void {
@@ -403,28 +396,28 @@ export class Renderer {
 
   private drawNearGrass(ctx: CanvasRenderingContext2D, session: GameSession, hole: Hole): void {
     const zoom = session.cam.zoom;
-    if (zoom < 4.2) return;
+    if (zoom < 5.5 || session.lie === "green") return;
     const halfW = this.w / zoom / 2;
     const halfH = this.h / zoom / 2;
     const minX = session.cam.x - halfW;
     const minY = session.cam.y - halfH;
-    const density = zoom > 8 ? 220 : 120;
     ctx.save();
+    this.clipPolys(ctx, hole.fairway);
     ctx.lineCap = "round";
+    const density = 90;
     for (let i = 0; i < density; i++) {
-      const x = minX + hashNoise(i * 1.7, session.cam.x * 0.01) * halfW * 2;
-      const y = minY + hashNoise(i * 3.1 + 4, session.cam.y * 0.01) * halfH * 2;
+      const x = minX + hashNoise(i * 1.7, 9.2) * halfW * 2;
+      const y = minY + hashNoise(i * 3.1 + 4, 4.4) * halfH * 2;
       const n = hashNoise(x * 0.35, y * 0.35);
-      ctx.globalAlpha = 0.12 + n * 0.22;
-      ctx.strokeStyle = n > 0.55 ? "rgba(210, 240, 150, 0.8)" : "rgba(20, 60, 24, 0.75)";
-      ctx.lineWidth = 0.12 + (zoom - 4) * 0.02;
+      ctx.globalAlpha = 0.08 + n * 0.14;
+      ctx.strokeStyle = n > 0.55 ? "rgba(210, 240, 150, 0.7)" : "rgba(20, 60, 24, 0.55)";
+      ctx.lineWidth = 0.1;
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.lineTo(x + (n - 0.5) * 1.4, y - 0.8 - n * 0.8);
+      ctx.lineTo(x + (n - 0.5) * 0.9, y - 0.45 - n * 0.35);
       ctx.stroke();
     }
     ctx.restore();
-    void hole;
   }
 
   private pathPoly(ctx: CanvasRenderingContext2D, poly: Vec2[]): void {
@@ -486,9 +479,10 @@ export class Renderer {
     const highX = -bx * g.rx * 0.6;
     const highY = -by * g.ry * 0.6;
     const body = ctx.createLinearGradient(highX, highY, bx * g.rx * 0.75, by * g.ry * 0.75);
-    body.addColorStop(0, "#8fd89a");
-    body.addColorStop(0.4, "#3faf6a");
-    body.addColorStop(1, "#1d6a42");
+    body.addColorStop(0, "#a8e8b4");
+    body.addColorStop(0.35, "#3aaa72");
+    body.addColorStop(0.7, "#1f7a4c");
+    body.addColorStop(1, "#145534");
     ctx.fillStyle = body;
     ctx.fillRect(-g.rx - 2, -g.ry - 2, g.rx * 2 + 4, g.ry * 2 + 4);
 
@@ -721,7 +715,7 @@ export class Renderer {
     if (session.swingPhase !== "flight" && session.swingPhase !== "settle") return;
     if (session.shotArc.length < 2) return;
     ctx.save();
-    this.drawRibbon(ctx, session.shotArc, 0.2);
+    this.drawRibbon(ctx, session.shotArc, 0.28);
     this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.24)", true, 1.3);
     this.strokeFlight(ctx, session.shotArc, "rgba(255, 228, 130, 0.96)", false, 1.7);
     const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
