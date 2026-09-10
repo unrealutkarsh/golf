@@ -138,8 +138,8 @@ export class UI {
           <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
           <li><b>Shape</b> the ball with Z fade / X draw. The preview ribbon shows the curve.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
-          <li><b>Camera</b> with V or the View button: auto, player, follow, or putting perspective.</li>
-          <li>On the green, look down the putt toward the pin. G toggles the break grid.</li>
+          <li><b>Camera</b> with V or View: auto, player, follow. On the green the view is always over the shoulder, looking at the pin.</li>
+          <li>G toggles the break grid. The gold line is the putt at the hole.</li>
           <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>

@@ -18,9 +18,12 @@ export function resolveCamView(
   phase: string,
   putting: boolean,
 ): ResolvedCam {
+  if (putting) {
+    if (mode === "follow") return "follow";
+    return "putt";
+  }
   if (mode === "player" || mode === "follow" || mode === "putt") return mode;
   if (phase === "flight" || phase === "settle") return "follow";
-  if (putting) return "putt";
   return "player";
 }
 
@@ -71,12 +74,27 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
 export function bladeHeight(lie: Lie): number {
   switch (lie) {
     case "green":
-      return 0.045;
+      return 0.12;
+    case "tee":
+      return 0.16;
+    case "fairway":
+      return 0.26;
+    case "rough":
+      return 0.52;
+    default:
+      return 0;
+  }
+}
+
+export function bladeWidth(lie: Lie): number {
+  switch (lie) {
+    case "green":
+      return 0.7;
     case "tee":
     case "fairway":
-      return 0.1;
+      return 1;
     case "rough":
-      return 0.24;
+      return 1.45;
     default:
       return 0;
   }

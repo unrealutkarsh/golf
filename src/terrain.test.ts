@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HARBOR_DUNES, inWater } from "./course";
-import { groundHeight, resolveCamView, shapeLabel, suggestedPuttPower, surfaceColor } from "./terrain";
+import { bladeHeight, groundHeight, resolveCamView, shapeLabel, suggestedPuttPower, surfaceColor } from "./terrain";
 
 describe("course terrain", () => {
   it("raises the putting surface above bunkers and water", () => {
@@ -19,9 +19,13 @@ describe("course terrain", () => {
 
   it("picks player, follow, and putting cameras", () => {
     expect(resolveCamView("auto", "aim", true)).toBe("putt");
+    expect(resolveCamView("player", "aim", true)).toBe("putt");
+    expect(resolveCamView("auto", "flight", true)).toBe("putt");
     expect(resolveCamView("auto", "flight", false)).toBe("follow");
     expect(resolveCamView("auto", "aim", false)).toBe("player");
     expect(resolveCamView("follow", "aim", true)).toBe("follow");
+    expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway"));
+    expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
   });
 
   it("scales putt power with leftover distance", () => {

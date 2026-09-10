@@ -6,6 +6,7 @@ import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
 import {
   bladeHeight,
+  bladeWidth,
   groundHeight,
   isPuttingSituation,
   resolveCamView,
@@ -15,7 +16,7 @@ import {
 import type { Hole } from "./types";
 
 const MAX_PATH = 140;
-const BLADE_COUNT = 7800;
+const BLADE_COUNT = 11000;
 
 const TURF_VERT = /* glsl */ `
   attribute vec3 color;
@@ -60,15 +61,18 @@ const TURF_FRAG = /* glsl */ `
 const BLADE_VERT = /* glsl */ `
   uniform float time;
   varying vec3 vColor;
+  varying float vLift;
   void main() {
     #ifdef USE_INSTANCING_COLOR
       vColor = instanceColor;
     #else
       vColor = vec3(0.28, 0.5, 0.22);
     #endif
+    vLift = position.y;
     vec3 p = position;
-    float sway = sin(time * 1.6 + instanceMatrix[3][0] * 0.4 + instanceMatrix[3][2] * 0.3) * 0.16;
+    float sway = sin(time * 1.55 + instanceMatrix[3][0] * 0.45 + instanceMatrix[3][2] * 0.32) * 0.18;
     p.x += sway * p.y;
+    p.z += sway * 0.35 * p.y;
     vec4 world = modelMatrix * instanceMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewMatrix * world;
   }
@@ -76,8 +80,13 @@ const BLADE_VERT = /* glsl */ `
 
 const BLADE_FRAG = /* glsl */ `
   varying vec3 vColor;
+  varying float vLift;
   void main() {
-    gl_FragColor = vec4(vColor, 1.0);
+    vec3 base = vColor * 0.52;
+    vec3 tip = vColor * 1.28;
+    vec3 col = mix(base, tip, clamp(vLift, 0.0, 1.0));
+    float lit = 0.58 + 0.42 * clamp(vLift, 0.0, 1.0);
+    gl_FragColor = vec4(col * lit, 1.0);
   }
 `;
 
@@ -124,7 +133,9 @@ export class CourseScene {
   private groundLine: THREE.Line;
   private groundPos: Float32Array;
   private blades: THREE.InstancedMesh | null = null;
+  private bladeGeo: THREE.BufferGeometry;
   private bladeMat: THREE.ShaderMaterial;
+  private puttAim: THREE.Line;
   private turfMat: THREE.ShaderMaterial;
   private raycaster = new THREE.Raycaster();
   private terrain: THREE.Mesh | null = null;
@@ -182,12 +193,17 @@ export class CourseScene {
         grassMap: { value: grassMap },
       },
     });
+    this.bladeGeo = makeCrossBladeGeo();
     this.bladeMat = new THREE.ShaderMaterial({
       vertexShader: BLADE_VERT,
       fragmentShader: BLADE_FRAG,
       uniforms: { time: { value: 0 } },
       side: THREE.DoubleSide,
     });
+    const puttGeo = new THREE.BufferGeometry();
+    puttGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+    this.puttAim = new THREE.Line(puttGeo, new THREE.LineBasicMaterial({ color: 0xf3e2a0, transparent: true, opacity: 0.9 }));
+    this.scene.add(this.puttAim);
 
     this.ball = new THREE.Mesh(
       new THREE.SphereGeometry(0.16, 28, 20),
@@ -257,6 +273,7 @@ export class CourseScene {
     this.placeGolfer(session, view);
     this.updatePath(session);
     this.updateGrid(session, putting);
+    this.updatePuttAim(session, hole, putting);
     this.updateGrass(session, hole, view);
     this.updateCamera(session, hole, view, putting, dt);
     this.turfMat.uniforms.cameraPos.value.copy(this.camera.position);
@@ -405,41 +422,33 @@ export class CourseScene {
   private buildGrid(hole: Hole): void {
     this.grid.clear();
     const g = hole.green;
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, 256, 256);
-      ctx.strokeStyle = "rgba(18, 46, 28, 0.28)";
-      ctx.lineWidth = 1.4;
-      for (let i = 1; i < 10; i++) {
-        const t = (i / 10) * 256;
-        ctx.beginPath();
-        ctx.moveTo(t, 8);
-        ctx.lineTo(t, 248);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(8, t);
-        ctx.lineTo(248, t);
-        ctx.stroke();
-      }
-      ctx.strokeStyle = "rgba(240, 210, 110, 0.55)";
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.moveTo(128, 128);
-      ctx.lineTo(128 + hole.greenBreak.x * 56, 128 + hole.greenBreak.y * 56);
-      ctx.stroke();
+    const y = groundHeight(hole, g.cx, g.cy) + 0.08;
+    const pts: number[] = [];
+    const rot = g.rotation;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const toWorld = (lx: number, ly: number) => {
+      const x = g.cx + lx * cos - ly * sin;
+      const z = g.cy + lx * sin + ly * cos;
+      return { x, z };
+    };
+    for (let i = -4; i <= 4; i++) {
+      const u = (i / 4) * g.rx * 0.92;
+      const a = toWorld(u, -g.ry * 0.92);
+      const b = toWorld(u, g.ry * 0.92);
+      pts.push(a.x, y, a.z, b.x, y, b.z);
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(g.rx * 2.02, g.ry * 2.02),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
-    );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.rotation.z = g.rotation;
-    mesh.position.set(g.cx, groundHeight(hole, g.cx, g.cy) + 0.06, g.cy);
-    this.grid.add(mesh);
+    for (let i = -4; i <= 4; i++) {
+      const v = (i / 4) * g.ry * 0.92;
+      const a = toWorld(-g.rx * 0.92, v);
+      const b = toWorld(g.rx * 0.92, v);
+      pts.push(a.x, y, a.z, b.x, y, b.z);
+    }
+    const br = toWorld(hole.greenBreak.x * 6, hole.greenBreak.y * 6);
+    pts.push(g.cx, y + 0.02, g.cy, br.x, y + 0.02, br.z);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    this.grid.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xdde8c8, transparent: true, opacity: 0.42 })));
   }
 
   private buildGolfer(): void {
@@ -478,11 +487,14 @@ export class CourseScene {
 
   private placeGolfer(session: GameSession, view: ResolvedCam): void {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
-    this.golfer.visible = session.screen === "play" && !flying && view !== "putt";
+    this.golfer.visible = session.screen === "play" && !flying;
     const p = session.ball.pos;
-    const back = fromAngle(session.aim + Math.PI, 1.2);
-    this.golfer.position.set(p.x + back.x, groundHeight(session.hole(), p.x, p.y), p.y + back.y);
-    this.golfer.rotation.y = -session.aim + Math.PI / 2;
+    const hole = session.hole();
+    const aim = view === "putt" ? Math.atan2(hole.pin.y - p.y, hole.pin.x - p.x) : session.aim;
+    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.05 : 1.2);
+    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.38 : 0);
+    this.golfer.position.set(p.x + back.x + left.x, groundHeight(hole, p.x, p.y), p.y + back.y + left.y);
+    this.golfer.rotation.y = -aim + Math.PI / 2;
   }
 
   private updatePath(session: GameSession): void {
@@ -537,33 +549,47 @@ export class CourseScene {
     this.grid.visible = session.screen === "play" && session.puttGrid && putting;
   }
 
+  private updatePuttAim(session: GameSession, hole: Hole, putting: boolean): void {
+    const show = session.screen === "play" && putting && session.swingPhase !== "flight";
+    this.puttAim.visible = show;
+    if (!show) return;
+    const from = session.ball.pos;
+    const to = hole.pin;
+    const attr = this.puttAim.geometry.getAttribute("position") as THREE.BufferAttribute;
+    attr.setXYZ(0, from.x, groundHeight(hole, from.x, from.y) + 0.1, from.y);
+    attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.1, to.y);
+    attr.needsUpdate = true;
+  }
+
   private updateGrass(session: GameSession, hole: Hole, view: ResolvedCam): void {
     const focus = session.ball.pos;
-    const radius = view === "putt" ? 9 : view === "player" ? 14 : 9;
-    if (this.blades && dist(focus, this.grassAt) < 2.2) return;
+    if (this.blades && dist(focus, this.grassAt) < 1.8) return;
     this.grassAt = { ...focus };
     if (this.blades) this.scene.remove(this.blades);
-    const geo = new THREE.PlaneGeometry(0.038, 1, 1, 1);
-    geo.translate(0, 0.5, 0);
-    const mesh = new THREE.InstancedMesh(geo, this.bladeMat, BLADE_COUNT);
+    const mesh = new THREE.InstancedMesh(this.bladeGeo, this.bladeMat, BLADE_COUNT);
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
     let written = 0;
-    for (let i = 0; i < BLADE_COUNT * 3 && written < BLADE_COUNT; i++) {
+    for (let i = 0; i < BLADE_COUNT * 4 && written < BLADE_COUNT; i++) {
+      const close = written < BLADE_COUNT * 0.5;
+      const span = view === "putt" ? (close ? 3.6 : 8.5) : view === "player" ? (close ? 6 : 15) : (close ? 5 : 11);
       const a = fbm(focus.x * 0.3 + i * 1.7, focus.y * 0.3 + i) * Math.PI * 2;
-      const r = Math.sqrt(fbm(i * 0.37, focus.x + i * 0.11)) * radius;
+      const r = Math.sqrt(fbm(i * 0.37, focus.x + i * 0.11)) * span;
       const x = focus.x + Math.cos(a) * r;
       const z = focus.y + Math.sin(a) * r;
       const lie = lieAt(hole, { x, y: z });
       const h = bladeHeight(lie);
       if (h <= 0) continue;
       dummy.position.set(x, groundHeight(hole, x, z), z);
-      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * 0.28);
-      dummy.scale.set(0.75 + fbm(z, x) * 0.7, h * (0.9 + fbm(x * 2, z * 2) * 0.5), 1);
+      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.45 : 0.18));
+      const w = bladeWidth(lie) * (0.8 + fbm(z, x) * 0.5);
+      dummy.scale.set(w, h * (0.85 + fbm(x * 2, z * 2) * 0.4), w);
       dummy.updateMatrix();
       mesh.setMatrixAt(written, dummy.matrix);
       const c = surfaceColor(hole, x, z);
-      color.setRGB(Math.min(1, c[0] * 0.9 + 0.04), Math.min(1, c[1] * 1.12), c[2] * 0.85);
+      if (lie === "green") color.setRGB(0.34, 0.72, 0.4);
+      else if (lie === "rough") color.setRGB(0.32 + c[0] * 0.2, 0.42 + c[1] * 0.15, 0.16);
+      else color.setRGB(Math.min(1, c[0] * 0.85 + 0.06), Math.min(1, c[1] * 1.18), c[2] * 0.8);
       mesh.setColorAt(written, color);
       written += 1;
     }
@@ -588,11 +614,11 @@ export class CourseScene {
       look.set((hole.tee.x + pin.x) * 0.55, 1.2, (hole.tee.y + pin.y) * 0.55);
       fov = 50;
     } else if (view === "putt") {
-      const back = fromAngle(aim + Math.PI, 2.35);
-      const side = fromAngle(aim + Math.PI / 2, 0.42);
-      desired.set(ball.x + back.x + side.x, bh + 0.78, ball.y + back.y + side.y);
-      look.set(pin.x, groundHeight(hole, pin.x, pin.y) + 0.22, pin.y);
-      fov = 46;
+      const back = fromAngle(aim + Math.PI, 1.85);
+      const side = fromAngle(aim + Math.PI / 2, 0.62);
+      desired.set(ball.x + back.x + side.x, bh + 1.18, ball.y + back.y + side.y);
+      look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.18, ball.y * 0.28 + pin.y * 0.72);
+      fov = 52;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.4 ? Math.atan2(v.y, v.x) : session.aim;
@@ -620,6 +646,20 @@ export class CourseScene {
     this.camera.fov += (fov - this.camera.fov) * 0.12;
     this.camera.updateProjectionMatrix();
   }
+}
+
+function makeCrossBladeGeo(): THREE.BufferGeometry {
+  const w = 0.5;
+  const positions = new Float32Array([
+    -w, 0, 0, w, 0, 0, 0.14, 1, 0,
+    -w, 0, 0, 0.14, 1, 0, -0.14, 1, 0,
+    0, 0, -w, 0, 0, w, 0, 1, 0.14,
+    0, 0, -w, 0, 1, 0.14, 0, 1, -0.14,
+  ]);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function makeSky(): THREE.Mesh {
