@@ -56,16 +56,16 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
   const lie = lieAt(hole, p);
   if (lie === "bunker") return [0.86 + n * 0.08, 0.74 + n * 0.06, 0.48 + n * 0.04];
   if (lie === "green" || onGreen(hole, p)) {
-    const sheen = 0.88 + stripe * 0.14;
-    return [(0.22 + n * 0.04) * sheen, (0.52 + n * 0.08) * sheen, (0.3 + n * 0.04) * sheen];
+    const sheen = 0.94 + stripe * 0.07;
+    return [(0.18 + n * 0.03) * sheen, (0.46 + n * 0.05) * sheen, (0.28 + n * 0.03) * sheen];
   }
-  if (lie === "tee") return [0.36 + n * 0.04, 0.62 + n * 0.05, 0.28 + n * 0.03];
+  if (lie === "tee") return [0.3 + n * 0.03, 0.52 + n * 0.04, 0.24 + n * 0.02];
   if (lie === "fairway") {
-    const sheen = 0.86 + stripe * 0.18;
-    return [(0.28 + n * 0.06) * sheen, (0.5 + n * 0.08) * sheen, (0.2 + n * 0.03) * sheen];
+    const sheen = 0.93 + stripe * 0.08;
+    return [(0.26 + n * 0.05) * sheen, (0.44 + n * 0.06) * sheen, (0.18 + n * 0.03) * sheen];
   }
-  if (lie === "rough") return [0.18 + n * 0.05, 0.34 + n * 0.07, 0.14 + n * 0.03];
-  return [0.55 + n * 0.12, 0.46 + n * 0.08, 0.28 + n * 0.05];
+  if (lie === "rough") return [0.27 + n * 0.06, 0.34 + n * 0.05, 0.14 + n * 0.03];
+  return [0.58 + n * 0.1, 0.5 + n * 0.07, 0.3 + n * 0.04];
 }
 
 export function bladeHeight(lie: Lie): number {
