@@ -27,8 +27,8 @@ interface LandRing {
   max: number;
 }
 
-const LIFT_X = 0.16;
-const LIFT_Y = 0.84;
+const LIFT_X = 0.2;
+const LIFT_Y = 0.98;
 
 export function airborneOffset(z: number): Vec2 {
   const h = Math.max(0, z);
@@ -122,6 +122,7 @@ export class Renderer {
     this.drawGreen(ctx, hole);
     this.drawPin(ctx, hole);
     this.drawAim(ctx, session, hole);
+    this.drawShotArc(ctx, session);
     this.updateParticles(dt);
     this.drawRings(ctx);
     this.drawParticles(ctx);
@@ -321,19 +322,19 @@ export class Renderer {
       this.pathPoly(ctx, poly);
       ctx.clip();
     }
-    const stripeW = 5.2;
+    const stripeW = 6.4;
     const span = Math.hypot(hole.bounds.w, hole.bounds.h) + 80;
     ctx.translate((hole.tee.x + hole.pin.x) / 2, (hole.tee.y + hole.pin.y) / 2);
     ctx.rotate(heading);
     for (let i = -28; i < 28; i++) {
       const even = i % 2 === 0;
-      ctx.fillStyle = even ? "rgba(255, 245, 200, 0.11)" : "rgba(20, 70, 30, 0.1)";
+      ctx.fillStyle = even ? "rgba(255, 248, 200, 0.26)" : "rgba(16, 62, 26, 0.2)";
       ctx.fillRect(i * stripeW - span, -span, stripeW, span * 2);
     }
     const sheen = ctx.createLinearGradient(-span, 0, span, 0);
-    sheen.addColorStop(0, "rgba(10, 40, 18, 0.16)");
-    sheen.addColorStop(0.42, "rgba(255, 236, 170, 0.14)");
-    sheen.addColorStop(1, "rgba(12, 42, 20, 0.18)");
+    sheen.addColorStop(0, "rgba(10, 40, 18, 0.22)");
+    sheen.addColorStop(0.42, "rgba(255, 236, 170, 0.22)");
+    sheen.addColorStop(1, "rgba(12, 42, 20, 0.24)");
     ctx.fillStyle = sheen;
     ctx.fillRect(-span, -span, span * 2, span * 2);
     ctx.restore();
@@ -402,11 +403,15 @@ export class Renderer {
     ctx.translate(g.cx, g.cy);
     ctx.rotate(g.rotation);
 
-    ctx.fillStyle = "#6a9a48";
+    ctx.fillStyle = "#5d8f3c";
     ctx.beginPath();
-    ctx.ellipse(0, 0, g.rx + 2.6, g.ry + 2.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, g.rx + 3.1, g.ry + 2.8, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(40, 80, 28, 0.35)";
+    ctx.fillStyle = "#7aad4e";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, g.rx + 2.15, g.ry + 1.95, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40, 80, 28, 0.4)";
     ctx.lineWidth = 0.7;
     ctx.stroke();
 
@@ -418,9 +423,9 @@ export class Renderer {
     const lowX = bx * g.rx * 0.7;
     const lowY = by * g.ry * 0.7;
     const body = ctx.createLinearGradient(highX, highY, lowX, lowY);
-    body.addColorStop(0, "#9be08a");
-    body.addColorStop(0.42, "#68c46a");
-    body.addColorStop(1, "#2f8a4a");
+    body.addColorStop(0, "#b6f09a");
+    body.addColorStop(0.38, "#62c868");
+    body.addColorStop(1, "#246e3c");
     ctx.fillStyle = body;
     ctx.fillRect(-g.rx - 2, -g.ry - 2, g.rx * 2 + 4, g.ry * 2 + 4);
 
@@ -664,6 +669,31 @@ export class Renderer {
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(from.x + b.x * 8, from.y + b.y * 8);
       ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawShotArc(ctx: CanvasRenderingContext2D, session: GameSession): void {
+    if (session.swingPhase !== "flight" && session.swingPhase !== "settle") return;
+    if (session.shotArc.length < 2) return;
+    ctx.save();
+    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.22)", true, 1.25);
+    this.strokeFlight(ctx, session.shotArc, "rgba(255, 226, 120, 0.88)", false, 1.15);
+    const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
+    if (apex.z > 3) {
+      const ap = airbornePos(apex.pos, apex.z);
+      ctx.strokeStyle = "rgba(255,255,255,0.32)";
+      ctx.lineWidth = 0.28;
+      ctx.setLineDash([0.8, 0.55]);
+      ctx.beginPath();
+      ctx.moveTo(apex.pos.x, apex.pos.y);
+      ctx.lineTo(ap.x, ap.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255, 248, 210, 0.95)";
+      ctx.beginPath();
+      ctx.arc(ap.x, ap.y, 1.15, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }

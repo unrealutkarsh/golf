@@ -71,6 +71,7 @@ export class GameSession {
   messageTime = 0;
   seed = 2026;
   audio = new AudioBus();
+  shotArc: FlightSample[] = [];
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -143,6 +144,7 @@ export class GameSession {
     this.cam.x = (hole.tee.x + hole.pin.x) / 2;
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
+    this.shotArc = [];
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
   }
@@ -223,14 +225,16 @@ export class GameSession {
     } else {
       this.audio.swing(this.power);
     }
-    this.ball = launchBall(this.ball.pos, {
+    const shot = {
       aim: this.aim,
       power: this.power,
       accuracy: this.accuracy,
       club,
       lie: this.lie,
       wind: this.wind,
-    });
+    };
+    this.shotArc = sampleFlightPath(this.ball.pos, shot, this.hole());
+    this.ball = launchBall(this.ball.pos, shot);
     this.swingPhase = "flight";
   }
 
@@ -322,6 +326,7 @@ export class GameSession {
     }
     this.swingPhase = "aim";
     this.lockedAccuracy = false;
+    this.shotArc = [];
     this.aim = defaultAim(this.ball.pos, hole);
     this.autoClub();
   }

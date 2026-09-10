@@ -17,6 +17,19 @@ describe("tour session", () => {
     expect(game.profile.eventsPlayed).toBeGreaterThan(0);
   });
 
+  it("stores a lofted shot arc when the ball is struck", () => {
+    const game = new GameSession(3);
+    game.startTournament();
+    game.power = 1;
+    game.accuracy = 0;
+    game.swingPhase = "accuracy";
+    game.meter = 0.5;
+    game.tap();
+    expect(game.swingPhase).toBe("flight");
+    expect(game.shotArc.length).toBeGreaterThan(8);
+    expect(Math.max(...game.shotArc.map((s) => s.z))).toBeGreaterThan(10);
+  });
+
   it("records a live hole finish", () => {
     const game = new GameSession(2);
     game.startTournament();

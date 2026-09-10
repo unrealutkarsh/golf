@@ -132,6 +132,35 @@ const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
   session.playThroughForTest();
+} else if (qa === "fairway") {
+  session.startTournament();
+} else if (qa === "flight") {
+  session.startTournament();
+  session.power = 1;
+  session.accuracy = 0;
+  session.swingPhase = "accuracy";
+  session.meter = 0.5;
+  session.tap();
+  const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
+  session.ball.pos = { ...apex.pos };
+  session.ball.z = apex.z;
+  session.ball.vz = 0;
+  session.cam.x = apex.pos.x;
+  session.cam.y = apex.pos.y - apex.z * 0.55;
+  session.cam.zoom = 4.6;
+  session.update = () => undefined;
+} else if (qa === "green") {
+  session.startTournament();
+  const hole = session.hole();
+  session.ball.pos = { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
+  session.ball.vel = { x: 0, y: 0 };
+  session.ball.z = 0;
+  session.lie = "green";
+  session.autoClub();
+  session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
+  session.cam.x = hole.green.cx;
+  session.cam.y = hole.green.cy;
+  session.cam.zoom = 12;
 }
 
 (window as unknown as { __ptg: GameSession }).__ptg = session;
