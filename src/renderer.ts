@@ -25,7 +25,6 @@ export class Renderer {
   private staticCtx: CanvasRenderingContext2D;
   private staticHole = -1;
   private time = 0;
-  private pattern: CanvasPattern | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -94,7 +93,10 @@ export class Renderer {
     this.drawBall(ctx, session);
     ctx.restore();
     this.drawVignette(ctx);
-    if (session.screen === "play") this.drawMeters(ctx, session);
+    if (session.screen === "play") {
+      this.drawMinimap(ctx, session);
+      this.drawMeters(ctx, session);
+    }
   }
 
   worldFromScreen(session: GameSession, sx: number, sy: number): Vec2 {
@@ -114,7 +116,7 @@ export class Renderer {
   }
 
   private ensureStatic(hole: Hole): void {
-    if (this.staticHole === hole.number && this.pattern) return;
+    if (this.staticHole === hole.number) return;
     this.staticHole = hole.number;
     const pad = 4;
     const scale = 4;
@@ -122,11 +124,11 @@ export class Renderer {
     this.staticCanvas.height = Math.max(64, Math.ceil(hole.bounds.h * scale));
     const ctx = this.staticCtx;
     ctx.setTransform(scale, 0, 0, scale, -hole.bounds.x * scale, -hole.bounds.y * scale);
-    ctx.fillStyle = "#16301f";
+    ctx.fillStyle = "#0c1c12";
     ctx.fillRect(hole.bounds.x - pad, hole.bounds.y - pad, hole.bounds.w + pad * 2, hole.bounds.h + pad * 2);
-    this.fillPolys(ctx, hole.rough, "#2a6b38");
-    this.strokePolys(ctx, hole.rough, "#1f4f2a", 1.2);
-    this.fillPolys(ctx, hole.fairway, "#4ea85a");
+    this.fillPolys(ctx, hole.rough, "#3d7a36");
+    this.strokePolys(ctx, hole.rough, "#2b5827", 1.4);
+    this.fillPolys(ctx, hole.fairway, "#7bc86a");
     this.drawFairwayStripes(ctx, hole);
     this.strokePolys(ctx, hole.fairway, "#3d8d49", 0.8);
     this.drawTee(ctx, hole);
@@ -166,7 +168,7 @@ export class Renderer {
       ctx.clip();
     }
     ctx.globalAlpha = 0.12;
-    ctx.strokeStyle = "#2f7a3c";
+    ctx.strokeStyle = "#4e9a4a";
     ctx.lineWidth = 3.2;
     const minX = hole.bounds.x;
     const maxX = hole.bounds.x + hole.bounds.w;
@@ -405,25 +407,94 @@ export class Renderer {
   private updateCamera(session: GameSession, dt: number): void {
     const hole = session.hole();
     const putting = session.lie === "green";
-    const fit = Math.min(this.w / (hole.bounds.w + 20), this.h / (hole.bounds.h + 36));
-    const close = putting ? 11 : session.swingPhase === "flight" ? 5.2 : 3.6;
-    const zoomTarget = session.screen === "play" ? clamp(Math.max(fit * 0.92, close * 0.35), 1.6, putting ? 14 : 7) : fit * 0.95;
+    const fit = Math.min(this.w / (hole.bounds.w + 36), this.h / (hole.bounds.h + 72));
+    const pinD = dist(session.ball.pos, hole.pin);
     let tx = session.ball.pos.x;
     let ty = session.ball.pos.y;
+    let zoomTarget = fit * 0.92;
     if (session.screen !== "play") {
-      tx = hole.green.cx;
-      ty = hole.green.cy;
-    } else if (session.swingPhase === "aim") {
-      const pinD = dist(session.ball.pos, hole.pin);
-      if (pinD < 140) {
-        tx = (session.ball.pos.x + hole.pin.x) / 2;
-        ty = (session.ball.pos.y + hole.pin.y) / 2;
-      }
+      tx = hole.bounds.x + hole.bounds.w * 0.55;
+      ty = hole.bounds.y + hole.bounds.h * 0.5;
+      zoomTarget = fit * 0.88;
+    } else if (session.swingPhase === "flight") {
+      tx = session.ball.pos.x;
+      ty = session.ball.pos.y;
+      zoomTarget = clamp(putting ? 8 : 4.2, 2.4, 8);
+    } else if (putting) {
+      tx = (session.ball.pos.x + hole.pin.x) / 2;
+      ty = (session.ball.pos.y + hole.pin.y) / 2;
+      zoomTarget = clamp(Math.min(this.w, this.h) / Math.max(pinD * 2.4, 28), 6, 16);
+    } else {
+      tx = (session.ball.pos.x * 0.45 + hole.pin.x * 0.55);
+      ty = (session.ball.pos.y * 0.45 + hole.pin.y * 0.55);
+      const spanX = Math.abs(hole.pin.x - session.ball.pos.x) + 90;
+      const spanY = Math.abs(hole.pin.y - session.ball.pos.y) + 90;
+      zoomTarget = clamp(Math.min(this.w / spanX, this.h / spanY) * 0.88, 1.35, 5.2);
     }
-    const k = 1 - Math.pow(0.001, dt);
+    const k = 1 - Math.pow(0.002, dt);
     session.cam.x += (tx - session.cam.x) * k;
     session.cam.y += (ty - session.cam.y) * k;
     session.cam.zoom += (zoomTarget - session.cam.zoom) * k;
+  }
+
+  private drawMinimap(ctx: CanvasRenderingContext2D, session: GameSession): void {
+    const hole = session.hole();
+    const mw = 196;
+    const mh = 118;
+    const x = this.w - mw - 18;
+    const y = 86;
+    ctx.save();
+    ctx.fillStyle = "rgba(8, 16, 12, 0.78)";
+    this.roundRect(ctx, x - 8, y - 8, mw + 16, mh + 16, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(212, 175, 55, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const sx = mw / hole.bounds.w;
+    const sy = mh / hole.bounds.h;
+    const s = Math.min(sx, sy);
+    const ox = x + (mw - hole.bounds.w * s) / 2 - hole.bounds.x * s;
+    const oy = y + (mh - hole.bounds.h * s) / 2 - hole.bounds.y * s;
+    ctx.translate(ox, oy);
+    ctx.scale(s, s);
+    ctx.fillStyle = "#2f6a32";
+    for (const poly of hole.rough) {
+      this.pathPoly(ctx, poly);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#6fbf66";
+    for (const poly of hole.fairway) {
+      this.pathPoly(ctx, poly);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#1d6d9a";
+    for (const water of hole.water) {
+      this.pathPoly(ctx, water);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#e6d2a2";
+    for (const b of hole.bunkers) {
+      ctx.beginPath();
+      ctx.ellipse(b.cx, b.cy, b.rx, b.ry, b.rotation, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#8be28b";
+    ctx.beginPath();
+    ctx.ellipse(hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#c62828";
+    ctx.beginPath();
+    ctx.arc(hole.pin.x, hole.pin.y, 2.4 / s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(session.ball.pos.x, session.ball.pos.y, 2.6 / s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "#d4af37";
+    ctx.font = "600 10px 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`HOLE ${hole.number} MAP`, x, y - 14);
   }
 
   private drawVignette(ctx: CanvasRenderingContext2D): void {

@@ -230,7 +230,7 @@ export class GameSession {
     if (this.screen !== "play") return;
 
     if (this.swingPhase === "power") {
-      this.meter += this.meterDir * dt * 1.15;
+      this.meter += this.meterDir * dt * 0.72;
       if (this.meter >= 1) {
         this.meter = 1;
         this.meterDir = -1;
@@ -240,7 +240,7 @@ export class GameSession {
         this.meterDir = 1;
       }
     } else if (this.swingPhase === "accuracy") {
-      this.meter += this.meterDir * dt * 1.05;
+      this.meter += this.meterDir * dt * 0.68;
       if (this.meter >= 1) {
         this.meter = 1;
         this.meterDir = -1;

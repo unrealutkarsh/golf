@@ -9,6 +9,8 @@
   --green: #2e7d32;
   --danger: #c62828;
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+  word-spacing: 0.04em;
 }
 
 * {
@@ -314,8 +316,8 @@ td.empty {
   background: rgba(8, 16, 12, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  padding: 6px 10px;
-  min-width: 88px;
+  padding: 7px 12px;
+  min-width: 96px;
 }
 
 .stat label {
