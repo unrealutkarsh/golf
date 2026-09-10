@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { HARBOR_DUNES, inWater } from "./course";
-import { bladeHeight, groundHeight, resolveCamView, shapeLabel, suggestedPuttPower, surfaceColor } from "./terrain";
+import {
+  bladeHeight,
+  bladeKeepChance,
+  bladeWidth,
+  grassBudget,
+  groundHeight,
+  resolveCamView,
+  shapeLabel,
+  suggestedPuttPower,
+  surfaceColor,
+  turfLush,
+} from "./terrain";
 
 describe("course terrain", () => {
   it("raises the putting surface above bunkers and water", () => {
@@ -24,8 +35,13 @@ describe("course terrain", () => {
     expect(resolveCamView("auto", "flight", false)).toBe("follow");
     expect(resolveCamView("auto", "aim", false)).toBe("player");
     expect(resolveCamView("follow", "aim", true)).toBe("follow");
-    expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway"));
+    expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);
     expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
+    expect(bladeWidth("green")).toBeLessThan(bladeWidth("fairway"));
+    expect(turfLush("green")).toBeLessThan(turfLush("fairway"));
+    expect(turfLush("fairway")).toBeLessThan(turfLush("rough"));
+    expect(bladeKeepChance("green")).toBeLessThan(bladeKeepChance("fairway"));
+    expect(grassBudget("green", 11000)).toBeLessThan(grassBudget("fairway", 11000) * 0.25);
   });
 
   it("scales putt power with leftover distance", () => {
