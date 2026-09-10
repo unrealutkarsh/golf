@@ -2,6 +2,7 @@ import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
 import { surfaceLabel, windLabel } from "./physics";
+import { shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
 import { PLAYER_CARD } from "./tour";
 import type { ScreenId } from "./types";
@@ -133,13 +134,15 @@ export class UI {
       <div class="panel help">
         <h2>How to play</h2>
         <ol>
-          <li><b>Aim</b> with the mouse or finger. Arrow keys nudge the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the accuracy window.</li>
+          <li><b>Aim</b> with the mouse or finger. Arrow keys or A / D nudge the line.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
+          <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
-          <li>Wind pushes the ball in the air. Rough, sand, and water all cost you.</li>
-          <li>Stroke play vs par. Water is a drop plus one. Out of bounds is stroke and distance.</li>
+          <li><b>Camera</b> with V or View: auto, player, follow. On the green the view is always over the shoulder, looking at the pin.</li>
+          <li>G toggles the break grid. The gold line is the putt at the hole.</li>
+          <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
-        <p class="keys">C scorecard · H help · M mute · Esc cancel swing / menus</p>
+        <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
         <button class="btn primary" data-action="close-help">Got it</button>
       </div>`;
   }
@@ -265,6 +268,8 @@ export class UI {
         <span>${surfaceLabel(session.lie)}</span>
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
+        <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>
+        <span>${session.resolvedCam()}</span>
         <span class="grow"></span>
         <span>${escapeHtml(session.profile.name)}</span>
         <span>Str ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
@@ -273,6 +278,13 @@ export class UI {
       ${tip}
       ${msg}
       <div class="hud-dock">
+        <div class="shape-rail ${session.canShape() || session.swingPhase === "flight" ? "" : "off"}">
+          <span>Shot shape</span>
+          <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
+          <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
+          <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
+          <span class="shape-hint">${session.club().id === "putter" || session.lie === "green" ? "Off on the green" : "Z fade · X draw"}</span>
+        </div>
         <div class="clubs">
           ${CLUBS.map(
             (c, i) =>
@@ -281,6 +293,8 @@ export class UI {
         </div>
         <div class="tools">
           <span class="phase">${phase}</span>
+          <button data-action="camera">View · ${session.camMode}</button>
+          <button class="${session.puttGrid ? "on" : ""}" data-action="grid">Grid</button>
           <button data-action="scorecard">Card</button>
           <button data-action="help">Help</button>
           <button data-action="mute">${session.audio.muted ? "Muted" : "Sound"}</button>

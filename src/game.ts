@@ -1,8 +1,9 @@
 import { AudioBus } from "./audio";
 import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubIndex, recommendClub } from "./clubs";
-import { HARBOR_DUNES, lieAt } from "./course";
+import { HARBOR_DUNES, lieAt, onGreen } from "./course";
 import { hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
+import { isPuttingSituation, resolveCamView, suggestedPuttPower, type ResolvedCam } from "./terrain";
 import {
   createBall,
   defaultAim,
@@ -27,6 +28,7 @@ import type {
   SwingPhase,
   Tournament,
   Wind,
+  CamMode,
 } from "./types";
 
 export interface Camera {
@@ -61,6 +63,9 @@ export class GameSession {
   gir = false;
   cam: Camera = { x: 200, y: 150, zoom: 3 };
   camHold = false;
+  camMode: CamMode = "auto";
+  puttGrid = true;
+  shape = 0;
   tipVisible = true;
   helpOpen = false;
   scorecardOpen = false;
@@ -91,14 +96,58 @@ export class GameSession {
     return dist(this.ball.pos, this.hole().pin);
   }
 
+  putting(): boolean {
+    return isPuttingSituation(this.lie, this.toPin(), this.club().id, this.hole(), this.ball.pos);
+  }
+
+  resolvedCam(): ResolvedCam {
+    return resolveCamView(this.camMode, this.swingPhase, this.putting());
+  }
+
+  suggestedPower(): number {
+    if (this.club().id === "putter") return suggestedPuttPower(this.toPin());
+    return 0.92;
+  }
+
+  cycleCam(): void {
+    const order: CamMode[] = ["auto", "player", "follow", "putt"];
+    this.camMode = order[(order.indexOf(this.camMode) + 1) % order.length];
+    this.flash(this.camMode === "auto" ? "Camera · Auto" : `Camera · ${this.camMode}`);
+  }
+
+  toggleGrid(): void {
+    this.puttGrid = !this.puttGrid;
+    this.flash(this.puttGrid ? "Putting grid on" : "Putting grid off");
+  }
+
+  canShape(): boolean {
+    return this.club().id !== "putter" && this.lie !== "green" && (this.swingPhase === "aim" || this.swingPhase === "power");
+  }
+
+  nudgeShape(delta: number): void {
+    if (!this.canShape()) return;
+    this.shape = clamp(this.shape + delta, -1, 1);
+    this.flash(this.shape > 0.2 ? "Draw" : this.shape < -0.2 ? "Fade" : "Straight");
+  }
+
+  setShape(value: number): void {
+    if (this.club().id === "putter" || this.lie === "green") {
+      this.shape = 0;
+      return;
+    }
+    if (this.swingPhase !== "aim" && this.swingPhase !== "power") return;
+    this.shape = clamp(value, -1, 1);
+  }
+
   private previewShot() {
     return {
       aim: this.aim,
-      power: this.swingPhase === "aim" ? 0.92 : this.swingPhase === "power" ? Math.max(this.meter, 0.2) : this.power,
+      power: this.swingPhase === "aim" ? this.suggestedPower() : this.swingPhase === "power" ? Math.max(this.meter, 0.2) : this.power,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
       wind: this.wind,
+      shape: this.shape,
     };
   }
 
@@ -146,6 +195,7 @@ export class GameSession {
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
     this.camHold = false;
+    this.shape = 0;
     this.shotArc = [];
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
@@ -204,7 +254,8 @@ export class GameSession {
       return;
     }
     if (this.swingPhase === "accuracy") {
-      this.accuracy = clamp(this.meter * 2 - 1, -1, 1);
+      const raw = clamp(this.meter * 2 - 1, -1, 1);
+      this.accuracy = Math.abs(raw) < 0.12 ? 0 : Math.sign(raw) * raw * raw;
       this.lockedAccuracy = true;
       this.fire();
     }
@@ -234,6 +285,7 @@ export class GameSession {
       club,
       lie: this.lie,
       wind: this.wind,
+      shape: this.shape,
     };
     this.shotArc = sampleFlightPath(this.ball.pos, shot, this.hole());
     this.ball = launchBall(this.ball.pos, shot);
@@ -256,7 +308,7 @@ export class GameSession {
         this.meterDir = 1;
       }
     } else if (this.swingPhase === "accuracy") {
-      this.meter += this.meterDir * dt * 0.68;
+      this.meter += this.meterDir * dt * 0.5;
       if (this.meter >= 1) {
         this.meter = 1;
         this.meterDir = -1;
@@ -331,6 +383,10 @@ export class GameSession {
     this.shotArc = [];
     this.aim = defaultAim(this.ball.pos, hole);
     this.autoClub();
+    if (this.club().id === "putter" || onGreen(hole, this.ball.pos)) {
+      this.power = suggestedPuttPower(this.toPin());
+      this.shape = 0;
+    }
   }
 
   isHoled(): boolean {

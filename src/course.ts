@@ -1,6 +1,7 @@
 import {
   angleTo,
   clone,
+  closestPointOnPolygon,
   dist,
   offsetCorridor,
   pointInEllipse,
@@ -8,6 +9,9 @@ import {
   type Vec2,
 } from "./math";
 import type { Course, Ellipse, Hole, Lie, Tree } from "./types";
+
+/** Extra yards beyond painted rough that still play as rough, not OB. */
+export const PLAYABLE_MARGIN = 20;
 
 interface HoleSpec {
   number: number;
@@ -69,7 +73,7 @@ function buildHole(spec: HoleSpec): Hole {
     bunkers: spec.bunkers ?? [],
     water: spec.water ?? [],
     trees: spec.trees ?? [],
-    bounds: aabb([...fairway, ...rough, ...(spec.water ?? [])], extras, 28),
+    bounds: aabb([...fairway, ...rough, ...(spec.water ?? [])], extras, 44),
   };
 }
 
@@ -111,7 +115,7 @@ const hole1 = buildHole({
     { x: 398, y: 142 },
   ],
   fairwayHalf: (t) => 22 - t * 4,
-  roughExtra: 26,
+  roughExtra: 38,
   green: { cx: 398, cy: 142, rx: 16, ry: 12, rotation: -0.25 },
   greenBreak: { x: 0.35, y: 0.55 },
   bunkers: [
@@ -136,7 +140,7 @@ const hole2 = buildHole({
     { x: 208, y: 118 },
   ],
   fairwayHalf: 16,
-  roughExtra: 18,
+  roughExtra: 32,
   green: { cx: 208, cy: 118, rx: 14, ry: 11, rotation: 0.15 },
   greenBreak: { x: -0.4, y: 0.8 },
   bunkers: [
@@ -166,7 +170,7 @@ const hole3 = buildHole({
     { x: 548, y: 168 },
   ],
   fairwayHalf: (t) => 26 - t * 6,
-  roughExtra: 30,
+  roughExtra: 40,
   green: { cx: 548, cy: 168, rx: 17, ry: 13, rotation: -0.1 },
   greenBreak: { x: 0.2, y: -0.7 },
   bunkers: [
@@ -194,7 +198,7 @@ const hole4 = buildHole({
     { x: 438, y: 188 },
   ],
   fairwayHalf: (t) => 15 + (t > 0.7 ? 4 : 0),
-  roughExtra: 16,
+  roughExtra: 36,
   green: { cx: 438, cy: 188, rx: 15, ry: 12, rotation: 0.35 },
   greenBreak: { x: -0.6, y: 0.25 },
   bunkers: [
@@ -221,7 +225,7 @@ const hole5 = buildHole({
     { x: 352, y: 96 },
   ],
   fairwayHalf: (t) => 20 - t * 3,
-  roughExtra: 22,
+  roughExtra: 34,
   green: { cx: 352, cy: 96, rx: 15, ry: 12, rotation: -0.6 },
   greenBreak: { x: 0.7, y: 0.35 },
   bunkers: [
@@ -258,7 +262,7 @@ const hole6 = buildHole({
     { x: 228, y: 108 },
   ],
   fairwayHalf: 14,
-  roughExtra: 20,
+  roughExtra: 32,
   green: { cx: 228, cy: 108, rx: 13, ry: 10, rotation: 0.2 },
   greenBreak: { x: -0.9, y: 0.4 },
   bunkers: [
@@ -289,7 +293,7 @@ const hole7 = buildHole({
     { x: 560, y: 230 },
   ],
   fairwayHalf: (t) => 24 - Math.abs(t - 0.5) * 6,
-  roughExtra: 28,
+  roughExtra: 38,
   green: { cx: 560, cy: 230, rx: 16, ry: 13, rotation: 0.4 },
   greenBreak: { x: -0.25, y: -0.55 },
   bunkers: [
@@ -317,7 +321,7 @@ const hole8 = buildHole({
     { x: 458, y: 148 },
   ],
   fairwayHalf: (t) => 20 + (t > 0.6 ? -3 : 2),
-  roughExtra: 24,
+  roughExtra: 36,
   green: { cx: 458, cy: 148, rx: 16, ry: 12, rotation: 0.05 },
   greenBreak: { x: 0.15, y: 0.85 },
   bunkers: [
@@ -344,7 +348,7 @@ const hole9 = buildHole({
     { x: 412, y: 132 },
   ],
   fairwayHalf: (t) => 21 - t * 3,
-  roughExtra: 24,
+  roughExtra: 36,
   green: { cx: 412, cy: 132, rx: 16, ry: 13, rotation: -0.35 },
   greenBreak: { x: 0.45, y: 0.5 },
   bunkers: [
@@ -377,7 +381,7 @@ export function courseById(id: string): Course {
   return course;
 }
 
-export function lieAt(hole: Hole, p: Vec2): Lie {
+function lieAtStrict(hole: Hole, p: Vec2): Lie {
   for (const water of hole.water) {
     if (pointInPolygon(p, water)) return "water";
   }
@@ -395,6 +399,40 @@ export function lieAt(hole: Hole, p: Vec2): Lie {
     if (pointInPolygon(p, rough)) return "rough";
   }
   return "ob";
+}
+
+export function distanceToPlayable(hole: Hole, p: Vec2): number {
+  if (lieAtStrict(hole, p) !== "ob") return 0;
+  let best = Infinity;
+  for (const poly of [...hole.rough, ...hole.fairway]) {
+    best = Math.min(best, dist(p, closestPointOnPolygon(p, poly)));
+  }
+  best = Math.min(best, dist(p, hole.tee) - 9);
+  const greenEdge = Math.hypot(
+    (p.x - hole.green.cx) / hole.green.rx,
+    (p.y - hole.green.cy) / hole.green.ry,
+  );
+  if (greenEdge > 1) best = Math.min(best, (greenEdge - 1) * Math.min(hole.green.rx, hole.green.ry));
+  for (const bunker of hole.bunkers) {
+    const e = Math.hypot((p.x - bunker.cx) / bunker.rx, (p.y - bunker.cy) / bunker.ry);
+    if (e > 1) best = Math.min(best, (e - 1) * Math.min(bunker.rx, bunker.ry));
+  }
+  for (const tree of hole.trees) {
+    best = Math.min(best, Math.max(0, dist(p, tree) - tree.r - 6));
+  }
+  return Math.max(0, best);
+}
+
+export function lieAt(hole: Hole, p: Vec2): Lie {
+  const strict = lieAtStrict(hole, p);
+  if (strict !== "ob") return strict;
+  if (distanceToPlayable(hole, p) <= PLAYABLE_MARGIN) return "rough";
+  return "ob";
+}
+
+export function nearOb(hole: Hole, p: Vec2): boolean {
+  const d = distanceToPlayable(hole, p);
+  return d > 0 && d <= PLAYABLE_MARGIN;
 }
 
 export function onGreen(hole: Hole, p: Vec2): boolean {

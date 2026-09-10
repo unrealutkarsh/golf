@@ -1,4 +1,5 @@
 import type { GameSession } from "./game";
+import { onGreen } from "./course";
 import { grassTile, hashNoise, patternFrom, SUN } from "./look";
 import { CUP_RADIUS, type FlightSample } from "./physics";
 import { angleTo, clamp, dist, fromAngle, hashString, mulberry32, type Vec2 } from "./math";
@@ -101,10 +102,17 @@ export class Renderer {
     }
   }
 
-  draw(session: GameSession, dt: number): void {
+  draw(session: GameSession, dt: number, opts?: { hudOnly?: boolean }): void {
     this.time += dt;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.w, this.h);
+    if (opts?.hudOnly) {
+      if (session.screen === "play") {
+        this.drawMinimap(ctx, session);
+        this.drawMeters(ctx, session);
+      }
+      return;
+    }
     this.drawSky(ctx);
     const hole = session.hole();
     this.ensureStatic(hole);
@@ -877,9 +885,12 @@ export class Renderer {
   private updateCamera(session: GameSession, dt: number): void {
     if (session.camHold) return;
     const hole = session.hole();
-    const putting = session.lie === "green";
-    const fit = Math.min(this.w / (hole.bounds.w + 36), this.h / (hole.bounds.h + 72));
     const pinD = dist(session.ball.pos, hole.pin);
+    const putting =
+      session.lie === "green" ||
+      onGreen(hole, session.ball.pos) ||
+      (pinD < 24 && session.club().id === "putter");
+    const fit = Math.min(this.w / (hole.bounds.w + 36), this.h / (hole.bounds.h + 72));
     const visual = airbornePos(session.ball.pos, session.ball.z);
     let tx = session.ball.pos.x;
     let ty = session.ball.pos.y;
@@ -908,9 +919,11 @@ export class Renderer {
       zoomTarget = clamp(Math.min(this.w / spanX, this.h / spanY) * 0.82, 2.1, putting ? 8 : 5.4);
       follow = 0.00018;
     } else if (putting) {
-      tx = (session.ball.pos.x + hole.pin.x) / 2;
-      ty = (session.ball.pos.y + hole.pin.y) / 2;
-      zoomTarget = clamp(Math.min(this.w, this.h) / Math.max(pinD * 2.4, 28), 6, 16);
+      tx = session.ball.pos.x * 0.58 + hole.pin.x * 0.42;
+      ty = session.ball.pos.y * 0.58 + hole.pin.y * 0.42;
+      const span = Math.max(pinD * 1.55, 16);
+      zoomTarget = clamp(Math.min(this.w, this.h) / span, 9, 20);
+      follow = 0.0006;
     } else {
       tx = session.ball.pos.x * 0.45 + hole.pin.x * 0.55;
       ty = session.ball.pos.y * 0.45 + hole.pin.y * 0.55;
@@ -991,54 +1004,80 @@ export class Renderer {
   }
 
   private drawMeters(ctx: CanvasRenderingContext2D, session: GameSession): void {
-    const x = this.w - 36;
-    const y = this.h * 0.28;
-    const h = Math.min(240, this.h * 0.36);
+    const x = this.w - 42;
+    const y = this.h * 0.24;
+    const h = Math.min(280, this.h * 0.4);
     ctx.save();
-    ctx.fillStyle = "rgba(6, 12, 10, 0.35)";
-    this.roundRect(ctx, x - 10, y - 18, 28, h + 36, 8);
+    ctx.fillStyle = "rgba(6, 12, 10, 0.5)";
+    this.roundRect(ctx, x - 14, y - 22, 36, h + 44, 10);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.font = "600 9px 'Segoe UI', sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = "700 10px 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("PWR", x + 4, y - 6);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    this.roundRect(ctx, x, y, 8, h, 4);
+    ctx.fillText("PWR", x + 4, y - 8);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    this.roundRect(ctx, x - 2, y, 14, h, 6);
     ctx.fill();
     const g = ctx.createLinearGradient(0, y + h, 0, y);
     g.addColorStop(0, "#2e7d32");
     g.addColorStop(0.7, "#d4af37");
     g.addColorStop(1, "#c62828");
     ctx.fillStyle = g;
-    const fill = session.swingPhase === "aim" ? 0 : session.swingPhase === "power" ? session.meter : session.power;
-    this.roundRect(ctx, x + 1, y + h - h * fill, 6, h * fill, 3);
+    const fill = session.swingPhase === "aim" ? session.suggestedPower() * 0.15 : session.swingPhase === "power" ? session.meter : session.power;
+    this.roundRect(ctx, x, y + h - h * fill, 10, h * fill, 5);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillRect(x - 2, y + 8, 12, 2);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillRect(x - 4, y + 10, 18, 2);
     ctx.restore();
 
-    if (session.swingPhase !== "flight" && session.swingPhase !== "settle" && (session.swingPhase === "accuracy" || session.lockedAccuracy)) {
-      const bx = this.w / 2 - 120;
-      const by = this.h - 92;
-      ctx.fillStyle = "rgba(6, 12, 10, 0.45)";
-      this.roundRect(ctx, bx - 8, by - 8, 256, 28, 8);
-      ctx.fill();
-      ctx.fillStyle = "#222";
-      this.roundRect(ctx, bx, by, 240, 10, 5);
-      ctx.fill();
-      ctx.fillStyle = "#2e7d32";
-      ctx.fillRect(bx + 108, by, 24, 10);
-      ctx.fillStyle = "#d4af37";
-      ctx.fillRect(bx + 116, by, 8, 10);
-      const t = session.swingPhase === "accuracy" ? session.meter * 2 - 1 : session.accuracy;
-      const mx = bx + 120 + t * 120;
-      ctx.fillStyle = "#f4f1e8";
-      ctx.beginPath();
-      ctx.moveTo(mx, by - 3);
-      ctx.lineTo(mx - 4, by + 16);
-      ctx.lineTo(mx + 4, by + 16);
-      ctx.fill();
-    }
+    if (session.swingPhase === "flight" || session.swingPhase === "settle") return;
+    const bw = Math.min(560, this.w * 0.58);
+    const bh = 22;
+    const bx = (this.w - bw) / 2;
+    const by = this.h - 150;
+    const active = session.swingPhase === "accuracy" || session.lockedAccuracy;
+    ctx.save();
+    ctx.globalAlpha = active ? 1 : session.swingPhase === "power" ? 0.92 : 0.45;
+    ctx.fillStyle = "rgba(6, 12, 10, 0.62)";
+    this.roundRect(ctx, bx - 14, by - 28, bw + 28, bh + 50, 12);
+    ctx.fill();
+    ctx.fillStyle = "rgba(243, 239, 227, 0.72)";
+    ctx.font = "700 11px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("ACCURACY", bx + bw / 2, by - 10);
+    ctx.fillStyle = "#1a1a1a";
+    this.roundRect(ctx, bx, by, bw, bh, 8);
+    ctx.fill();
+    const miss = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    miss.addColorStop(0, "#8b2d2d");
+    miss.addColorStop(0.22, "#b8842a");
+    miss.addColorStop(0.42, "#2e7d32");
+    miss.addColorStop(0.5, "#d4af37");
+    miss.addColorStop(0.58, "#2e7d32");
+    miss.addColorStop(0.78, "#b8842a");
+    miss.addColorStop(1, "#8b2d2d");
+    ctx.fillStyle = miss;
+    this.roundRect(ctx, bx + 2, by + 2, bw - 4, bh - 4, 6);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(bx + bw * 0.46, by + 2, bw * 0.08, bh - 4);
+    const t = active ? (session.swingPhase === "accuracy" ? session.meter * 2 - 1 : session.accuracy) : 0;
+    const mx = bx + bw / 2 + t * (bw / 2 - 8);
+    ctx.fillStyle = "#f4f1e8";
+    ctx.beginPath();
+    ctx.moveTo(mx, by - 4);
+    ctx.lineTo(mx - 8, by + bh + 8);
+    ctx.lineTo(mx + 8, by + bh + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = "600 10px 'Segoe UI', sans-serif";
+    ctx.fillStyle = "rgba(243,239,227,0.7)";
+    ctx.fillText("MISS", bx + 28, by + bh + 16);
+    ctx.fillText("GOOD", bx + bw * 0.28, by + bh + 16);
+    ctx.fillText("PERFECT", bx + bw / 2, by + bh + 16);
+    ctx.fillText("GOOD", bx + bw * 0.72, by + bh + 16);
+    ctx.fillText("MISS", bx + bw - 28, by + bh + 16);
+    ctx.restore();
   }
 
   private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

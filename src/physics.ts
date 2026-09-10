@@ -30,6 +30,8 @@ export interface ShotInput {
   club: Club;
   lie: Lie;
   wind: Wind;
+  /** -1 fade, 0 straight, +1 draw (curves left of the aim line). */
+  shape?: number;
 }
 
 export interface SimEvent {
@@ -78,7 +80,7 @@ const LIE_POWER: Record<Lie, number> = {
 };
 
 export function createBall(pos: Vec2): Ball {
-  return { pos: clone(pos), vel: { x: 0, y: 0 }, z: 0, vz: 0, spinning: 0 };
+  return { pos: clone(pos), vel: { x: 0, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0 };
 }
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
@@ -87,11 +89,13 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const acc = clamp(shot.accuracy, -1, 1);
   const spray = (1 - shot.club.accuracy) * acc * 0.22 + acc * 0.045;
   const aim = shot.aim + spray;
+  const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
+  const curve = shape * (0.7 + shot.club.loft / 40) * (0.55 + power * 0.7) * 32;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
     const speed = roll * 1.62;
-    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0 };
+    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0, curve: 0 };
   }
 
   const carry = shot.club.carry * power * lieMul;
@@ -99,7 +103,7 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const flightTime = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
   const horiz = carry / flightTime;
   const vz = (flightTime * GRAVITY) / 2;
-  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power };
+  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve };
 }
 
 export function windAccel(wind: Wind, z: number): Vec2 {
@@ -117,7 +121,16 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     z: ball.z + ball.vz * dt,
     vz: ball.vz - GRAVITY * dt,
     spinning: ball.spinning,
+    curve: ball.curve,
   };
+
+  if (next.z > 0.35 && Math.abs(ball.curve) > 0.01) {
+    const speed = len(next.vel) || 1;
+    next.vel = {
+      x: next.vel.x + (-next.vel.y / speed) * ball.curve * dt,
+      y: next.vel.y + (next.vel.x / speed) * ball.curve * dt,
+    };
+  }
 
   const tree = treeHit(hole, next.pos, next.z);
   if (tree) {
@@ -174,7 +187,9 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     } else {
       next.vz = 0;
       next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
-      if (lie === "green") {
+      // Break only while the ball is still rolling. Applying it at rest
+      // kept putts creeping forever and blocked the next stroke.
+      if (lie === "green" && len(next.vel) > STOP_SPEED * 1.2) {
         next.vel = add(next.vel, scale(hole.greenBreak, dt * 2.4));
       }
       if (lie === "bunker") {

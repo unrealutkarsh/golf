@@ -80,7 +80,11 @@ export interface Ball {
   z: number;
   vz: number;
   spinning: number;
+  /** Lateral curve rate while airborne. Positive is a draw (left of aim). */
+  curve: number;
 }
+
+export type CamMode = "auto" | "player" | "follow" | "putt";
 
 export type Lie = Surface;
 
