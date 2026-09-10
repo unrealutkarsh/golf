@@ -27,8 +27,8 @@ interface LandRing {
   max: number;
 }
 
-const LIFT_X = 0.2;
-const LIFT_Y = 0.98;
+const LIFT_X = 0.28;
+const LIFT_Y = 2.25;
 
 export function airborneOffset(z: number): Vec2 {
   const h = Math.max(0, z);
@@ -636,8 +636,8 @@ export class Renderer {
     ctx.setLineDash([]);
 
     if (path.length > 1 && session.club().id !== "putter") {
-      this.strokeFlight(ctx, path, "rgba(0,0,0,0.18)", true, 1.15);
-      this.strokeFlight(ctx, path, "rgba(255, 232, 140, 0.92)", false, 0.85);
+      this.strokeFlight(ctx, path, "rgba(0,0,0,0.22)", true, 1.2);
+      this.strokeFlight(ctx, path, "rgba(255, 232, 140, 0.95)", false, 1.15);
       const apex = path.reduce((best, s) => (s.z > best.z ? s : best), path[0]);
       const ap = airbornePos(apex.pos, apex.z);
       ctx.fillStyle = "rgba(255, 248, 210, 0.9)";
@@ -682,8 +682,8 @@ export class Renderer {
     if (session.swingPhase !== "flight" && session.swingPhase !== "settle") return;
     if (session.shotArc.length < 2) return;
     ctx.save();
-    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.22)", true, 1.25);
-    this.strokeFlight(ctx, session.shotArc, "rgba(255, 226, 120, 0.88)", false, 1.15);
+    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.28)", true, 1.45);
+    this.strokeFlight(ctx, session.shotArc, "rgba(255, 226, 120, 0.95)", false, 1.55);
     const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
     if (apex.z > 3) {
       const ap = airbornePos(apex.pos, apex.z);

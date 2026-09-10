@@ -134,12 +134,14 @@ if (qa === "round") {
   session.playThroughForTest();
 } else if (qa === "fairway") {
   session.startTournament();
+  session.tipVisible = false;
 } else if (qa === "flight") {
   session.startTournament();
   session.power = 1;
   session.accuracy = 0;
   session.swingPhase = "accuracy";
   session.meter = 0.5;
+  session.tipVisible = false;
   session.tap();
   const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
   session.ball.pos = { ...apex.pos };
@@ -151,6 +153,7 @@ if (qa === "round") {
   session.update = () => undefined;
 } else if (qa === "green") {
   session.startTournament();
+  session.tipVisible = false;
   const hole = session.hole();
   session.ball.pos = { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
   session.ball.vel = { x: 0, y: 0 };

@@ -8,7 +8,7 @@ describe("2.5D ball lift", () => {
     const high = airbornePos(ground, 16);
     expect(airborneOffset(16).y).toBeLessThan(airborneOffset(2).y);
     expect(high.y).toBeLessThan(low.y);
-    expect(high.y).toBeLessThan(ground.y - 12);
+    expect(high.y).toBeLessThan(ground.y - 28);
     expect(low.x).toBeGreaterThan(ground.x);
   });
 });
