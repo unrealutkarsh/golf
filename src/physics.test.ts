@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { createBall, launchBall, stepBall } from "./physics";
+import { createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];
@@ -71,5 +71,33 @@ describe("shot physics", () => {
   it("stops a rolling ball", () => {
     const { ball } = settle(HARBOR_DUNES.holes[0].tee, "iron7", 0.7, 0);
     expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
+  });
+
+  it("flies with a visible apex that grows with loft", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = hole.tee;
+    const aim = Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x);
+    const wind = { speed: 0, dir: 0 };
+    const pathOf = (id: "driver" | "iron7" | "sw") =>
+      sampleFlightPath(from, {
+        aim,
+        power: 1,
+        accuracy: 0,
+        club: clubById(id),
+        lie: "tee",
+        wind,
+      }, hole);
+    const driver = pathOf("driver");
+    const iron = pathOf("iron7");
+    const wedge = pathOf("sw");
+    const driverApex = flightApex(driver);
+    const ironApex = flightApex(iron);
+    const wedgeApex = flightApex(wedge);
+    expect(driverApex).toBeGreaterThan(10);
+    expect(ironApex).toBeGreaterThan(driverApex + 8);
+    expect(wedgeApex).toBeGreaterThan(ironApex + 8);
+    const mid = driver[Math.floor(driver.length / 2)];
+    expect(mid.z).toBeGreaterThan(4);
+    expect(wedge.filter((s) => s.z > 0.5).length).toBeGreaterThan(driver.filter((s) => s.z > 0.5).length);
   });
 });

@@ -16,6 +16,12 @@ export const CUP_RADIUS = 1.35;
 export const GIMME_RADIUS = 1.15;
 export const STOP_SPEED = 0.55;
 export const MAX_HOLE_STROKES = 10;
+export const GRAVITY = 28;
+
+export interface FlightSample {
+  pos: Vec2;
+  z: number;
+}
 
 export interface ShotInput {
   aim: number;
@@ -52,10 +58,10 @@ const FRICTION: Record<Lie, number> = {
 };
 
 const RESTITUTION: Record<Lie, number> = {
-  tee: 0.32,
-  fairway: 0.3,
-  rough: 0.18,
-  green: 0.14,
+  tee: 0.36,
+  fairway: 0.34,
+  rough: 0.2,
+  green: 0.16,
   bunker: 0.08,
   water: 0,
   ob: 0.22,
@@ -90,10 +96,10 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
 
   const carry = shot.club.carry * power * lieMul;
   const loftRad = (shot.club.loft * Math.PI) / 180;
-  const flightTime = 1.22 + loftRad * 2.35;
+  const flightTime = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
   const horiz = carry / flightTime;
-  const vz = (flightTime * 28) / 2;
-  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.15, vz, spinning: shot.club.roll * power };
+  const vz = (flightTime * GRAVITY) / 2;
+  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power };
 }
 
 export function windAccel(wind: Wind, z: number): Vec2 {
@@ -109,7 +115,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     pos: add(ball.pos, scale(ball.vel, dt)),
     vel: add(ball.vel, scale(windAccel(wind, ball.z), dt)),
     z: ball.z + ball.vz * dt,
-    vz: ball.vz - 28 * dt,
+    vz: ball.vz - GRAVITY * dt,
     spinning: ball.spinning,
   };
 
@@ -160,7 +166,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     }
 
     if (Math.abs(ball.vz) > 2.2) {
-      next.vz = -ball.vz * RESTITUTION[lie] * (0.55 + clubBounce * 0.4);
+      next.vz = -ball.vz * RESTITUTION[lie] * (0.64 + clubBounce * 0.42);
       const rollKeep = 0.12 + Math.min(0.22, (ball.spinning / 28) * 0.18);
       next.vel = scale(next.vel, rollKeep);
       next.spinning *= 0.35;
@@ -218,16 +224,29 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
   };
 }
 
-export function predictedLanding(from: Vec2, shot: ShotInput, hole: Hole): Vec2 {
+export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilRest = false): FlightSample[] {
   let ball = launchBall(from, shot);
-  let last = clone(from);
-  for (let i = 0; i < 240; i++) {
+  const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
+  let airborne = ball.z > 0.05;
+  for (let i = 0; i < 280; i++) {
     const step = stepBall(ball, hole, shot.wind, 1 / 30, shot.club.bounce);
-    last = clone(step.ball.pos);
-    if (step.penaltyKind || step.holed || !step.flying) return last;
+    samples.push({ pos: clone(step.ball.pos), z: step.ball.z });
+    if (step.penaltyKind || step.holed) break;
+    if (!untilRest && airborne && step.ball.z <= 0.05) break;
+    if (!step.flying) break;
+    if (step.ball.z > 0.05) airborne = true;
     ball = step.ball;
   }
-  return last;
+  return samples;
+}
+
+export function predictedLanding(from: Vec2, shot: ShotInput, hole: Hole): Vec2 {
+  const path = sampleFlightPath(from, shot, hole, true);
+  return path.length ? clone(path[path.length - 1].pos) : clone(from);
+}
+
+export function flightApex(samples: FlightSample[]): number {
+  return samples.reduce((max, sample) => Math.max(max, sample.z), 0);
 }
 
 export function defaultAim(from: Vec2, hole: Hole): number {

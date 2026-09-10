@@ -8,8 +8,10 @@ import {
   defaultAim,
   launchBall,
   predictedLanding,
+  sampleFlightPath,
   stepBall,
   MAX_HOLE_STROKES,
+  type FlightSample,
 } from "./physics";
 import { prizeMoney, scoreName } from "./scoring";
 import { TOURNAMENTS } from "./tour";
@@ -87,15 +89,23 @@ export class GameSession {
     return dist(this.ball.pos, this.hole().pin);
   }
 
-  previewLanding(): Vec2 {
-    return predictedLanding(this.ball.pos, {
+  private previewShot() {
+    return {
       aim: this.aim,
       power: this.swingPhase === "aim" ? 0.92 : this.swingPhase === "power" ? Math.max(this.meter, 0.2) : this.power,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
       wind: this.wind,
-    }, this.hole());
+    };
+  }
+
+  previewFlight(): FlightSample[] {
+    return sampleFlightPath(this.ball.pos, this.previewShot(), this.hole());
+  }
+
+  previewLanding(): Vec2 {
+    return predictedLanding(this.ball.pos, this.previewShot(), this.hole());
   }
 
   startTournament(): void {
