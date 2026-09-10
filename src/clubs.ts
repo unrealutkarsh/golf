@@ -24,7 +24,8 @@ export function clubById(id: ClubId): Club {
 export function recommendClub(distanceYards: number, lie: string): Club {
   if (lie === "green") return clubById("putter");
   if (lie === "bunker") return clubById("sw");
-  const target = Math.max(0, distanceYards - 6);
+  const lieMul = lie === "rough" ? 0.88 : 1;
+  const target = Math.max(0, distanceYards / lieMul - 4);
   let best = CLUBS[0];
   let bestErr = Infinity;
   for (const club of CLUBS) {

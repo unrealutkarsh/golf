@@ -15,7 +15,7 @@ import type { Ball, Club, Hole, Lie, Wind } from "./types";
 export const CUP_RADIUS = 1.35;
 export const GIMME_RADIUS = 1.15;
 export const STOP_SPEED = 0.55;
-export const MAX_HOLE_STROKES = 8;
+export const MAX_HOLE_STROKES = 10;
 
 export interface ShotInput {
   aim: number;
@@ -64,9 +64,9 @@ const RESTITUTION: Record<Lie, number> = {
 const LIE_POWER: Record<Lie, number> = {
   tee: 1,
   fairway: 1,
-  rough: 0.78,
+  rough: 0.88,
   green: 1,
-  bunker: 0.62,
+  bunker: 0.7,
   water: 0.4,
   ob: 0.7,
 };
