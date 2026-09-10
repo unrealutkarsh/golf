@@ -74,7 +74,7 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
 export function bladeHeight(lie: Lie): number {
   switch (lie) {
     case "green":
-      return 0.12;
+      return 0.15;
     case "tee":
       return 0.16;
     case "fairway":

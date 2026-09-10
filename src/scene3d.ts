@@ -491,8 +491,8 @@ export class CourseScene {
     const p = session.ball.pos;
     const hole = session.hole();
     const aim = view === "putt" ? Math.atan2(hole.pin.y - p.y, hole.pin.x - p.x) : session.aim;
-    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.05 : 1.2);
-    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.38 : 0);
+    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.15 : 1.2);
+    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.55 : 0);
     this.golfer.position.set(p.x + back.x + left.x, groundHeight(hole, p.x, p.y), p.y + back.y + left.y);
     this.golfer.rotation.y = -aim + Math.PI / 2;
   }
@@ -581,9 +581,9 @@ export class CourseScene {
       const h = bladeHeight(lie);
       if (h <= 0) continue;
       dummy.position.set(x, groundHeight(hole, x, z), z);
-      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.45 : 0.18));
-      const w = bladeWidth(lie) * (0.8 + fbm(z, x) * 0.5);
-      dummy.scale.set(w, h * (0.85 + fbm(x * 2, z * 2) * 0.4), w);
+      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.38 : 0.12));
+      const lean = 0.82 + fbm(x * 2, z * 2) * 0.4;
+      dummy.scale.set(bladeWidth(lie), h * lean, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(written, dummy.matrix);
       const c = surfaceColor(hole, x, z);
@@ -614,11 +614,11 @@ export class CourseScene {
       look.set((hole.tee.x + pin.x) * 0.55, 1.2, (hole.tee.y + pin.y) * 0.55);
       fov = 50;
     } else if (view === "putt") {
-      const back = fromAngle(aim + Math.PI, 1.85);
-      const side = fromAngle(aim + Math.PI / 2, 0.62);
-      desired.set(ball.x + back.x + side.x, bh + 1.18, ball.y + back.y + side.y);
-      look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.18, ball.y * 0.28 + pin.y * 0.72);
-      fov = 52;
+      const back = fromAngle(aim + Math.PI, 2.25);
+      const side = fromAngle(aim + Math.PI / 2, 0.82);
+      desired.set(ball.x + back.x + side.x, bh + 1.32, ball.y + back.y + side.y);
+      look.set(ball.x * 0.22 + pin.x * 0.78, groundHeight(hole, pin.x, pin.y) + 0.2, ball.y * 0.22 + pin.y * 0.78);
+      fov = 50;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.4 ? Math.atan2(v.y, v.x) : session.aim;
@@ -649,16 +649,13 @@ export class CourseScene {
 }
 
 function makeCrossBladeGeo(): THREE.BufferGeometry {
-  const w = 0.5;
+  const w = 0.03;
   const positions = new Float32Array([
-    -w, 0, 0, w, 0, 0, 0.14, 1, 0,
-    -w, 0, 0, 0.14, 1, 0, -0.14, 1, 0,
-    0, 0, -w, 0, 0, w, 0, 1, 0.14,
-    0, 0, -w, 0, 1, 0.14, 0, 1, -0.14,
+    -w, 0, 0, w, 0, 0, 0, 1, 0,
+    0, 0, -w, 0, 0, w, 0, 1, 0,
   ]);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geo.computeVertexNormals();
   return geo;
 }
 
