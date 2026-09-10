@@ -44,14 +44,14 @@ const TURF_FRAG = /* glsl */ `
     vec3 n = normalize(vNormal);
     vec3 viewDir = normalize(cameraPos - vWorld);
     float stripe = 0.94 + 0.08 * sin(vWorld.x * 1.05 + vWorld.z * 0.06);
-    float patch = 0.9 + 0.12 * texture2D(grassMap, vWorld.xz * 0.42).r;
+    float mottling = 0.9 + 0.12 * texture2D(grassMap, vWorld.xz * 0.42).r;
     float blades = 0.88 + 0.16 * texture2D(grassMap, vWorld.xz * 1.15).g;
     float ndl = max(dot(n, sunDir), 0.0);
     float wrap = ndl * 0.55 + 0.45;
     vec3 halfV = normalize(sunDir + viewDir);
     float spec = pow(max(dot(n, halfV), 0.0), 36.0) * 0.22 * (0.35 + ndl);
     float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 3.0) * 0.12;
-    vec3 col = vColor * stripe * patch * blades;
+    vec3 col = vColor * stripe * mottling * blades;
     vec3 lit = col * (ambient + sunColor * wrap) + sunColor * spec + vec3(0.55, 0.7, 0.45) * rim;
     gl_FragColor = vec4(lit, 1.0);
   }
