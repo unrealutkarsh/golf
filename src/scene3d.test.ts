@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dimpleIndent, makeGolfBallGeometry } from "./scene3d";
+import { dimpleIndent, golferMeshCount, makeGolfBallGeometry } from "./scene3d";
 
 describe("golf ball dimples", () => {
   it("indents vertices that sit on a dimple center", () => {
@@ -28,5 +28,9 @@ describe("golf ball dimples", () => {
     expect(dented).toBeLessThan(pos.count * 0.85);
     expect(geo.getAttribute("color")).toBeTruthy();
     geo.dispose();
+  });
+
+  it("builds a multi-part golfer instead of a three-mesh stick figure", () => {
+    expect(golferMeshCount()).toBeGreaterThanOrEqual(12);
   });
 });

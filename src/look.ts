@@ -19,6 +19,18 @@ export function fbm(x: number, y: number): number {
   );
 }
 
+/** Tangent-space-ish normal from four height samples. Y is up. */
+export function heightToNormal(hL: number, hR: number, hD: number, hU: number, scale = 1.6): [number, number, number] {
+  const nx = (hL - hR) * scale;
+  const nz = (hD - hU) * scale;
+  const len = Math.hypot(nx, 1, nz) || 1;
+  return [nx / len, 1 / len, nz / len];
+}
+
+export function packNormalRgb(nx: number, ny: number, nz: number): [number, number, number] {
+  return [nx * 0.5 + 0.5, ny * 0.5 + 0.5, nz * 0.5 + 0.5];
+}
+
 export function grassTile(seed: string, colors: string[], size = 128, specks = 2400): HTMLCanvasElement {
   const tile = document.createElement("canvas");
   tile.width = size;
