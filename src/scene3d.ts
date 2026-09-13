@@ -401,7 +401,7 @@ export class CourseScene {
     this.addBunkerLips(hole);
     this.addTrees(hole);
     this.addForest(hole);
-    this.addHorizon(hole);
+    // Horizon skirt removed: its rim read as a black oval in the sky.
     this.addDunes(hole);
     this.buildPin();
     this.buildGrid(hole);
