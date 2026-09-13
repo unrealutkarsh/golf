@@ -187,6 +187,7 @@ function cutout(canvas: HTMLCanvasElement, alphaTest = 0.28): THREE.MeshStandard
   map.anisotropy = 8;
   return new THREE.MeshStandardMaterial({
     map,
+    color: 0x4e7e38,
     transparent: true,
     alphaTest,
     side: THREE.DoubleSide,
@@ -508,9 +509,9 @@ function addImpostorRing(parent: THREE.Group, kit: FoliageKit, hole: Hole): void
     const z = cz + Math.sin(a) * (radius + jitter);
     const ground = groundHeight(hole, x, z);
     const s = 12 + hashNoise(i, 7) * 16;
-    dummy.position.set(x, ground + s * 0.5, z);
-    dummy.lookAt(cx, ground + 5, cz);
-    dummy.scale.set(s * (0.75 + hashNoise(i, 8) * 0.35), s * (0.85 + hashNoise(i, 9) * 0.3), 1);
+    dummy.position.set(x, ground + s * 0.38, z);
+    dummy.lookAt(cx, ground + 3, cz);
+    dummy.scale.set(s * (0.7 + hashNoise(i, 8) * 0.28), s * (0.62 + hashNoise(i, 9) * 0.22), 1);
     dummy.updateMatrix();
     mats.push(dummy.matrix.clone());
   }
