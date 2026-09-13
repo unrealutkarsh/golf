@@ -38,20 +38,47 @@ export function grassTile(seed: string, colors: string[], size = 128, specks = 2
   const ctx = tile.getContext("2d");
   if (!ctx) throw new Error("Grass tile unavailable");
   const rng = mulberry32(hashString(seed));
-  ctx.fillStyle = colors[0];
-  ctx.fillRect(0, 0, size, size);
+  const img = ctx.createImageData(size, size);
+  const parsed = colors.map((hex) => {
+    const n = hex.startsWith("#") ? hex.slice(1) : hex;
+    return [parseInt(n.slice(0, 2), 16), parseInt(n.slice(2, 4), 16), parseInt(n.slice(4, 6), 16)];
+  });
+  const mix = (a: number[], b: number[], t: number) => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const n =
+        hashNoise(x * 0.07 + rng() * 0.01, y * 0.07) * 0.45 +
+        hashNoise(x * 0.19, y * 0.17) * 0.32 +
+        hashNoise(x * 0.41, y * 0.38) * 0.23;
+      const i0 = Math.floor(n * (parsed.length - 1));
+      const t = n * (parsed.length - 1) - i0;
+      const c = mix(parsed[i0], parsed[Math.min(parsed.length - 1, i0 + 1)], t);
+      const i = (y * size + x) * 4;
+      img.data[i] = c[0];
+      img.data[i + 1] = c[1];
+      img.data[i + 2] = c[2];
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
   for (let i = 0; i < specks; i++) {
     const px = rng() * size;
     const py = rng() * size;
     const tone = colors[1 + Math.floor(rng() * (colors.length - 1))];
-    ctx.globalAlpha = 0.1 + rng() * 0.42;
+    ctx.globalAlpha = 0.08 + rng() * 0.28;
     ctx.fillStyle = tone;
-    const w = 0.45 + rng() * 1.6;
-    const h = 2.2 + rng() * 5.6;
+    const w = 0.35 + rng() * 1.1;
+    const h = 1.4 + rng() * 3.4;
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate((rng() - 0.5) * 0.35);
-    ctx.fillRect(-w * 0.5, -h, w, h);
+    ctx.rotate(rng() * Math.PI * 2);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
   ctx.globalAlpha = 1;

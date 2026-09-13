@@ -48,15 +48,15 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.14, 0.36, 0.72);
-    vec3 mid = vec3(0.38, 0.60, 0.88);
-    vec3 horizon = vec3(0.70, 0.78, 0.86);
-    vec3 ground = vec3(0.52, 0.58, 0.54);
-    vec3 col = mix(ground, horizon, smoothstep(-0.12, 0.08, h));
-    col = mix(col, mid, smoothstep(0.05, 0.36, h));
-    col = mix(col, zenith, smoothstep(0.26, 0.94, h));
-    float haze = pow(1.0 - clamp(h * 0.9 + 0.08, 0.0, 1.0), 1.35);
-    col = mix(col, vec3(0.72, 0.78, 0.84), haze * 0.42);
+    vec3 zenith = vec3(0.08, 0.32, 0.78);
+    vec3 mid = vec3(0.30, 0.56, 0.92);
+    vec3 horizon = vec3(0.58, 0.74, 0.90);
+    vec3 ground = vec3(0.36, 0.50, 0.46);
+    vec3 col = mix(ground, horizon, smoothstep(-0.16, 0.06, h));
+    col = mix(col, mid, smoothstep(0.04, 0.34, h));
+    col = mix(col, zenith, smoothstep(0.22, 0.92, h));
+    float haze = pow(1.0 - clamp(h * 1.05 + 0.04, 0.0, 1.0), 1.5);
+    col = mix(col, vec3(0.66, 0.78, 0.90), haze * 0.28);
     vec3 sunD = normalize(vec3(0.42, 0.62, 0.22));
     float glow = pow(max(dot(dir, sunD), 0.0), 8.0);
     float wash = pow(max(dot(dir, sunD), 0.0), 2.2);
@@ -124,7 +124,7 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x6a88b0, 1);
+    this.renderer.setClearColor(0x4a7ab8, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const software = isSoftwareGL(this.renderer);
@@ -132,22 +132,22 @@ export class CourseScene {
     this.renderer.toneMappingExposure = software ? 1.0 : 0.98;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xb8c6d0, 380, 3600);
+    this.scene.fog = new THREE.Fog(0x8eacc8, 520, 4200);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc4c8d0, 0.7));
-    const hemi = new THREE.HemisphereLight(0xd4e4f4, 0x7a7458, 1.22);
+    this.scene.add(new THREE.AmbientLight(0xb4c4d8, 0.52));
+    const hemi = new THREE.HemisphereLight(0xc8e4ff, 0x4a5c34, 1.18);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xd0d8e4, 0.58);
+    const fill = new THREE.DirectionalLight(0xc4d8f0, 0.48);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xc0b488, 0.24);
+    const bounce = new THREE.DirectionalLight(0x7a8c48, 0.16);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff2d6, 0.92);
+    this.sun = new THREE.DirectionalLight(0xfff4dc, 1.18);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -424,7 +424,7 @@ export class CourseScene {
     this.turfMat.map = maps.albedo;
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(2.25, 2.25);
+    this.turfMat.normalScale.set(1.35, 1.35);
     this.turfMat.vertexColors = true;
     this.turfMat.needsUpdate = true;
     applyNapUniforms(this.turfMat, hole);
@@ -547,12 +547,12 @@ export class CourseScene {
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
     const grass = new THREE.MeshStandardMaterial({
-      color: 0xa8a478,
-      roughness: 0.96,
-      emissive: new THREE.Color(0x4a4830),
-      emissiveIntensity: 0.03,
+      color: 0x5a6c38,
+      roughness: 0.97,
+      emissive: new THREE.Color(0x1c2410),
+      emissiveIntensity: 0.02,
     });
-    const far = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600, 96, 96), grass);
+    const far = new THREE.Mesh(new THREE.PlaneGeometry(4200, 4200, 80, 80), grass);
     far.rotation.x = -Math.PI / 2;
     const pos = far.geometry.attributes.position;
     const b = hole.bounds;
@@ -561,30 +561,28 @@ export class CourseScene {
       const lz = pos.getY(i);
       const x = lx + cx;
       const z = lz + cz;
-      const inPlay = x > b.x - 20 && x < b.x + b.w + 20 && z > b.y - 20 && z < b.y + b.h + 20;
-      const dune = hashNoise(x * 0.01, z * 0.01) * 28 + hashNoise(x * 0.028, z * 0.028) * 12 + hashNoise(x * 0.06, z * 0.06) * 4;
-      pos.setZ(i, inPlay ? -1.4 : -1.8 + dune);
+      const inPlay = x > b.x - 40 && x < b.x + b.w + 40 && z > b.y - 40 && z < b.y + b.h + 40;
+      const dune = hashNoise(x * 0.008, z * 0.008) * 16 + hashNoise(x * 0.02, z * 0.02) * 7;
+      pos.setZ(i, inPlay ? -2.2 : -1.4 + dune);
     }
     far.geometry.computeVertexNormals();
     far.position.set(cx, 0, cz);
     far.receiveShadow = true;
     this.holeGroup.add(far);
     const spots = [
-      [b.x - 110, b.y - 90, 82, 0.28],
-      [b.x + b.w + 100, b.y + 8, 96, 0.24],
-      [b.x + 70, b.y - 140, 78, 0.22],
-      [b.x + b.w * 0.55, b.y + b.h + 110, 104, 0.26],
-      [b.x - 70, b.y + b.h + 80, 70, 0.24],
-      [b.x + b.w * 0.22, b.y - 180, 120, 0.18],
-      [cx + 280, cz + 220, 140, 0.16],
-      [cx - 300, cz - 200, 130, 0.17],
-      [cx + 160, cz - 260, 150, 0.14],
-      [cx - 40, cz + 300, 160, 0.12],
+      [b.x - 260, b.y - 220, 90, 0.14],
+      [b.x + b.w + 240, b.y + 40, 100, 0.12],
+      [b.x + 40, b.y - 320, 88, 0.11],
+      [b.x + b.w * 0.55, b.y + b.h + 260, 110, 0.13],
+      [b.x - 180, b.y + b.h + 200, 80, 0.12],
+      [cx + 420, cz + 360, 130, 0.1],
+      [cx - 460, cz - 340, 120, 0.1],
+      [cx + 280, cz - 420, 140, 0.09],
     ];
     for (const [x, z, r, sy] of spots) {
-      const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 20), grass);
-      hill.scale.set(1 + hashNoise(x, z) * 0.25, sy, 0.85 + hashNoise(z, x) * 0.3);
-      hill.position.set(x, r * sy * 0.18, z);
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), grass);
+      hill.scale.set(1 + hashNoise(x, z) * 0.22, sy, 0.85 + hashNoise(z, x) * 0.28);
+      hill.position.set(x, r * sy * 0.08, z);
       hill.receiveShadow = true;
       this.holeGroup.add(hill);
     }
@@ -850,11 +848,11 @@ export class CourseScene {
       fov = 48;
     } else if (view === "putt") {
       const pinDist = Math.max(2, dist(ball, pin));
-      const back = fromAngle(aim + Math.PI, 3.1 + Math.min(2.6, pinDist * 0.2));
-      const side = fromAngle(aim + Math.PI / 2, 2.25);
-      desired.set(ball.x + back.x + side.x, bh + 1.38 + Math.min(0.42, pinDist * 0.03), ball.y + back.y + side.y);
-      look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.08, ball.y * 0.28 + pin.y * 0.72);
-      fov = 46;
+      const back = fromAngle(aim + Math.PI, 3.9 + Math.min(2.2, pinDist * 0.18));
+      const side = fromAngle(aim + Math.PI / 2, 1.42);
+      desired.set(ball.x + back.x + side.x, bh + 1.62 + Math.min(0.36, pinDist * 0.028), ball.y + back.y + side.y);
+      look.set(ball.x * 0.2 + pin.x * 0.8, groundHeight(hole, pin.x, pin.y) + 0.18, ball.y * 0.2 + pin.y * 0.8);
+      fov = 48;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
@@ -868,11 +866,11 @@ export class CourseScene {
       look.set(ball.x + Math.cos(heading) * ahead, 0.55, ball.y + Math.sin(heading) * ahead);
       fov = 46;
     } else {
-      const back = fromAngle(aim + Math.PI, 3.85);
-      const side = fromAngle(aim + Math.PI / 2, 2.85);
-      desired.set(ball.x + back.x + side.x, bh + 1.58, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(aim) * 18, 0.9, ball.y + Math.sin(aim) * 18);
-      fov = 48;
+      const back = fromAngle(aim + Math.PI, 4.85);
+      const side = fromAngle(aim + Math.PI / 2, 1.58);
+      desired.set(ball.x + back.x + side.x, bh + 1.74, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 11, bh + 0.42, ball.y + Math.sin(aim) * 11);
+      fov = 50;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));

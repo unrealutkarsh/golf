@@ -514,7 +514,7 @@ export function makeBush(x: number, z: number, r: number, ground: number, kit: F
 
 export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
   for (const tree of hole.trees) {
-    parent.add(makeVolumeTree(tree.x, tree.y, tree.r * 1.28, groundHeight(hole, tree.x, tree.y), kit));
+    parent.add(makeVolumeTree(tree.x, tree.y, tree.r * 1.42, groundHeight(hole, tree.x, tree.y), kit));
     if (fbm(tree.x, tree.y) > 0.42) {
       const jx = tree.x + (fbm(tree.x + 2, tree.y) - 0.5) * 14;
       const jz = tree.y + (fbm(tree.x, tree.y + 3) - 0.5) * 14;
@@ -529,7 +529,94 @@ export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hol
       parent.add(makeBush(tree.x - 2.6, tree.y + 3.4, 1.4, groundHeight(hole, tree.x - 2.6, tree.y + 3.4), kit));
     }
   }
+  addGreenGallery(parent, kit, hole);
+  addTeeGallery(parent, kit, hole);
   addInstancedWoods(parent, kit, hole);
+}
+
+function plantIfRough(parent: THREE.Group, kit: FoliageKit, hole: Hole, x: number, z: number, r: number, compact: boolean): boolean {
+  const lie = lieAt(hole, { x, y: z });
+  if (playableLie(lie) || lie === "bunker") return false;
+  parent.add(makeVolumeTree(x, z, r, groundHeight(hole, x, z), kit, { compact, shadow: !compact }));
+  return true;
+}
+
+function addGreenGallery(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
+  const g = hole.green;
+  const toTee = Math.atan2(hole.tee.y - g.cy, hole.tee.x - g.cx);
+  const back = toTee + Math.PI;
+  const px = Math.cos(back);
+  const pz = Math.sin(back);
+  const sx = Math.cos(back + Math.PI / 2);
+  const sz = Math.sin(back + Math.PI / 2);
+  for (let i = 0; i < 22; i++) {
+    const lateral = ((i + 0.5) / 22 - 0.5) * 34;
+    const depth = 16 + hashNoise(i, 8) * 20 + (i % 4) * 3;
+    plantIfRough(
+      parent,
+      kit,
+      hole,
+      g.cx + px * depth + sx * lateral,
+      g.cy + pz * depth + sz * lateral,
+      7.4 + hashNoise(i, 3) * 3.2,
+      i % 3 !== 0,
+    );
+  }
+  for (let i = 0; i < 14; i++) {
+    const lateral = ((i + 0.5) / 14 - 0.5) * 48;
+    const depth = 42 + hashNoise(i, 11) * 28;
+    plantIfRough(
+      parent,
+      kit,
+      hole,
+      g.cx + px * depth + sx * lateral,
+      g.cy + pz * depth + sz * lateral,
+      9.2 + (i % 4),
+      i % 2 === 0,
+    );
+  }
+  let planted = 0;
+  for (let i = 0; i < 36 && planted < 22; i++) {
+    const a = (i / 36) * Math.PI * 2 + 0.07;
+    let da = a - toTee;
+    while (da > Math.PI) da -= Math.PI * 2;
+    while (da < -Math.PI) da += Math.PI * 2;
+    if (Math.abs(da) < 0.62) continue;
+    const rad = Math.max(g.rx, g.ry) + 16 + hashNoise(i, g.cx) * 16 + (i % 3) * 4;
+    if (
+      plantIfRough(
+        parent,
+        kit,
+        hole,
+        g.cx + Math.cos(a) * rad,
+        g.cy + Math.sin(a) * rad,
+        6.4 + hashNoise(i, 3) * 3.6,
+        i % 2 === 0,
+      )
+    ) {
+      planted += 1;
+    }
+  }
+}
+
+function addTeeGallery(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
+  const aim = Math.atan2(hole.pin.y - hole.tee.y, hole.pin.x - hole.tee.x);
+  const fx = Math.cos(aim);
+  const fz = Math.sin(aim);
+  const sx = Math.cos(aim + Math.PI / 2);
+  const sz = Math.sin(aim + Math.PI / 2);
+  for (let i = 0; i < 12; i++) {
+    const back = 7 + (i % 6) * 4.2;
+    const side = (i % 2 === 0 ? 1 : -1) * (18 + (i % 5) * 3.4);
+    plantIfRough(parent, kit, hole, hole.tee.x - fx * back + sx * side, hole.tee.y - fz * back + sz * side, 6.2 + (i % 3), i > 7);
+  }
+  for (let i = 0; i < 24; i++) {
+    const t = 0.12 + (i / 24) * 0.72;
+    const x0 = hole.tee.x + (hole.pin.x - hole.tee.x) * t;
+    const z0 = hole.tee.y + (hole.pin.y - hole.tee.y) * t;
+    const side = (i % 2 === 0 ? 1 : -1) * (22 + hashNoise(i, 2) * 10 + (i % 5));
+    plantIfRough(parent, kit, hole, x0 + sx * side, z0 + sz * side, 7.4 + hashNoise(i, 4) * 2.8, i % 3 !== 0);
+  }
 }
 
 function playableLie(lie: ReturnType<typeof lieAt>): boolean {
@@ -537,7 +624,6 @@ function playableLie(lie: ReturnType<typeof lieAt>): boolean {
 }
 
 function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
-  const b = hole.bounds;
   const pineTrunks: THREE.Matrix4[] = [];
   const oakTrunks: THREE.Matrix4[] = [];
   const mapleTrunks: THREE.Matrix4[] = [];
@@ -548,16 +634,19 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const under: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
-  for (let i = 0; i < 380 && n < 148; i++) {
-    const cluster = Math.floor(i / 4);
-    const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
-    const rad = 64 + hashNoise(cluster, 2.2) * 132;
-    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 42;
-    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 42;
-    const x = cx + (hashNoise(i, 8) - 0.5) * 48;
-    const z = cz + (hashNoise(i, 9) - 0.5) * 44;
+  const reach = Math.hypot(hole.pin.x - hole.tee.x, hole.pin.y - hole.tee.y) || 1;
+  const fx = (hole.pin.x - hole.tee.x) / reach;
+  const fz = (hole.pin.y - hole.tee.y) / reach;
+  const sx = -fz;
+  const sz = fx;
+  for (let i = 0; i < 420 && n < 168; i++) {
+    const along = -12 + hashNoise(i, 0.4) * (reach + 110);
+    const sideSign = i % 2 === 0 ? 1 : -1;
+    const sideDist = 20 + hashNoise(i, 1.2) * 22 + (i % 6) * 2.4;
+    const x = hole.tee.x + fx * along + sx * sideSign * sideDist + (hashNoise(i, 8) - 0.5) * 7;
+    const z = hole.tee.y + fz * along + sz * sideSign * sideDist + (hashNoise(i, 9) - 0.5) * 7;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;
-    if (hashNoise(i, 1.4) < 0.26) continue;
+    if (hashNoise(i, 1.4) < 0.08) continue;
     const ground = groundHeight(hole, x, z);
     const kind = treeKind(x + 1, z);
     const r = 3.6 + hashNoise(i, 11) * 8.4;

@@ -68,37 +68,37 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.33 + micro * 0.03 + n * 0.025) * nap,
-      (0.385 + micro * 0.025 + n * 0.025) * nap,
-      (0.2 + micro * 0.015) * nap,
+      (0.28 + micro * 0.03 + n * 0.02) * nap,
+      (0.42 + micro * 0.03 + n * 0.025) * nap,
+      (0.16 + micro * 0.015) * nap,
     ];
   }
   if (band === "collar") {
     return [
-      (0.34 + micro * 0.03) * nap,
-      (0.4 + n * 0.025) * nap,
-      (0.2 + micro * 0.015) * nap,
+      (0.3 + micro * 0.03) * nap,
+      (0.43 + n * 0.025) * nap,
+      (0.17 + micro * 0.015) * nap,
     ];
   }
   if (band === "fringe") {
     return [
-      (0.38 + micro * 0.04 + clump * 0.03) * nap,
-      (0.41 + n * 0.025 + micro * 0.02) * nap,
+      (0.4 + micro * 0.04 + clump * 0.03) * nap,
+      (0.44 + n * 0.025 + micro * 0.02) * nap,
       (0.2 + micro * 0.015) * nap,
     ];
   }
   if (band === "fairway") {
     return [
-      (0.39 + micro * 0.04 + n * 0.025 + clump * 0.025) * nap,
-      (0.42 + micro * 0.03 + n * 0.025) * nap,
-      (0.22 + micro * 0.015) * nap,
+      (0.36 + micro * 0.04 + n * 0.025 + clump * 0.025) * nap,
+      (0.48 + micro * 0.03 + n * 0.03) * nap,
+      (0.18 + micro * 0.015) * nap,
     ];
   }
   if (band === "tee") {
-    return [0.37 + n * 0.03 + micro * 0.03, 0.41 + n * 0.025, 0.21 + micro * 0.015];
+    return [0.34 + n * 0.03 + micro * 0.03, 0.46 + n * 0.03, 0.18 + micro * 0.015];
   }
   if (band === "rough") {
-    return [0.28 + n * 0.06 + clump * 0.04, 0.32 + n * 0.04, 0.16 + n * 0.02];
+    return [0.26 + n * 0.05 + clump * 0.04, 0.36 + n * 0.04, 0.12 + n * 0.02];
   }
   if (band === "bunker") {
     return [0.74 + n * 0.1 + micro * 0.08, 0.6 + n * 0.07, 0.34 + n * 0.03];
@@ -325,10 +325,17 @@ ${shader.fragmentShader}`;
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <map_fragment>",
       `#include <map_fragment>
-       vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       float detailMix = uCourseWide > 0.5 ? 0.26 : 0.16;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 0.98, detailMix);
        vec2 world = vWorldPos.xz;
+       vec2 warp = vec2(
+         sin(world.x * 0.19 + world.y * 0.13),
+         cos(world.x * 0.11 - world.y * 0.17)
+       ) * 0.42;
+       vec2 wUv = (world + warp) * 0.27;
+       vec2 wUv2 = vec2(wUv.x * 0.62 - wUv.y * 0.78, wUv.x * 0.78 + wUv.y * 0.62) * 1.85;
+       vec2 wUv3 = (world - warp * 0.7) * 0.11 + vec2(0.37, 0.18);
+       vec3 detail = (texture2D(uDetail, wUv).rgb + texture2D(uDetail, wUv2).rgb + texture2D(uDetail, wUv3).rgb) / 3.0;
+       float detailMix = uCourseWide > 0.5 ? 0.16 : 0.1;
+       diffuseColor.rgb *= mix(vec3(1.0), detail, detailMix);
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
        float sa = sin(-uGreenCenter.z);
@@ -339,20 +346,16 @@ ${shader.fragmentShader}`;
        vec2 viewN = viewXZ / vlen;
        vec2 nap = normalize(uNapDir);
        float along = dot(viewN, nap);
-       float across = local.x * -nap.y + local.y * nap.x;
-       float grain = 0.5 + 0.5 * sin(across * 9.0 + along * 1.5);
-       float clump = 0.5 + 0.5 * sin(world.x * 1.7 + world.y * 1.3);
+       float clump = fract(sin(dot(world, vec2(12.7, 31.1))) * 43758.5);
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.98 + along * 0.028 + grain * 0.022;
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.0, 0.99, 0.94) * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 0.99, 0.9) * (0.98 + grain * 0.02), onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.99, 0.88) * (0.97 + clump * 0.03), onFringe);
+       float napTerm = 0.97 + along * 0.04 + clump * 0.03;
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.02, 0.9) * napTerm, onGreen);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.9) * (0.97 + clump * 0.03), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 1.0, 0.86) * (0.96 + clump * 0.04), onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       float fwGrain = 0.5 + 0.5 * sin(world.x * 2.4 + world.y * 1.8);
-       float fwClump = 0.5 + 0.5 * sin(world.x * 0.55 + world.y * 0.42);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 1.0, 0.9) * (0.98 + fwGrain * 0.03 + fwClump * 0.025), fairway * uCourseWide);`
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.04, 0.88) * (0.97 + clump * 0.04), fairway * uCourseWide);`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <roughnessmap_fragment>",
@@ -363,12 +366,18 @@ ${shader.fragmentShader}`;
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
-       vec3 dn = texture2D(uDetailN, vMapUv * uDetailScale * 1.8).xyz * 2.0 - 1.0;
-       float nAmt = uCourseWide > 0.5 ? 0.38 : 0.55;
+       vec2 nWarp = vec2(
+         sin(vWorldPos.x * 0.19 + vWorldPos.z * 0.13),
+         cos(vWorldPos.x * 0.11 - vWorldPos.z * 0.17)
+       ) * 0.42;
+       vec2 nUv = (vWorldPos.xz + nWarp) * 0.34;
+       vec2 nUv2 = vec2(nUv.x * 0.55 - nUv.y * 0.83, nUv.x * 0.83 + nUv.y * 0.55) * 1.55;
+       vec3 dn = mix(texture2D(uDetailN, nUv).xyz, texture2D(uDetailN, nUv2).xyz, 0.5) * 2.0 - 1.0;
+       float nAmt = uCourseWide > 0.5 ? 0.24 : 0.36;
        normal = normalize(normal + dn * nAmt);`,
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-v8-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v10-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {
@@ -407,7 +416,7 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   mat.map = maps.albedo;
   mat.roughnessMap = maps.rough;
   mat.normalMap = maps.normal;
-  mat.normalScale.set(2.45, 2.45);
+  mat.normalScale.set(1.55, 1.55);
   mat.needsUpdate = true;
   applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);
