@@ -236,7 +236,7 @@ export function makeGrassDetailTex(): THREE.CanvasTexture {
 }
 
 export function makeGrassDetailNormal(): THREE.CanvasTexture {
-  const tex = new THREE.CanvasTexture(grassNormalTile("ptg-grass-n", 256));
+  const tex = new THREE.CanvasTexture(grassNormalTile("ptg-grass-n", 128));
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = 4;
   tex.needsUpdate = true;

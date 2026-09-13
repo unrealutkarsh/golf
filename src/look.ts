@@ -65,7 +65,7 @@ export function patternFrom(ctx: CanvasRenderingContext2D, tile: HTMLCanvasEleme
 }
 
 /** Tiled grass-blade normal from a height-speckle field. */
-export function grassNormalTile(seed: string, size = 256): HTMLCanvasElement {
+export function grassNormalTile(seed: string, size = 128): HTMLCanvasElement {
   const tile = document.createElement("canvas");
   tile.width = size;
   tile.height = size;
@@ -74,7 +74,7 @@ export function grassNormalTile(seed: string, size = 256): HTMLCanvasElement {
   const rng = mulberry32(hashString(seed));
   const height = new Float32Array(size * size);
   for (let i = 0; i < size * size; i++) height[i] = 0.42;
-  for (let i = 0; i < 5200; i++) {
+  for (let i = 0; i < 2400; i++) {
     const px = Math.floor(rng() * size);
     const py = Math.floor(rng() * size);
     const h = 0.35 + rng() * 0.65;
