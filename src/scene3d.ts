@@ -198,7 +198,7 @@ export class CourseScene {
     this.ball.add(this.halo);
     const marker = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xfff8e0, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
     marker.name = "air-marker";
-    marker.scale.set(0.7, 0.7, 1);
+    marker.scale.set(0.28, 0.28, 1);
     this.ball.add(marker);
     this.scene.add(this.ball);
 
@@ -515,8 +515,8 @@ export class CourseScene {
     const marker = this.ball.getObjectByName("air-marker") as THREE.Sprite | undefined;
     if (marker) {
       const mat = marker.material as THREE.SpriteMaterial;
-      mat.opacity = air > 2 ? Math.min(0.85, 0.2 + air * 0.03) : 0;
-      const s = 0.45 + Math.min(1.1, air * 0.04);
+      mat.opacity = air > 2 ? Math.min(0.55, 0.16 + air * 0.018) : 0;
+      const s = 0.2 + Math.min(0.28, air * 0.012);
       marker.scale.set(s, s, 1);
     }
   }
