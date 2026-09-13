@@ -545,9 +545,9 @@ export class CourseScene {
     if (aiming && session.screen === "play") path = session.previewFlight();
     else if (flying) path = session.shotArc;
     const show = session.screen === "play" && path.length > 1;
-    this.groundLine.visible = show;
+    this.groundLine.visible = show && aiming;
     this.landing.visible = show && aiming && session.club().id !== "putter";
-    if (this.flightMesh) this.flightMesh.visible = show;
+    if (this.flightMesh) this.flightMesh.visible = show && aiming;
     if (!show) return;
     const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
     this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xff9a4a : 0xffe27a);
@@ -705,15 +705,14 @@ export class CourseScene {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
       const landing = session.shotArc[session.shotArc.length - 1];
-      const back = fromAngle(heading + Math.PI, 18);
+      const back = fromAngle(heading + Math.PI, 20);
       const curve = session.ball.curve || session.shape * 24;
-      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 5);
-      desired.set(ball.x + back.x + side.x, 6.4 + Math.min(4.2, session.ball.z * 0.12), ball.y + back.y + side.y);
-      const ahead = 28;
-      const lx = landing ? ball.x * 0.28 + landing.pos.x * 0.72 : ball.x + Math.cos(heading) * ahead;
-      const lz = landing ? ball.y * 0.28 + landing.pos.y * 0.72 : ball.y + Math.sin(heading) * ahead;
-      look.set(lx, 0.9 + session.ball.z * 0.1, lz);
-      fov = 46;
+      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 4);
+      desired.set(ball.x + back.x + side.x, 9.2, ball.y + back.y + side.y);
+      const toLand = landing ? Math.hypot(landing.pos.x - ball.x, landing.pos.y - ball.y) : 40;
+      const ahead = Math.min(70, Math.max(26, toLand * 0.55));
+      look.set(ball.x + Math.cos(heading) * ahead, 0.45, ball.y + Math.sin(heading) * ahead);
+      fov = 44;
     } else {
       const lookDist = 28;
       const back = fromAngle(aim + Math.PI, 12);
