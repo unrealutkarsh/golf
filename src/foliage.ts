@@ -181,8 +181,10 @@ export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hol
   }
   addGreenGallery(parent, kit, hole, lite);
   addTeeGallery(parent, kit, hole, lite);
-  addCorridorWalls(parent, kit, hole, lite);
-  addHorizonImpostors(parent, kit, hole);
+  if (!lite) {
+    addCorridorWalls(parent, kit, hole, lite);
+    addHorizonImpostors(parent, kit, hole);
+  }
 }
 
 function playableLie(lie: ReturnType<typeof lieAt>): boolean {

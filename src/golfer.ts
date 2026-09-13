@@ -256,7 +256,7 @@ function kit() {
     hair: new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.74 }),
     belt: new THREE.MeshStandardMaterial({ color: 0x32241c, roughness: 0.55 }),
     grip: new THREE.MeshStandardMaterial({ color: 0x1a1a18, roughness: 0.78 }),
-    steel: new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.38, metalness: 0.55, envMapIntensity: 0.85 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x1a1c1e, roughness: 0.32, metalness: 0.62, envMapIntensity: 0.95, emissive: new THREE.Color(0x0a0c0e), emissiveIntensity: 0.08 }),
     woodCrown: new THREE.MeshStandardMaterial({ color: 0x16301c, roughness: 0.42, metalness: 0.18, envMapIntensity: 0.7 }),
     putterFace: new THREE.MeshStandardMaterial({ color: 0x2c3238, roughness: 0.32, metalness: 0.48, envMapIntensity: 0.8 }),
     iris: new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.35 }),
@@ -283,9 +283,9 @@ export function buildAddressGolfer(): THREE.Group {
   const rShoulder: Joint = { x: 0.2, y: 1.39, z: 0.08 };
   const lElbow: Joint = { x: -0.06, y: 1.06, z: 0.31 };
   const rElbow: Joint = { x: 0.08, y: 1.04, z: 0.33 };
-  const hands: Joint = { x: 0.06, y: 0.76, z: 0.43 };
+  const hands: Joint = { x: 0.14, y: 0.76, z: 0.44 };
   const headPos: Joint = { x: 0.02, y: 1.59, z: 0.22 };
-  const headPt: Joint = { x: 0.08, y: 0.034, z: 0.58 };
+  const headPt: Joint = { x: 0.2, y: 0.034, z: 0.6 };
 
   const hipsB = makeBone("hips", 0, 0.92, -0.02);
   const spine = makeBone("spine", 0, 0.16, 0.04);
