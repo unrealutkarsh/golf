@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
 import type { GameSession } from "./game";
-import { fbm, hashNoise, heightToNormal, packNormalRgb } from "./look";
+import { fbm, grassTile, hashNoise, heightToNormal, packNormalRgb } from "./look";
 import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
 import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
@@ -120,26 +120,29 @@ export class CourseScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 0.96;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x9aafb8, 0.00095);
+    this.scene.fog = new THREE.FogExp2(0xa8b8b4, 0.00072);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    const hemi = new THREE.HemisphereLight(0xc9dcf0, 0x4e5a38, 0.55);
+    const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x5a6240, 0.92);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xb4c8dc, 0.32);
+    const fill = new THREE.DirectionalLight(0xc5d4e0, 0.55);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    this.sun = new THREE.DirectionalLight(0xffe6b0, 2.55);
+    const bounce = new THREE.DirectionalLight(0x8a9a58, 0.22);
+    bounce.position.set(40, 12, -30);
+    this.scene.add(bounce);
+    this.sun = new THREE.DirectionalLight(0xffe8c4, 1.15);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
-    this.sun.shadow.bias = -0.0007;
-    this.sun.shadow.normalBias = 0.05;
-    this.sun.shadow.radius = 2.4;
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.08;
+    this.sun.shadow.radius = 4.5;
     this.sun.shadow.camera.near = 4;
     this.sun.shadow.camera.far = 540;
     this.sun.shadow.camera.left = -210;
@@ -161,8 +164,9 @@ export class CourseScene {
     this.turfMat = new THREE.MeshStandardMaterial({
       roughness: 1,
       metalness: 0,
-      envMapIntensity: 0.34,
+      envMapIntensity: 0.18,
     });
+    attachDetailMap(this.turfMat, makeGrassDetailTex(), 72);
     this.pineMat = makeCutoutMat(makePineCard());
     this.oakMat = makeCutoutMat(makeOakCard());
     this.horizonMat = makeCutoutMat(makeHorizonCard());
@@ -215,14 +219,15 @@ export class CourseScene {
     this.ball.add(marker);
     this.scene.add(this.ball);
 
+    const softMap = new THREE.CanvasTexture(makeSoftShadowCard());
     this.shadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.16, 24),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: softMap, transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false }),
     );
     this.shadow.rotation.x = -Math.PI / 2;
     this.softShadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.42, 24),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.14, depthWrite: false }),
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: softMap, transparent: true, opacity: 0.12, depthWrite: false, toneMapped: false }),
     );
     this.softShadow.rotation.x = -Math.PI / 2;
     this.scene.add(this.shadow, this.softShadow);
@@ -377,10 +382,16 @@ export class CourseScene {
     this.terrain = terrain;
     this.holeGroup.add(terrain);
 
-    const underlay = new THREE.Mesh(
-      new THREE.PlaneGeometry(2600, 2600),
-      new THREE.MeshStandardMaterial({ color: 0x6f6948, roughness: 1 }),
-    );
+    const underMat = new THREE.MeshStandardMaterial({
+      map: makeGrassDetailTex(),
+      color: 0x6a6848,
+      roughness: 1,
+    });
+    if (underMat.map) {
+      underMat.map.wrapS = underMat.map.wrapT = THREE.RepeatWrapping;
+      underMat.map.repeat.set(90, 90);
+    }
+    const underlay = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), underMat);
     underlay.rotation.x = -Math.PI / 2;
     underlay.position.set(cx, -0.55, cz);
     underlay.receiveShadow = true;
@@ -422,15 +433,26 @@ export class CourseScene {
   }
 
   private addBunkerLips(hole: Hole): void {
-    const sand = new THREE.MeshStandardMaterial({ color: 0xe4c490, roughness: 0.97 });
+    const sandMap = new THREE.CanvasTexture(makeSandCard());
+    sandMap.wrapS = sandMap.wrapT = THREE.RepeatWrapping;
+    sandMap.repeat.set(3.2, 3.2);
+    sandMap.colorSpace = THREE.SRGBColorSpace;
+    const sand = new THREE.MeshStandardMaterial({ map: sandMap, roughness: 0.94, metalness: 0, envMapIntensity: 0.08 });
+    const lip = new THREE.MeshStandardMaterial({ color: 0x6a5830, roughness: 0.98 });
     for (const bunker of hole.bunkers) {
-      const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 36), sand);
+      const y = groundHeight(hole, bunker.cx, bunker.cy);
+      const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 40), sand);
       mesh.scale.set(bunker.rx, bunker.ry, 1);
       mesh.rotation.x = -Math.PI / 2;
       mesh.rotation.z = bunker.rotation;
-      mesh.position.set(bunker.cx, groundHeight(hole, bunker.cx, bunker.cy) + 0.02, bunker.cy);
+      mesh.position.set(bunker.cx, y + 0.025, bunker.cy);
       mesh.receiveShadow = true;
-      this.holeGroup.add(mesh);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(0.92, 1.08, 40), lip);
+      rim.scale.set(bunker.rx, bunker.ry, 1);
+      rim.rotation.x = -Math.PI / 2;
+      rim.rotation.z = bunker.rotation;
+      rim.position.set(bunker.cx, y + 0.04, bunker.cy);
+      this.holeGroup.add(mesh, rim);
     }
   }
 
@@ -607,6 +629,9 @@ export class CourseScene {
     rArm.rotation.z = -0.12;
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), skin);
     head.position.set(0.02, 1.5, 0.16);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.018, 6, 10, Math.PI), shirt);
+    collar.position.set(0.02, 1.36, 0.14);
+    collar.rotation.x = 1.2;
     const hat = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), cap);
     hat.position.set(0.02, 1.56, 0.16);
     const brim = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.014, 0.13), cap);
@@ -621,7 +646,7 @@ export class CourseScene {
     handle.rotation.z = 0.22;
     const headClub = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 0.045), steel);
     headClub.position.set(0.16, 0.22, 0.32);
-    this.golfer.add(hips, lThigh, rThigh, lShin, rShin, lFoot, rFoot, torso, shoulders, lArm, rArm, head, hat, brim, shaft, handle, headClub);
+    this.golfer.add(hips, lThigh, rThigh, lShin, rShin, lFoot, rFoot, torso, shoulders, collar, lArm, rArm, head, hat, brim, shaft, handle, headClub);
   }
 
   private placeBall(session: GameSession): void {
@@ -636,8 +661,8 @@ export class CourseScene {
     const tight = Math.max(0.07, 0.18 - air * 0.007);
     this.shadow.scale.setScalar(tight);
     this.softShadow.scale.setScalar(Math.max(0.35, 1.15 - air * 0.03));
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.08 : 0.34;
-    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.04 : 0.13;
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.04 : 0.2;
+    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.02 : 0.1;
     const halo = this.halo.material as THREE.MeshBasicMaterial;
     halo.opacity = air > 1.4 ? Math.min(0.42, 0.1 + air * 0.016) : 0.03;
     const marker = this.ball.getObjectByName("air-marker") as THREE.Sprite | undefined;
@@ -907,7 +932,7 @@ export function makeGolfBallGeometry(radius = BALL_RADIUS): THREE.BufferGeometry
 }
 
 export function golferMeshCount(): number {
-  return 17;
+  return 18;
 }
 
 function makeSky(): THREE.Mesh {
@@ -931,12 +956,93 @@ function makeCutoutMat(canvas: HTMLCanvasElement): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     map,
     transparent: true,
-    alphaTest: 0.28,
+    alphaTest: 0.22,
     side: THREE.DoubleSide,
-    roughness: 0.86,
+    roughness: 0.9,
     metalness: 0,
     depthWrite: true,
   });
+}
+
+function attachDetailMap(mat: THREE.MeshStandardMaterial, tex: THREE.Texture, scale: number): void {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uDetail = { value: tex };
+    shader.uniforms.uDetailScale = { value: scale };
+    shader.fragmentShader = `uniform sampler2D uDetail;\nuniform float uDetailScale;\n${shader.fragmentShader}`;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <map_fragment>",
+      `#include <map_fragment>
+       vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.15, 0.48);`,
+    );
+  };
+  mat.customProgramCacheKey = () => `turf-detail-${scale}`;
+}
+
+function makeGrassDetailTex(): THREE.CanvasTexture {
+  const tile = grassTile("ptg-grass-detail", ["#355224", "#4a6e30", "#2a3f1c", "#6a8a3c", "#1e3014", "#587838"], 256, 5200);
+  const tex = new THREE.CanvasTexture(tile);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function makeSandCard(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const ctx = c.getContext("2d");
+  if (!ctx) return c;
+  ctx.fillStyle = "#d7b57a";
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 90; i++) {
+    const y = (i / 90) * 256;
+    ctx.strokeStyle = `rgba(${160 + (i % 5) * 8},${120 + (i % 4) * 6},70,${0.08 + (i % 3) * 0.04})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(128, y + Math.sin(i * 0.7) * 8, 256, y + Math.cos(i * 0.5) * 6);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 1400; i++) {
+    ctx.fillStyle = i % 3 === 0 ? "#c9a468" : i % 3 === 1 ? "#e8d09a" : "#b89058";
+    ctx.fillRect(hashNoise(i, 2) * 256, hashNoise(i, 7) * 256, 1.2, 1.2);
+  }
+  return c;
+}
+
+function makeSoftShadowCard(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d");
+  if (!ctx) return c;
+  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+  g.addColorStop(0, "rgba(0,0,0,0.45)");
+  g.addColorStop(0.35, "rgba(0,0,0,0.18)");
+  g.addColorStop(0.7, "rgba(0,0,0,0.05)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  return c;
+}
+
+function stampClump(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rgb: [number, number, number], seed: number): void {
+  ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  ctx.beginPath();
+  const steps = 10;
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const j = 0.72 + hashNoise(seed + i, x * 0.1) * 0.5;
+    const px = x + Math.cos(a) * rx * j;
+    const py = y + Math.sin(a) * ry * j;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
 }
 
 function makeDiscSprite(): HTMLCanvasElement {
@@ -956,75 +1062,66 @@ function makeDiscSprite(): HTMLCanvasElement {
 
 function makePineCard(): HTMLCanvasElement {
   const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 384;
+  c.width = 320;
+  c.height = 420;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  ctx.clearRect(0, 0, 256, 384);
+  ctx.clearRect(0, 0, 320, 420);
   ctx.fillStyle = "#4a3828";
-  ctx.fillRect(118, 250, 20, 120);
+  ctx.fillRect(148, 280, 22, 130);
   ctx.fillStyle = "#3a2c20";
-  ctx.fillRect(122, 250, 6, 120);
-  const layers: Array<[number, number, number, number, string]> = [
-    [128, 38, 46, 70, "#1d4a28"],
-    [128, 78, 62, 82, "#24572e"],
-    [128, 122, 78, 90, "#1b3f24"],
-    [128, 168, 94, 96, "#2a6434"],
-    [128, 214, 108, 100, "#173820"],
+  ctx.fillRect(154, 280, 6, 130);
+  const tones: Array<[number, number, number]> = [
+    [22, 52, 28],
+    [36, 72, 38],
+    [18, 40, 22],
+    [48, 86, 44],
+    [28, 60, 32],
   ];
-  for (const [x, y, hw, hh, col] of layers) {
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + hw, y + hh);
-    ctx.lineTo(x - hw, y + hh);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(210,230,170,0.14)";
-    ctx.beginPath();
-    ctx.moveTo(x, y + 6);
-    ctx.lineTo(x + hw * 0.35, y + hh * 0.72);
-    ctx.lineTo(x, y + hh * 0.55);
-    ctx.closePath();
-    ctx.fill();
+  for (let row = 0; row < 7; row++) {
+    const y = 36 + row * 38;
+    const spread = 28 + row * 14;
+    const count = 5 + row;
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const x = 160 + (t - 0.5) * spread * 2;
+      const tone = tones[(row + i) % tones.length];
+      stampClump(ctx, x, y + hashNoise(row, i) * 10, 16 + row * 1.4, 14 + row, tone, row * 10 + i);
+    }
   }
+  ctx.fillStyle = "rgba(200,220,150,0.12)";
+  stampClump(ctx, 148, 70, 22, 18, [70, 110, 60], 99);
   return c;
 }
 
 function makeOakCard(): HTMLCanvasElement {
   const c = document.createElement("canvas");
-  c.width = 320;
-  c.height = 320;
+  c.width = 360;
+  c.height = 360;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  ctx.clearRect(0, 0, 320, 320);
+  ctx.clearRect(0, 0, 360, 360);
   ctx.fillStyle = "#4a3828";
   ctx.beginPath();
-  ctx.moveTo(148, 168);
-  ctx.lineTo(178, 168);
-  ctx.lineTo(188, 312);
-  ctx.lineTo(136, 312);
+  ctx.moveTo(168, 188);
+  ctx.lineTo(198, 188);
+  ctx.lineTo(210, 348);
+  ctx.lineTo(154, 348);
   ctx.closePath();
   ctx.fill();
-  const blobs: Array<[number, number, number, number, string]> = [
-    [160, 118, 92, 78, "#1c3f22"],
-    [118, 132, 70, 58, "#2a5a30"],
-    [204, 128, 74, 60, "#245028"],
-    [150, 88, 64, 52, "#326838"],
-    [186, 96, 58, 48, "#1a3820"],
-    [128, 168, 62, 40, "#274e2c"],
-    [196, 170, 60, 38, "#1e4424"],
+  const clumps: Array<[number, number, number, number, [number, number, number], number]> = [
+    [180, 120, 78, 64, [28, 58, 32], 1],
+    [128, 140, 58, 48, [40, 74, 40], 2],
+    [230, 136, 62, 50, [22, 48, 26], 3],
+    [160, 88, 52, 42, [52, 90, 48], 4],
+    [208, 92, 48, 38, [24, 44, 24], 5],
+    [140, 178, 50, 34, [34, 62, 34], 6],
+    [220, 176, 48, 32, [18, 40, 22], 7],
+    [180, 158, 44, 30, [60, 98, 52], 8],
+    [112, 168, 36, 28, [30, 54, 30], 9],
+    [248, 160, 34, 26, [26, 50, 28], 10],
   ];
-  for (const [x, y, rx, ry, col] of blobs) {
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = "rgba(190,210,140,0.16)";
-  ctx.beginPath();
-  ctx.ellipse(148, 100, 36, 28, -0.4, 0, Math.PI * 2);
-  ctx.fill();
+  for (const [x, y, rx, ry, rgb, seed] of clumps) stampClump(ctx, x, y, rx, ry, rgb, seed);
   return c;
 }
 
@@ -1035,35 +1132,27 @@ function makeHorizonCard(): HTMLCanvasElement {
   const ctx = c.getContext("2d");
   if (!ctx) return c;
   ctx.clearRect(0, 0, 2048, 512);
-  for (let i = 0; i < 28; i++) {
-    const x = (i / 28) * 2048;
-    const h = 140 + hashNoise(i * 3.1, 2) * 90;
-    ctx.fillStyle = i % 3 === 0 ? "#2a3d28" : "#1e3322";
-    ctx.beginPath();
-    ctx.moveTo(x - 40, 512);
-    ctx.lineTo(x, 512 - h);
-    ctx.lineTo(x + 48, 512);
-    ctx.closePath();
-    ctx.fill();
-  }
-  for (let i = 0; i < 36; i++) {
-    const x = 20 + (i / 36) * 2048;
-    const pine = hashNoise(i, 8) > 0.4;
-    const h = pine ? 210 + hashNoise(i, 1) * 120 : 160 + hashNoise(i, 4) * 90;
-    const w = pine ? 36 + hashNoise(i, 2) * 18 : 48 + hashNoise(i, 3) * 22;
-    ctx.fillStyle = pine ? "#16301c" : "#214228";
-    if (pine) {
-      ctx.beginPath();
-      ctx.moveTo(x, 512 - h);
-      ctx.lineTo(x + w, 512);
-      ctx.lineTo(x - w, 512);
-      ctx.closePath();
-      ctx.fill();
+  for (let i = 0; i < 48; i++) {
+    const x = 16 + (i / 48) * 2048;
+    const h = 150 + hashNoise(i, 1) * 140;
+    const w = 28 + hashNoise(i, 3) * 34;
+    const oak = hashNoise(i, 8) > 0.45;
+    if (oak) {
+      stampClump(ctx, x, 512 - h * 0.42, w, h * 0.38, i % 2 === 0 ? [24, 48, 28] : [18, 38, 22], i);
+      ctx.fillStyle = "#3a2c20";
+      ctx.fillRect(x - 4, 512 - h * 0.28, 8, h * 0.28);
     } else {
-      ctx.beginPath();
-      ctx.ellipse(x, 512 - h * 0.45, w, h * 0.42, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(x - 5, 512 - h * 0.35, 10, h * 0.35);
+      for (let row = 0; row < 4; row++) {
+        stampClump(
+          ctx,
+          x + (hashNoise(i, row) - 0.5) * 10,
+          512 - h + row * (h * 0.18),
+          w * (0.45 + row * 0.14),
+          22,
+          row % 2 === 0 ? [20, 42, 24] : [30, 58, 32],
+          i * 4 + row,
+        );
+      }
     }
   }
   return c;
@@ -1138,32 +1227,32 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
       let b = 0.26;
       let rk = 0.92;
       if (lie === "green") {
-        const nap = 0.78 + stripe * 0.34;
-        r = (0.07 + micro * 0.025) * nap;
-        g = (0.38 + n * 0.04) * nap;
-        b = (0.28 + micro * 0.02) * nap;
-        rk = 0.48 + wet * 0.2;
+        const nap = 0.82 + stripe * 0.22;
+        r = (0.1 + micro * 0.03) * nap;
+        g = (0.32 + n * 0.04) * nap;
+        b = (0.22 + micro * 0.02) * nap;
+        rk = 0.52 + wet * 0.18;
       } else if (lie === "fairway") {
-        const sheen = 0.62 + stripe * 0.5 + n * 0.08;
-        r = (0.22 + micro * 0.07) * sheen;
-        g = (0.48 + micro * 0.05) * sheen;
-        b = (0.11 + micro * 0.03) * sheen;
-        rk = 0.62 + wet * 0.14 + clump * 0.08;
+        const sheen = 0.7 + stripe * 0.36 + n * 0.06;
+        r = (0.2 + micro * 0.06) * sheen;
+        g = (0.38 + micro * 0.05) * sheen;
+        b = (0.12 + micro * 0.03) * sheen;
+        rk = 0.66 + wet * 0.12 + clump * 0.08;
       } else if (lie === "tee") {
         r = 0.18 + n * 0.03 + micro * 0.04;
         g = 0.4 + n * 0.04 + stripe * 0.06;
         b = 0.14;
         rk = 0.6;
       } else if (lie === "rough") {
-        r = 0.1 + n * 0.05 + clump * 0.04;
-        g = 0.16 + n * 0.04 + micro * 0.03;
-        b = 0.05 + n * 0.02;
-        rk = 0.95;
+        r = 0.16 + n * 0.07 + clump * 0.06 + micro * 0.04;
+        g = 0.2 + n * 0.05 + micro * 0.03;
+        b = 0.08 + n * 0.02;
+        rk = 0.93;
       } else if (lie === "bunker") {
-        r = 0.8 + n * 0.08 + micro * 0.05;
-        g = 0.67 + n * 0.05;
-        b = 0.4;
-        rk = 0.98;
+        r = 0.72 + n * 0.1 + micro * 0.08;
+        g = 0.58 + n * 0.07 + micro * 0.04;
+        b = 0.32 + n * 0.03;
+        rk = 0.96;
       } else if (lie === "water") {
         r = 0.06;
         g = 0.22;
@@ -1230,13 +1319,14 @@ function makeTree(
     bark,
   );
   trunk.position.y = h * (pine ? 0.3 : 0.24);
-  trunk.castShadow = true;
+  trunk.castShadow = false;
   group.add(trunk);
-  for (let i = 0; i < 3; i++) {
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(w, h), foliage);
-    card.position.y = h * 0.52;
-    card.rotation.y = (i / 3) * Math.PI + fbm(x, i) * 0.15;
-    card.castShadow = true;
+  for (let i = 0; i < 4; i++) {
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(w * (0.92 + (i % 2) * 0.12), h * (0.9 + (i % 3) * 0.05)), foliage);
+    card.position.y = h * (0.5 + (i % 2) * 0.04);
+    card.position.x = (fbm(x + i, z) - 0.5) * 0.8;
+    card.rotation.y = (i / 4) * Math.PI + fbm(x, i) * 0.2;
+    card.castShadow = false;
     group.add(card);
   }
   group.position.set(x, ground, z);

@@ -106,7 +106,7 @@ export class Renderer {
     this.time += dt;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.w, this.h);
-    if (opts?.hudOnly) {
+    if (opts?.hudOnly || document.body.classList.contains("has-3d")) {
       if (session.screen === "play") {
         this.drawMinimap(ctx, session);
         this.drawMeters(ctx, session);
