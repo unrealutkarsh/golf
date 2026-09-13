@@ -810,7 +810,7 @@ export class CourseScene {
       const pinDist = Math.max(2, dist(ball, pin));
       const back = fromAngle(aim + Math.PI, 2.25 + Math.min(2.2, pinDist * 0.12));
       const side = fromAngle(aim + Math.PI / 2, 1.95);
-      desired.set(ball.x + back.x + side.x, bh + 1.05 + Math.min(0.32, pinDist * 0.02), ball.y + back.y + side.y);
+      desired.set(ball.x + back.x + side.x, bh + 1.22 + Math.min(0.36, pinDist * 0.025), ball.y + back.y + side.y);
       look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.08, ball.y * 0.28 + pin.y * 0.72);
       fov = 46;
     } else if (view === "follow") {
