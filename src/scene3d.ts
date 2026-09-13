@@ -129,7 +129,7 @@ export class CourseScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const software = isSoftwareGL(this.renderer);
     this.renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = software ? 1.06 : 1.12;
+    this.renderer.toneMappingExposure = software ? 1.28 : 1.1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0x9ec4e6, 1100, 5200);
@@ -138,16 +138,16 @@ export class CourseScene {
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc4d4e8, 0.38));
-    const hemi = new THREE.HemisphereLight(0xd4e8ff, 0x2e4a22, 0.92);
+    this.scene.add(new THREE.AmbientLight(software ? 0xd0dcec : 0xc4d4e8, software ? 0.72 : 0.4));
+    const hemi = new THREE.HemisphereLight(0xd4e8ff, software ? 0x4a6a32 : 0x2e4a22, software ? 1.15 : 0.95);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xb8d0f0, 0.28);
+    const fill = new THREE.DirectionalLight(0xb8d0f0, software ? 0.42 : 0.3);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0x3a5a2c, 0.07);
+    const bounce = new THREE.DirectionalLight(software ? 0x5a7a3c : 0x3a5a2c, software ? 0.14 : 0.07);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff6e8, 1.42);
+    this.sun = new THREE.DirectionalLight(0xfff6e8, software ? 1.55 : 1.38);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -452,7 +452,7 @@ export class CourseScene {
     this.addRollingCountry(hole, cx, cz);
     this.addWater(hole);
     this.addBunkerLips(hole);
-    addCourseFoliage(this.holeGroup, this.foliageKit, hole);
+    addCourseFoliage(this.holeGroup, this.foliageKit, hole, { lite: isSoftwareGL(this.renderer) });
     this.buildPin();
     this.buildGrid(hole);
 
@@ -882,11 +882,11 @@ export class CourseScene {
       look.set(ball.x + Math.cos(heading) * 20, bh + 0.55, ball.y + Math.sin(heading) * 20);
       fov = 52;
     } else {
-      const back = fromAngle(aim + Math.PI, 5.2);
-      const side = fromAngle(aim + Math.PI / 2, 1.64);
-      desired.set(ball.x + back.x + side.x, bh + 1.86, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(aim) * 58, bh + 0.92, ball.y + Math.sin(aim) * 58);
-      fov = 54;
+      const back = fromAngle(aim + Math.PI, 5.05);
+      const side = fromAngle(aim + Math.PI / 2, 1.6);
+      desired.set(ball.x + back.x + side.x, bh + 1.7, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 22, bh + 0.22, ball.y + Math.sin(aim) * 22);
+      fov = 53;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.36 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));

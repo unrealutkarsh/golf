@@ -249,8 +249,8 @@ export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.C
     metalness: 0,
     envMapIntensity: 0.18,
     vertexColors: true,
-    emissive: new THREE.Color(0x0a1608),
-    emissiveIntensity: 0.008,
+    emissive: new THREE.Color(0x142818),
+    emissiveIntensity: 0.02,
   });
   attachTurfShader(mat, detail, detailN, 72, true);
   return mat;
@@ -261,8 +261,8 @@ export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.
     roughness: 0.42,
     metalness: 0,
     envMapIntensity: 0.16,
-    emissive: new THREE.Color(0x081208),
-    emissiveIntensity: 0.008,
+    emissive: new THREE.Color(0x102418),
+    emissiveIntensity: 0.018,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
