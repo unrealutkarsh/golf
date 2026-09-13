@@ -225,7 +225,7 @@ function displaceBlob(detail: number, seed: number, flatten = 0.78): THREE.Buffe
 }
 
 export function createFoliageKit(): FoliageKit {
-  const pine = solidFoliage(0x2f5c28);
+  const pine = solidFoliage(0x3d6a30);
   const pineLit = solidFoliage(0x6aaa46);
   const oak = solidFoliage(0x4a7834);
   const oakLit = solidFoliage(0x86b84e);
@@ -406,7 +406,6 @@ export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hol
     }
   }
   addInstancedWoods(parent, kit, hole);
-  addImpostorRing(parent, kit, hole);
 }
 
 function playableLie(lie: ReturnType<typeof lieAt>): boolean {
@@ -427,7 +426,7 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   for (let i = 0; i < 260 && n < 168; i++) {
     const cluster = Math.floor(i / 5);
     const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
-    const rad = 62 + hashNoise(cluster, 2.2) * 170;
+    const rad = 58 + hashNoise(cluster, 2.2) * 118;
     const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 24;
     const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 24;
     const x = cx + (hashNoise(i, 8) - 0.5) * 36;
@@ -493,29 +492,6 @@ function makeInstanced(
   mesh.frustumCulled = false;
   if (matrices.length === 0) mesh.count = 0;
   return mesh;
-}
-
-function addImpostorRing(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
-  const b = hole.bounds;
-  const cx = b.x + b.w / 2;
-  const cz = b.y + b.h / 2;
-  const radius = Math.hypot(b.w, b.h) * 0.68 + 70;
-  const dummy = new THREE.Object3D();
-  const mats: THREE.Matrix4[] = [];
-  for (let i = 0; i < 80; i++) {
-    const a = (i / 80) * Math.PI * 2 + hashNoise(i, 2) * 0.28;
-    const jitter = (hashNoise(i, 5) - 0.4) * 80;
-    const x = cx + Math.cos(a) * (radius + jitter);
-    const z = cz + Math.sin(a) * (radius + jitter);
-    const ground = groundHeight(hole, x, z);
-    const s = 12 + hashNoise(i, 7) * 16;
-    dummy.position.set(x, ground + s * 0.38, z);
-    dummy.lookAt(cx, ground + 3, cz);
-    dummy.scale.set(s * (0.7 + hashNoise(i, 8) * 0.28), s * (0.62 + hashNoise(i, 9) * 0.22), 1);
-    dummy.updateMatrix();
-    mats.push(dummy.matrix.clone());
-  }
-  parent.add(makeInstanced(kit.card, kit.impostor, mats, false));
 }
 
 export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {
