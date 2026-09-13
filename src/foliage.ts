@@ -43,8 +43,8 @@ export interface FoliageKit {
 
 /** Ragged leaf-mass card — not a circular lollipop. */
 function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
-  const w = 192;
-  const h = 192;
+  const w = 128;
+  const h = 128;
   const data = new Uint8Array(w * h * 4);
   const pine: Array<[number, number, number]> = [
     [74, 86, 52],
@@ -242,9 +242,9 @@ export function createFoliageKit(): FoliageKit {
     bush,
     bark,
     impostor,
-    pineBlob: displaceBlob(3, 2.2, 0.48),
-    oakBlob: displaceBlob(3, 7.4, 0.68),
-    midBlob: displaceBlob(2, 4.1, 0.62),
+    pineBlob: displaceBlob(2, 2.2, 0.48),
+    oakBlob: displaceBlob(2, 7.4, 0.68),
+    midBlob: displaceBlob(1, 4.1, 0.62),
     trunk: makeTrunkGeo(),
     flare: new THREE.CylinderGeometry(0.4, 0.68, 0.2, 12),
     card: new THREE.PlaneGeometry(1, 1),
@@ -441,7 +441,7 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const oakCanopy: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
-  for (let i = 0; i < 420 && n < 168; i++) {
+  for (let i = 0; i < 360 && n < 140; i++) {
     const cluster = Math.floor(i / 4);
     const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
     const rad = 64 + hashNoise(cluster, 2.2) * 132;
