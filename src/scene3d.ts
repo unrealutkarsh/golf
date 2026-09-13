@@ -138,10 +138,10 @@ export class CourseScene {
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(software ? 0xd0dcec : 0xc4d4e8, software ? 0.72 : 0.4));
-    const hemi = new THREE.HemisphereLight(0xd4e8ff, software ? 0x4a6a32 : 0x2e4a22, software ? 1.15 : 0.95);
+    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xc4d4e8, software ? 0.78 : 0.4));
+    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd4e8ff, software ? 0x3a6a28 : 0x2e4a22, software ? 1.22 : 0.95);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xb8d0f0, software ? 0.42 : 0.3);
+    const fill = new THREE.DirectionalLight(software ? 0xc4d8b8 : 0xb8d0f0, software ? 0.36 : 0.3);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
     const bounce = new THREE.DirectionalLight(software ? 0x5a7a3c : 0x3a5a2c, software ? 0.14 : 0.07);

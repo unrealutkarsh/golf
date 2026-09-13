@@ -68,9 +68,9 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.14 + micro * 0.02 + n * 0.015) * nap,
-      (0.40 + micro * 0.03 + n * 0.025) * nap,
-      (0.18 + micro * 0.015) * nap,
+      (0.16 + micro * 0.02 + n * 0.015) * nap,
+      (0.46 + micro * 0.03 + n * 0.025) * nap,
+      (0.14 + micro * 0.012) * nap,
     ];
   }
   if (band === "collar") {
@@ -89,9 +89,9 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   }
   if (band === "fairway") {
     return [
-      (0.24 + micro * 0.03 + n * 0.02 + clump * 0.02) * nap,
-      (0.46 + micro * 0.03 + n * 0.028) * nap,
-      (0.14 + micro * 0.012) * nap,
+      (0.22 + micro * 0.03 + n * 0.02 + clump * 0.02) * nap,
+      (0.52 + micro * 0.03 + n * 0.028) * nap,
+      (0.11 + micro * 0.01) * nap,
     ];
   }
   if (band === "tee") {
