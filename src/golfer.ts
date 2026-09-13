@@ -151,7 +151,7 @@ export function buildAddressGolfer(): THREE.Group {
 
   const club = new THREE.Group();
   club.name = "club";
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.013, 1.05, 8), steel);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 1.05, 8), steel);
   shaft.name = "shaft";
   shaft.position.set(-0.01, 0.52, 0.58);
   shaft.rotation.x = 0.22;

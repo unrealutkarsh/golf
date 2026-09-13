@@ -17,7 +17,7 @@ const BALL_RADIUS = 0.11;
 const SKY_VERT = /* glsl */ `
   varying vec3 vDir;
   void main() {
-    vDir = normalize(position);
+    vDir = normalize((modelMatrix * vec4(position, 1.0)).xyz - cameraPosition);
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
   }
 `;
@@ -43,13 +43,13 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.16, 0.38, 0.72);
-    vec3 mid = vec3(0.5, 0.7, 0.9);
-    vec3 horizon = vec3(0.82, 0.86, 0.9);
-    vec3 haze = vec3(0.92, 0.88, 0.78);
-    vec3 col = mix(haze, horizon, smoothstep(-0.22, 0.06, h));
-    col = mix(col, mid, smoothstep(0.02, 0.36, h));
-    col = mix(col, zenith, smoothstep(0.28, 0.9, h));
+    vec3 zenith = vec3(0.2, 0.46, 0.82);
+    vec3 mid = vec3(0.42, 0.66, 0.9);
+    vec3 horizon = vec3(0.7, 0.8, 0.88);
+    vec3 haze = vec3(0.86, 0.84, 0.76);
+    vec3 col = mix(haze, horizon, smoothstep(-0.12, 0.08, h));
+    col = mix(col, mid, smoothstep(0.04, 0.28, h));
+    col = mix(col, zenith, smoothstep(0.16, 0.78, h));
     vec3 sunD = normalize(vec3(0.52, 0.48, 0.38));
     float sun = pow(max(dot(dir, sunD), 0.0), 80.0);
     float glow = pow(max(dot(dir, sunD), 0.0), 4.2);
@@ -57,8 +57,8 @@ const SKY_FRAG = /* glsl */ `
     col += vec3(1.0, 0.96, 0.78) * sun * 1.55;
     col += vec3(1.0, 0.78, 0.48) * glow * 0.5;
     col += vec3(1.0, 0.82, 0.58) * wash * 0.16;
-    float horizonHaze = smoothstep(0.28, -0.04, h);
-    col = mix(col, vec3(0.9, 0.86, 0.78), horizonHaze * 0.35);
+    float horizonHaze = smoothstep(0.14, -0.02, h);
+    col = mix(col, vec3(0.86, 0.84, 0.78), horizonHaze * 0.18);
     vec2 cuv = dir.xz / max(abs(h) + 0.22, 0.12);
     float cloud = fbm(cuv * 1.15 + vec2(0.4, 0.1));
     float wisps = fbm(cuv * 2.8 + 6.0);
@@ -122,21 +122,20 @@ export class CourseScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x8aa0aa, 1);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.14;
+    this.renderer.toneMappingExposure = 1.08;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xb8c6c2, 140, 2400);
+    this.scene.fog = new THREE.Fog(0xa8b8c4, 420, 3200);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
-    this.sky.rotation.z = Math.PI / 2;
     this.scene.add(this.sky);
     this.haze = makeHaze();
     this.scene.add(this.haze);
 
-    const hemi = new THREE.HemisphereLight(0xdce8f2, 0x5e6648, 0.82);
+    const hemi = new THREE.HemisphereLight(0xc8daf0, 0x4a5438, 0.62);
     this.scene.add(hemi);
     const fill = new THREE.DirectionalLight(0xc8d6e4, 0.42);
     fill.position.set(-90, 48, 70);
@@ -144,7 +143,7 @@ export class CourseScene {
     const bounce = new THREE.DirectionalLight(0x8fa05e, 0.22);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xffe6bc, 1.55);
+    this.sun = new THREE.DirectionalLight(0xffe2b0, 1.95);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00028;
@@ -355,8 +354,8 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const stripe = 0.86 + 0.16 * Math.sin(x * 0.38 + z * 0.05);
-      const boost = lie === "green" ? 0.98 + stripe * 0.04 : lie === "fairway" || lie === "tee" ? stripe : 0.8;
+      const stripe = 0.78 + 0.28 * Math.sin(x * 0.38 + z * 0.05);
+      const boost = lie === "green" ? 0.92 + stripe * 0.12 : lie === "fairway" || lie === "tee" ? stripe : 0.82;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;
@@ -731,11 +730,11 @@ export class CourseScene {
       fov = 48;
     } else if (view === "putt") {
       const pinDist = Math.max(2, dist(ball, pin));
-      const back = fromAngle(aim + Math.PI, 4.4 + Math.min(5.4, pinDist * 0.22));
-      const side = fromAngle(aim + Math.PI / 2, 0.55);
-      desired.set(ball.x + back.x + side.x, bh + 1.42 + Math.min(0.85, pinDist * 0.04), ball.y + back.y + side.y);
-      look.set(ball.x * 0.38 + pin.x * 0.62, groundHeight(hole, pin.x, pin.y) + 0.1, ball.y * 0.38 + pin.y * 0.62);
-      fov = 48;
+      const back = fromAngle(aim + Math.PI, 3.2 + Math.min(3.6, pinDist * 0.16));
+      const side = fromAngle(aim + Math.PI / 2, 1.28);
+      desired.set(ball.x + back.x + side.x, bh + 1.18 + Math.min(0.55, pinDist * 0.03), ball.y + back.y + side.y);
+      look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.08, ball.y * 0.28 + pin.y * 0.72);
+      fov = 46;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
@@ -749,11 +748,11 @@ export class CourseScene {
       look.set(ball.x + Math.cos(heading) * ahead, 0.55, ball.y + Math.sin(heading) * ahead);
       fov = 46;
     } else {
-      const back = fromAngle(aim + Math.PI, 6.05);
-      const side = fromAngle(aim + Math.PI / 2, 1.12);
-      desired.set(ball.x + back.x + side.x, bh + 1.68, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(aim) * 58, 0.7, ball.y + Math.sin(aim) * 58);
-      fov = 50;
+      const back = fromAngle(aim + Math.PI, 5.15);
+      const side = fromAngle(aim + Math.PI / 2, 2.05);
+      desired.set(ball.x + back.x + side.x, bh + 1.52, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 42, 0.85, ball.y + Math.sin(aim) * 42);
+      fov = 48;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));
@@ -853,7 +852,7 @@ function makeHaze(): THREE.Mesh {
         varying vec3 vDir;
         void main() {
           float h = vDir.y;
-          float a = smoothstep(0.26, -0.04, h) * 0.38;
+          float a = smoothstep(0.16, -0.04, h) * 0.2;
           gl_FragColor = vec4(0.88, 0.86, 0.8, a);
         }
       `,

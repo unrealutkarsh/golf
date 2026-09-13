@@ -326,16 +326,16 @@ ${shader.fragmentShader}`;
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.86 + along * 0.16 + stripe * 0.11 + fine * 0.045;
-       float fringeTerm = 0.9 + fwidth(radial) * 0.0 + (0.5 + 0.5 * sin(across * 1.6)) * 0.08;
-       vec3 greenLift = vec3(1.06, 1.12, 1.04);
-       vec3 fringeTint = vec3(1.12, 1.0, 0.82);
+       float napTerm = 0.78 + along * 0.22 + stripe * 0.16 + fine * 0.06;
+       float fringeTerm = 0.88 + (0.5 + 0.5 * sin(across * 1.6)) * 0.12;
+       vec3 greenLift = vec3(1.08, 1.18, 1.05);
+       vec3 fringeTint = vec3(1.18, 1.02, 0.78);
        diffuseColor.rgb *= mix(vec3(1.0), greenLift * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 1.06, 0.96) * (0.9 + stripe * 0.08), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.06, 1.08, 0.94) * (0.88 + stripe * 0.12), onCollar);
        diffuseColor.rgb *= mix(vec3(1.0), fringeTint * fringeTerm, onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
        float fwStripe = 0.5 + 0.5 * sin(world.x * 0.34 + world.y * 0.05);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96 + fwStripe * 0.1), fairway * uCourseWide);`,
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9 + fwStripe * 0.22, 0.94 + fwStripe * 0.16, 0.86 + fwStripe * 0.08), fairway * uCourseWide);`
     );
   };
   mat.customProgramCacheKey = () => `turf-nap-${detailScale}-${courseWide ? "w" : "g"}`;

@@ -17,6 +17,8 @@ export function treeKind(x: number, z: number): TreeKind {
 export interface FoliageKit {
   pine: THREE.MeshStandardMaterial;
   oak: THREE.MeshStandardMaterial;
+  pineCard: THREE.MeshStandardMaterial;
+  oakCard: THREE.MeshStandardMaterial;
   bush: THREE.MeshStandardMaterial;
   bark: THREE.MeshStandardMaterial;
   impostor: THREE.MeshStandardMaterial;
@@ -38,34 +40,36 @@ function paintLeafCluster(
   ctx.clearRect(0, 0, w, h);
   const cx = w * 0.5;
   const cy = h * 0.5;
-  const stamps = needles ? 420 : 280;
+  ctx.fillStyle = `rgb(${tones[0][0]},${tones[0][1]},${tones[0][2]})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.36, h * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const stamps = needles ? 720 : 520;
   for (let i = 0; i < stamps; i++) {
     const u = hashNoise(seed + i, 1.7);
     const v = hashNoise(seed + i, 4.2);
     const ang = u * Math.PI * 2;
-    const rad = Math.pow(v, 0.55) * (needles ? 0.48 : 0.46);
+    const rad = Math.pow(v, 0.62) * (needles ? 0.42 : 0.4);
     const x = cx + Math.cos(ang) * rad * w;
-    const y = cy + Math.sin(ang) * rad * h * (needles ? 1.05 : 0.92);
+    const y = cy + Math.sin(ang) * rad * h * (needles ? 1.02 : 0.9);
     const tone = tones[(i + Math.floor(u * 8)) % tones.length];
-    ctx.fillStyle = `rgba(${tone[0]},${tone[1]},${tone[2]},${0.55 + hashNoise(i, 9) * 0.4})`;
+    ctx.fillStyle = `rgba(${tone[0]},${tone[1]},${tone[2]},0.92)`;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(ang + (hashNoise(i, 3) - 0.5) * 1.2);
     if (needles) {
-      ctx.fillRect(-1.1, -8 - hashNoise(i, 5) * 7, 2.2, 12 + hashNoise(i, 6) * 9);
+      ctx.fillRect(-2.2, -10 - hashNoise(i, 5) * 8, 4.2, 16 + hashNoise(i, 6) * 10);
     } else {
       ctx.beginPath();
-      const rw = 4 + hashNoise(i, 2) * 7;
-      const rh = 6 + hashNoise(i, 8) * 9;
-      ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 7 + hashNoise(i, 2) * 8, 9 + hashNoise(i, 8) * 10, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
   }
   ctx.globalCompositeOperation = "destination-in";
-  const falloff = ctx.createRadialGradient(cx, cy, w * 0.12, cx, cy, w * 0.48);
+  const falloff = ctx.createRadialGradient(cx, cy, w * 0.22, cx, cy, w * 0.48);
   falloff.addColorStop(0, "rgba(255,255,255,1)");
-  falloff.addColorStop(0.62, "rgba(255,255,255,0.92)");
+  falloff.addColorStop(0.72, "rgba(255,255,255,1)");
   falloff.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = falloff;
   ctx.fillRect(0, 0, w, h);
@@ -105,43 +109,50 @@ function makeImpostorCard(): HTMLCanvasElement {
   const ctx = c.getContext("2d");
   if (!ctx) return c;
   ctx.clearRect(0, 0, 256, 320);
-  ctx.fillStyle = "#4a3828";
+  ctx.fillStyle = "#3d2c20";
   ctx.beginPath();
-  ctx.moveTo(118, 168);
-  ctx.lineTo(138, 168);
-  ctx.lineTo(146, 312);
-  ctx.lineTo(110, 312);
+  ctx.moveTo(116, 150);
+  ctx.lineTo(140, 150);
+  ctx.lineTo(148, 314);
+  ctx.lineTo(108, 314);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#3a2c20";
-  ctx.fillRect(124, 170, 6, 140);
   const pine = hashNoise(7, 2) > 0.4;
   const tones: Array<[number, number, number]> = pine
     ? [
-        [18, 42, 22],
-        [30, 64, 32],
-        [14, 34, 18],
-        [40, 78, 40],
+        [22, 52, 26],
+        [36, 74, 34],
+        [16, 40, 20],
+        [48, 86, 42],
       ]
     : [
-        [26, 56, 28],
-        [40, 78, 38],
-        [18, 42, 22],
-        [52, 92, 46],
+        [30, 64, 30],
+        [46, 88, 40],
+        [20, 48, 24],
+        [58, 98, 48],
       ];
-  const clumps = pine ? 22 : 18;
-  for (let i = 0; i < clumps; i++) {
-    const t = i / clumps;
-    const y = pine ? 36 + t * 190 : 48 + (hashNoise(i, 1) * 0.55 + t * 0.45) * 150;
-    const spread = pine ? 18 + t * 62 : 48 + hashNoise(i, 4) * 36;
-    const x = 128 + (hashNoise(i, 3) - 0.5) * spread;
-    const rx = (pine ? 16 + t * 10 : 22 + hashNoise(i, 5) * 16) * (0.75 + hashNoise(i, 6) * 0.4);
-    const ry = pine ? 14 + t * 4 : 18 + hashNoise(i, 7) * 10;
-    const tone = tones[i % tones.length];
-    ctx.fillStyle = `rgb(${tone[0]},${tone[1]},${tone[2]})`;
+  if (pine) {
+    for (let row = 0; row < 6; row++) {
+      const t = row / 5;
+      const y = 40 + t * 175;
+      const rx = 22 + t * 58;
+      ctx.fillStyle = `rgb(${tones[row % tones.length][0]},${tones[row % tones.length][1]},${tones[row % tones.length][2]})`;
+      ctx.beginPath();
+      ctx.ellipse(128, y, rx, 22 + t * 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = `rgb(${tones[0][0]},${tones[0][1]},${tones[0][2]})`;
     ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, (hashNoise(i, 8) - 0.5) * 0.6, 0, Math.PI * 2);
+    ctx.ellipse(128, 118, 78, 64, 0, 0, Math.PI * 2);
     ctx.fill();
+    for (let i = 0; i < 10; i++) {
+      const tone = tones[i % tones.length];
+      ctx.fillStyle = `rgb(${tone[0]},${tone[1]},${tone[2]})`;
+      ctx.beginPath();
+      ctx.ellipse(128 + (hashNoise(i, 3) - 0.5) * 90, 100 + hashNoise(i, 4) * 70, 28 + hashNoise(i, 5) * 18, 24 + hashNoise(i, 6) * 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   return c;
 }
@@ -178,11 +189,24 @@ function cutout(canvas: HTMLCanvasElement, alphaTest = 0.28): THREE.MeshStandard
   });
 }
 
+function solidFoliage(color: number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.9,
+    metalness: 0,
+    flatShading: true,
+    emissive: new THREE.Color(color).multiplyScalar(0.12),
+    emissiveIntensity: 0.22,
+  });
+}
+
 export function createFoliageKit(): FoliageKit {
-  const pine = cutout(makeFoliageCard(true, 11));
-  const oak = cutout(makeFoliageCard(false, 27));
-  const bush = cutout(makeFoliageCard(false, 41), 0.24);
-  const impostor = cutout(makeImpostorCard(), 0.16);
+  const pine = solidFoliage(0x2a5628);
+  const oak = solidFoliage(0x3a6a30);
+  const bush = solidFoliage(0x355828);
+  const pineCard = cutout(makeFoliageCard(true, 11), 0.2);
+  const oakCard = cutout(makeFoliageCard(false, 27), 0.2);
+  const impostor = cutout(makeImpostorCard(), 0.12);
   const barkMap = new THREE.CanvasTexture(makeBarkCard());
   barkMap.colorSpace = THREE.SRGBColorSpace;
   const bark = new THREE.MeshStandardMaterial({
@@ -193,10 +217,12 @@ export function createFoliageKit(): FoliageKit {
   return {
     pine,
     oak,
+    pineCard,
+    oakCard,
     bush,
     bark,
     impostor,
-    pineCone: new THREE.ConeGeometry(1, 1, 9, 1, true),
+    pineCone: new THREE.ConeGeometry(1, 1, 8),
     oakBlob: new THREE.IcosahedronGeometry(1, 1),
     trunk: new THREE.CylinderGeometry(0.22, 0.4, 1, 8),
     card: new THREE.PlaneGeometry(1, 1),
@@ -249,7 +275,7 @@ function addPine(group: THREE.Group, r: number, kit: FoliageKit, shadow: boolean
   }
   if (!compact) {
     for (let i = 0; i < 2; i++) {
-      const card = new THREE.Mesh(kit.card, kit.pine);
+      const card = new THREE.Mesh(kit.card, kit.pineCard);
       card.scale.set(w * 1.35, h * 0.95, 1);
       card.position.y = h * 0.52;
       card.rotation.y = (i * Math.PI) / 2 + 0.18;
@@ -291,7 +317,7 @@ function addOak(group: THREE.Group, r: number, kit: FoliageKit, shadow: boolean,
   }
   if (!compact) {
     for (let i = 0; i < 2; i++) {
-      const card = new THREE.Mesh(kit.card, kit.oak);
+      const card = new THREE.Mesh(kit.card, kit.oakCard);
       card.scale.set(w * 1.55, h * 0.85, 1);
       card.position.y = h * 0.58;
       card.rotation.y = (i * Math.PI) / 2 + 0.3;
