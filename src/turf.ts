@@ -130,7 +130,7 @@ export interface TurfMaps {
   normal: THREE.CanvasTexture;
 }
 
-export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number, res = 1152): TurfMaps {
+export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number, res = 896): TurfMaps {
   const w = res;
   const h = res;
   const color = document.createElement("canvas");

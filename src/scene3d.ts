@@ -730,9 +730,9 @@ export class CourseScene {
       fov = 48;
     } else if (view === "putt") {
       const pinDist = Math.max(2, dist(ball, pin));
-      const back = fromAngle(aim + Math.PI, 3.2 + Math.min(3.6, pinDist * 0.16));
-      const side = fromAngle(aim + Math.PI / 2, 1.28);
-      desired.set(ball.x + back.x + side.x, bh + 1.18 + Math.min(0.55, pinDist * 0.03), ball.y + back.y + side.y);
+      const back = fromAngle(aim + Math.PI, 2.7 + Math.min(2.8, pinDist * 0.14));
+      const side = fromAngle(aim + Math.PI / 2, 1.42);
+      desired.set(ball.x + back.x + side.x, bh + 1.08 + Math.min(0.4, pinDist * 0.025), ball.y + back.y + side.y);
       look.set(ball.x * 0.28 + pin.x * 0.72, groundHeight(hole, pin.x, pin.y) + 0.08, ball.y * 0.28 + pin.y * 0.72);
       fov = 46;
     } else if (view === "follow") {
@@ -748,10 +748,10 @@ export class CourseScene {
       look.set(ball.x + Math.cos(heading) * ahead, 0.55, ball.y + Math.sin(heading) * ahead);
       fov = 46;
     } else {
-      const back = fromAngle(aim + Math.PI, 5.15);
-      const side = fromAngle(aim + Math.PI / 2, 2.05);
-      desired.set(ball.x + back.x + side.x, bh + 1.52, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(aim) * 42, 0.85, ball.y + Math.sin(aim) * 42);
+      const back = fromAngle(aim + Math.PI, 4.35);
+      const side = fromAngle(aim + Math.PI / 2, 2.25);
+      desired.set(ball.x + back.x + side.x, bh + 1.42, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 28, 0.7, ball.y + Math.sin(aim) * 28);
       fov = 48;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;

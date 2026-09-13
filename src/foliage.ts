@@ -381,10 +381,20 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
     dummy.scale.set(kind === "pine" ? 0.8 : 1.1, h * (kind === "pine" ? 0.6 : 0.48), kind === "pine" ? 0.8 : 1.1);
     dummy.updateMatrix();
     (kind === "pine" ? pineTrunks : oakTrunks).push(dummy.matrix.clone());
-    dummy.position.set(x, ground + h * (kind === "pine" ? 0.58 : 0.62), z);
-    dummy.scale.set(kind === "pine" ? r * 1.05 : r * 1.3, kind === "pine" ? h * 0.55 : r * 0.85, kind === "pine" ? r * 1.05 : r * 1.2);
-    dummy.updateMatrix();
-    (kind === "pine" ? pineCanopy : oakCanopy).push(dummy.matrix.clone());
+    const layers = kind === "pine" ? 3 : 4;
+    for (let k = 0; k < layers; k++) {
+      const t = k / Math.max(layers - 1, 1);
+      if (kind === "pine") {
+        dummy.position.set(x + (fbm(k, x) - 0.5) * 0.8, ground + h * (0.82 - t * 0.28), z + (fbm(z, k) - 0.5) * 0.8);
+        dummy.scale.set(r * (0.55 + t * 0.7), h * 0.28, r * (0.55 + t * 0.7));
+      } else {
+        const a = (k / layers) * Math.PI * 2;
+        dummy.position.set(x + Math.cos(a) * r * 0.35, ground + h * (0.52 + (k % 2) * 0.12), z + Math.sin(a) * r * 0.32);
+        dummy.scale.set(r * 0.55, r * 0.42, r * 0.5);
+      }
+      dummy.updateMatrix();
+      (kind === "pine" ? pineCanopy : oakCanopy).push(dummy.matrix.clone());
+    }
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));

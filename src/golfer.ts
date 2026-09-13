@@ -62,7 +62,7 @@ export function buildAddressGolfer(): THREE.Group {
   torso.rotation.x = 0.38;
   torso.rotation.z = 0.2;
 
-  const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 3, 8), shirt);
+  const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.36, 3, 8), shirt);
   shoulders.position.set(-0.02, 1.38, 0.14);
   shoulders.rotation.z = Math.PI / 2;
   shoulders.rotation.y = 0.12;
@@ -85,10 +85,10 @@ export function buildAddressGolfer(): THREE.Group {
   const rEar = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), skin);
   rEar.position.set(0.07, 1.62, 0.26);
 
-  const hat = new THREE.Mesh(new THREE.SphereGeometry(0.112, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), cap);
+  const hat = new THREE.Mesh(new THREE.SphereGeometry(0.118, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), cap);
   hat.position.set(-0.02, 1.7, 0.25);
-  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.14), cap);
-  brim.position.set(-0.02, 1.655, 0.36);
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.018, 12), cap);
+  brim.position.set(-0.02, 1.652, 0.3);
 
   const lUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.26, 3, 7), shirt);
   lUpper.position.set(-0.16, 1.2, 0.28);
@@ -108,10 +108,10 @@ export function buildAddressGolfer(): THREE.Group {
   rFore.rotation.x = 0.7;
   rFore.rotation.z = -0.1;
 
-  const lHand = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.09), skin);
+  const lHand = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.11), skin);
   lHand.position.set(-0.04, 0.9, 0.5);
   lHand.rotation.x = 0.4;
-  const rHand = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.09), skin);
+  const rHand = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.11), skin);
   rHand.position.set(0.02, 0.88, 0.52);
   rHand.rotation.x = 0.4;
 
