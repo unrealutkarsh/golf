@@ -256,8 +256,9 @@ function kit() {
     hair: new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.74 }),
     belt: new THREE.MeshStandardMaterial({ color: 0x32241c, roughness: 0.55 }),
     grip: new THREE.MeshStandardMaterial({ color: 0x1a1a18, roughness: 0.78 }),
-    steel: new THREE.MeshStandardMaterial({ color: 0xb4bac0, roughness: 0.22, metalness: 0.72 }),
-    putterFace: new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.28, metalness: 0.55 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x2a2e32, roughness: 0.38, metalness: 0.55, envMapIntensity: 0.85 }),
+    woodCrown: new THREE.MeshStandardMaterial({ color: 0x16301c, roughness: 0.42, metalness: 0.18, envMapIntensity: 0.7 }),
+    putterFace: new THREE.MeshStandardMaterial({ color: 0x2c3238, roughness: 0.32, metalness: 0.48, envMapIntensity: 0.8 }),
     iris: new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.35 }),
     white: new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.35 }),
   };
@@ -282,9 +283,9 @@ export function buildAddressGolfer(): THREE.Group {
   const rShoulder: Joint = { x: 0.2, y: 1.39, z: 0.08 };
   const lElbow: Joint = { x: -0.06, y: 1.06, z: 0.31 };
   const rElbow: Joint = { x: 0.08, y: 1.04, z: 0.33 };
-  const hands: Joint = { x: 0.02, y: 0.76, z: 0.43 };
+  const hands: Joint = { x: 0.06, y: 0.76, z: 0.43 };
   const headPos: Joint = { x: 0.02, y: 1.59, z: 0.22 };
-  const headPt: Joint = { x: 0.03, y: 0.034, z: 0.55 };
+  const headPt: Joint = { x: 0.08, y: 0.034, z: 0.58 };
 
   const hipsB = makeBone("hips", 0, 0.92, -0.02);
   const spine = makeBone("spine", 0, 0.16, 0.04);
@@ -447,22 +448,22 @@ export function buildAddressGolfer(): THREE.Group {
 
   const club = new THREE.Group();
   club.name = "club";
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.011, 0.86, 10), m.steel);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.022, 0.86, 10), m.steel);
   shaft.name = "shaft";
   limbPlace(shaft, hands.x, hands.y + 0.08, hands.z - 0.02, headPt.x, headPt.y, headPt.z, 0.86);
   shaft.userData.restScaleY = shaft.scale.y;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.011, 0.17, 10), m.grip);
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.018, 0.17, 10), m.grip);
   limbPlace(handle, hands.x, hands.y + 0.09, hands.z - 0.02, hands.x, hands.y - 0.07, hands.z + 0.02, 0.17);
   const clubhead = new THREE.Group();
   clubhead.name = "clubhead";
   clubhead.position.set(headPt.x, headPt.y, headPt.z);
-  const putterHead = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.034), m.putterFace);
+  const putterHead = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.032, 0.05), m.putterFace);
   putterHead.name = "putter-head";
-  const woodHead = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 8), m.steel);
+  const woodHead = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 8), m.woodCrown);
   woodHead.name = "wood-head";
-  woodHead.scale.set(1.2, 0.46, 0.88);
+  woodHead.scale.set(1.55, 0.58, 1.05);
   woodHead.visible = false;
-  const ironHead = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.03, 0.022), m.steel);
+  const ironHead = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.034, 0.028), m.steel);
   ironHead.name = "iron-head";
   ironHead.visible = false;
   clubhead.add(putterHead, woodHead, ironHead);

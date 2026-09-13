@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
 import { buildFringeBladeField, buildGreenBladeField, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
-import { addCourseFoliage, createFoliageKit, type FoliageKit } from "./foliage";
+import { addCourseFoliage, bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { buildAddressGolfer, golferMeshCount as countGolferMeshes, poseGolferClub, snapGolferToBall } from "./golfer";
+import { dressStandard, loadArtKit } from "./kit";
 import { hashNoise } from "./look";
 import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
@@ -11,7 +12,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { applyNapUniforms, bakeTurfMaps, buildGreenOverlay, createGreenMaterial, createTurfMaterial, makeGrassDetailNormal, makeGrassDetailTex } from "./turf";
+import { buildGreenOverlay, createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
@@ -96,9 +97,9 @@ export class CourseScene {
   private trailCount = 0;
   private puttAim: THREE.Line;
   private turfMat: THREE.MeshStandardMaterial;
-  private albedoTex: THREE.CanvasTexture | null = null;
-  private roughTex: THREE.CanvasTexture | null = null;
-  private normalTex: THREE.CanvasTexture | null = null;
+  private sandMat: THREE.MeshStandardMaterial;
+  private countryMat: THREE.MeshStandardMaterial;
+  private waterMat: THREE.MeshPhysicalMaterial;
   private raycaster = new THREE.Raycaster();
   private terrain: THREE.Mesh | null = null;
   private camPos = new THREE.Vector3(80, 24, 80);
@@ -129,62 +130,51 @@ export class CourseScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x6aa0d4, 1);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const software = isSoftwareGL(this.renderer);
     this.renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = software ? 1.28 : 1.1;
+    this.renderer.toneMappingExposure = software ? 1.22 : 1.02;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xa8cce8, 1600, 5600);
+    this.scene.fog = new THREE.Fog(0x8eb6d4, 2200, 6400);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.12, 6800);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xb0c4dc, software ? 0.78 : 0.2));
-    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd4ecff, software ? 0x3a6a28 : 0x1e3014, software ? 1.22 : 0.7);
+    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xa8bdd0, software ? 0.7 : 0.12));
+    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd6ebff, software ? 0x3a6a28 : 0x243018, software ? 1.05 : 0.38);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(software ? 0xc4d8b8 : 0xc8d8f4, software ? 0.36 : 0.2);
-    fill.position.set(-90, 48, 70);
-    this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(software ? 0x5a7a3c : 0x3e5c2a, software ? 0.14 : 0.12);
-    bounce.position.set(40, 12, -30);
-    this.scene.add(bounce);
-    const wrap = new THREE.DirectionalLight(0xffe2b8, software ? 0.08 : 0.22);
-    wrap.position.set(70, 28, 40);
-    this.scene.add(wrap);
-    this.sun = new THREE.DirectionalLight(0xfff1cc, software ? 1.55 : 1.78);
+    if (software) {
+      const fill = new THREE.DirectionalLight(0xc4d8b8, 0.28);
+      fill.position.set(-90, 48, 70);
+      this.scene.add(fill);
+    }
+    this.sun = new THREE.DirectionalLight(0xffefc8, software ? 1.45 : 2.15);
     this.sun.castShadow = true;
     const map = software ? 1024 : 4096;
     this.sun.shadow.mapSize.set(map, map);
-    this.sun.shadow.bias = -0.00016;
-    this.sun.shadow.normalBias = 0.14;
-    this.sun.shadow.radius = software ? 6 : 24;
+    this.sun.shadow.bias = -0.00018;
+    this.sun.shadow.normalBias = 0.12;
+    this.sun.shadow.radius = software ? 4 : 12;
     this.sun.shadow.camera.near = 6;
-    this.sun.shadow.camera.far = 520;
-    this.sun.shadow.camera.left = -140;
-    this.sun.shadow.camera.right = 140;
-    this.sun.shadow.camera.top = 120;
-    this.sun.shadow.camera.bottom = -120;
+    this.sun.shadow.camera.far = 560;
+    this.sun.shadow.camera.left = -180;
+    this.sun.shadow.camera.right = 180;
+    this.sun.shadow.camera.top = 150;
+    this.sun.shadow.camera.bottom = -150;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    try {
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      const env = pmrem.fromScene(this.scene, 0.04);
-      this.scene.environment = env.texture;
-      pmrem.dispose();
-    } catch (err) {
-      console.warn("[ptg] PMREM env skip", err);
-    }
-
-    const detail = makeGrassDetailTex();
-    const detailN = makeGrassDetailNormal();
-    this.turfMat = createTurfMaterial(detail, detailN);
-    this.greenMat = createGreenMaterial(detail, detailN);
+    this.turfMat = createTurfMaterial();
+    this.greenMat = createGreenMaterial();
+    this.sandMat = createSandMaterial();
+    this.countryMat = createCountryMaterial();
+    this.waterMat = createWaterMaterial(this.waterTime, software);
     this.bladeMat = createBladeMaterial();
     this.fringeMat = createFringeBladeMaterial();
     this.foliageKit = createFoliageKit();
+    void this.loadCourseArt(software);
 
     const puttGeo = new THREE.BufferGeometry();
     puttGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
@@ -202,7 +192,7 @@ export class CourseScene {
         sheen: 0.22,
         sheenRoughness: 0.32,
         sheenColor: new THREE.Color(0xffffff),
-        envMapIntensity: 1.15,
+        envMapIntensity: 1.45,
         vertexColors: true,
       }),
     );
@@ -323,6 +313,35 @@ export class CourseScene {
     window.addEventListener("resize", () => this.resize());
   }
 
+  private async loadCourseArt(lite: boolean): Promise<void> {
+    try {
+      const kit = await loadArtKit(this.renderer, lite);
+      bindFoliageArt(this.foliageKit, kit);
+      dressStandard(this.turfMat, kit.fairway, { roughness: 0.84, env: 0.36, normalScale: 1.05 });
+      dressStandard(this.greenMat, kit.green, { roughness: 0.3, env: 0.78, normalScale: 0.72 });
+      this.greenMat.clearcoat = 0.08;
+      this.greenMat.clearcoatRoughness = 0.52;
+      this.greenMat.sheen = 0.48;
+      dressStandard(this.sandMat, kit.sand, { roughness: 0.95, env: 0.2, normalScale: 1.4 });
+      dressStandard(this.countryMat, kit.rough, { roughness: 0.92, env: 0.3, normalScale: 1.1 });
+      if (kit.env) {
+        this.scene.environment = kit.env;
+        this.waterMat.envMapIntensity = 1.55;
+        (this.ball.material as THREE.MeshPhysicalMaterial).envMapIntensity = 1.5;
+      }
+      if (kit.background && !lite) {
+        this.scene.background = kit.background;
+        this.scene.backgroundBlurriness = 0.045;
+        this.scene.backgroundIntensity = 1.05;
+        this.sky.visible = false;
+        this.scene.fog = new THREE.Fog(0x8eb6d4, 2400, 6400);
+      }
+      this.builtHole = -1;
+    } catch (err) {
+      console.warn("[ptg] art kit skip", err);
+    }
+  }
+
   private initComposer(): void {
     try {
       const composer = new EffectComposer(this.renderer);
@@ -400,10 +419,6 @@ export class CourseScene {
     this.builtHole = index;
     this.holeGroup.clear();
     this.terrain = null;
-    if (this.albedoTex) this.albedoTex.dispose();
-    if (this.roughTex) this.roughTex.dispose();
-    if (this.normalTex) this.normalTex.dispose();
-    this.albedoTex = this.roughTex = this.normalTex = null;
     this.greenBlades = null;
     this.fringeBlades = null;
     this.trailCount = 0;
@@ -434,25 +449,13 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const grain = 0.98 + 0.04 * hashNoise(x * 2.1, z * 2.1);
-      const boost = lie === "green" ? 1.02 * grain : lie === "fairway" || lie === "tee" ? 1.06 * grain : 0.96;
-      colors[i * 3] = cr * boost;
-      colors[i * 3 + 1] = cg * boost;
-      colors[i * 3 + 2] = cb * boost;
+      const lift = lie === "rough" ? 0.4 : lie === "bunker" ? 0.5 : 0.58;
+      colors[i * 3] = lift + cr * 0.48;
+      colors[i * 3 + 1] = lift + cg * 0.48;
+      colors[i * 3 + 2] = lift + cb * 0.48;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const maps = bakeTurfMaps(hole, ox, oz, tw, th);
-    this.albedoTex = maps.albedo;
-    this.roughTex = maps.rough;
-    this.normalTex = maps.normal;
-    this.turfMat.map = maps.albedo;
-    this.turfMat.roughnessMap = maps.rough;
-    this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(1.35, 1.35);
-    this.turfMat.vertexColors = true;
-    this.turfMat.needsUpdate = true;
-    applyNapUniforms(this.turfMat, hole);
     const terrain = new THREE.Mesh(geo, this.turfMat);
     terrain.receiveShadow = true;
     this.terrain = terrain;
@@ -475,7 +478,7 @@ export class CourseScene {
   }
 
   private addWater(hole: Hole): void {
-    const mat = createWaterMaterial(this.waterTime);
+    const mat = this.waterMat;
     for (const poly of hole.water) {
       if (poly.length < 3) continue;
       const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, p.y)));
@@ -489,18 +492,8 @@ export class CourseScene {
   }
 
   private addBunkerLips(hole: Hole): void {
-    const sandMap = new THREE.CanvasTexture(makeSandCard());
-    sandMap.wrapS = sandMap.wrapT = THREE.RepeatWrapping;
-    sandMap.repeat.set(3.4, 3.4);
-    sandMap.colorSpace = THREE.SRGBColorSpace;
-    const sand = new THREE.MeshStandardMaterial({
-      map: sandMap,
-      color: 0xe4c894,
-      roughness: 0.92,
-      metalness: 0,
-      envMapIntensity: 0.12,
-    });
-    const lip = new THREE.MeshStandardMaterial({ color: 0x7a7c50, roughness: 0.96 });
+    const sand = this.sandMat;
+    const lip = new THREE.MeshStandardMaterial({ color: 0x6a7a48, roughness: 0.94, map: this.countryMat.map ?? undefined });
     const profile = [
       new THREE.Vector2(0, -0.34),
       new THREE.Vector2(0.22, -0.3),
@@ -565,12 +558,7 @@ export class CourseScene {
   }
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
-    const grass = new THREE.MeshStandardMaterial({
-      color: 0x2e4a22,
-      roughness: 0.98,
-      emissive: new THREE.Color(0x0a1408),
-      emissiveIntensity: 0.012,
-    });
+    const grass = this.countryMat;
     const far = new THREE.Mesh(new THREE.PlaneGeometry(4600, 4600, 80, 80), grass);
     far.rotation.x = -Math.PI / 2;
     const pos = far.geometry.attributes.position;
@@ -980,19 +968,19 @@ function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
   }
 }
 
-function createWaterMaterial(time: { value: number }): THREE.MeshPhysicalMaterial {
+function createWaterMaterial(time: { value: number }, software: boolean): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({
     color: 0x0a4a58,
-    roughness: 0.18,
+    roughness: software ? 0.22 : 0.08,
     metalness: 0.0,
-    transmission: 0.38,
-    thickness: 2.4,
+    transmission: software ? 0 : 0.48,
+    thickness: 2.8,
     transparent: true,
-    opacity: 0.88,
+    opacity: software ? 0.84 : 0.78,
     ior: 1.333,
-    envMapIntensity: 1.15,
-    clearcoat: 0.28,
-    clearcoatRoughness: 0.34,
+    envMapIntensity: 1.45,
+    clearcoat: 0.42,
+    clearcoatRoughness: 0.18,
     attenuationColor: new THREE.Color(0x063038),
     attenuationDistance: 4.5,
   });
@@ -1046,7 +1034,7 @@ ${shader.fragmentShader}`;
        normal = normalize(normal + vec3(nx, 0.0, nz));`,
     );
   };
-  mat.customProgramCacheKey = () => "ptg-water-v3";
+  mat.customProgramCacheKey = () => "ptg-water-v4";
   return mat;
 }
 
@@ -1062,30 +1050,6 @@ function makeSky(): THREE.Mesh {
       toneMapped: false,
     }),
   );
-}
-
-function makeSandCard(): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 256;
-  const ctx = c.getContext("2d");
-  if (!ctx) return c;
-  ctx.fillStyle = "#e2c284";
-  ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 160; i++) {
-    const y = (i / 110) * 256;
-    ctx.strokeStyle = `rgba(${176 + (i % 5) * 8},${136 + (i % 4) * 6},78,${0.07 + (i % 3) * 0.04})`;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.quadraticCurveTo(128, y + Math.sin(i * 0.7) * 8, 256, y + Math.cos(i * 0.5) * 6);
-    ctx.stroke();
-  }
-  for (let i = 0; i < 3600; i++) {
-    ctx.fillStyle = i % 4 === 0 ? "#c9a45c" : i % 4 === 1 ? "#f2d8a2" : i % 4 === 2 ? "#d8b46e" : "#b89050";
-    ctx.fillRect(hashNoise(i, 2) * 256, hashNoise(i, 7) * 256, 1.6 + (i % 3) * 0.4, 1.2 + (i % 2));
-  }
-  return c;
 }
 
 function makeSoftShadowCard(): HTMLCanvasElement {

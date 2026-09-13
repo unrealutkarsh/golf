@@ -243,38 +243,88 @@ export function makeGrassDetailNormal(): THREE.CanvasTexture {
   return tex;
 }
 
-export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
+export function createTurfMaterial(): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.84,
+    map: makeGrassDetailTex(),
+    normalMap: makeGrassDetailNormal(),
+    roughness: 0.82,
     metalness: 0,
-    envMapIntensity: 0.24,
+    envMapIntensity: 0.4,
     vertexColors: true,
-    emissive: new THREE.Color(0x142818),
-    emissiveIntensity: 0.016,
   });
-  attachTurfShader(mat, detail, detailN, 72, true);
+  attachWorldUv(mat, 0.038);
   return mat;
 }
 
-export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshPhysicalMaterial {
-  const mat = new THREE.MeshPhysicalMaterial({
-    roughness: 0.38,
+export function createCountryMaterial(): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    map: makeGrassDetailTex(),
+    normalMap: makeGrassDetailNormal(),
+    color: 0xc8d4b0,
+    roughness: 0.92,
     metalness: 0,
-    envMapIntensity: 0.36,
-    sheen: 0.78,
-    sheenColor: new THREE.Color(0x4a8a3c),
-    sheenRoughness: 0.52,
-    clearcoat: 0.07,
-    clearcoatRoughness: 0.62,
-    ior: 1.22,
-    emissive: new THREE.Color(0x08140c),
-    emissiveIntensity: 0.01,
+    envMapIntensity: 0.28,
+  });
+  attachWorldUv(mat, 0.022);
+  return mat;
+}
+
+export function createSandMaterial(): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xe8c98a,
+    roughness: 0.94,
+    metalness: 0,
+    envMapIntensity: 0.18,
+  });
+  attachWorldUv(mat, 0.09);
+  return mat;
+}
+
+export function createGreenMaterial(): THREE.MeshPhysicalMaterial {
+  const mat = new THREE.MeshPhysicalMaterial({
+    map: makeGrassDetailTex(),
+    normalMap: makeGrassDetailNormal(),
+    roughness: 0.3,
+    metalness: 0,
+    envMapIntensity: 0.72,
+    sheen: 0.48,
+    sheenColor: new THREE.Color(0x6a9a52),
+    sheenRoughness: 0.42,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.52,
+    ior: 1.33,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-  attachTurfShader(mat, detail, detailN, 22, false);
+  attachWorldUv(mat, 0.12);
   return mat;
+}
+
+/** Repeat albedo / normal / roughness in world XZ so a hole-sized mesh does not stretch one tile. */
+function attachWorldUv(mat: THREE.MeshStandardMaterial, scale: number): void {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWorldScale = { value: scale };
+    shader.vertexShader = `uniform float uWorldScale;\n${shader.vertexShader}`;
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <uv_vertex>",
+      `#include <uv_vertex>
+       vec2 worldUv = (modelMatrix * vec4(position, 1.0)).xz * uWorldScale;
+       #ifdef USE_MAP
+         vMapUv = worldUv;
+       #endif
+       #ifdef USE_NORMALMAP
+         vNormalMapUv = worldUv;
+       #endif
+       #ifdef USE_ROUGHNESSMAP
+         vRoughnessMapUv = worldUv;
+       #endif
+       #ifdef USE_AOMAP
+         vAoMapUv = worldUv;
+       #endif`,
+    );
+  };
+  mat.customProgramCacheKey = () => `ptg-world-uv-v2-${scale}`;
 }
 
 export interface NapUniforms {
@@ -292,111 +342,6 @@ export function createNapUniforms(hole: Hole): NapUniforms {
   };
 }
 
-function attachTurfShader(
-  mat: THREE.MeshStandardMaterial,
-  detail: THREE.Texture,
-  detailN: THREE.Texture,
-  detailScale: number,
-  courseWide: boolean,
-): void {
-  const napDir = { value: new THREE.Vector2(1, 0) };
-  const greenCenter = { value: new THREE.Vector3(0, 0, 0) };
-  const greenRadii = { value: new THREE.Vector3(16, 12, FRINGE_OUTER) };
-  mat.userData.napDir = napDir;
-  mat.userData.greenCenter = greenCenter;
-  mat.userData.greenRadii = greenRadii;
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uDetail = { value: detail };
-    shader.uniforms.uDetailN = { value: detailN };
-    shader.uniforms.uDetailScale = { value: detailScale };
-    shader.uniforms.uNapDir = napDir;
-    shader.uniforms.uGreenCenter = greenCenter;
-    shader.uniforms.uGreenRadii = greenRadii;
-    shader.uniforms.uCourseWide = { value: courseWide ? 1 : 0 };
-    shader.vertexShader = `varying vec3 vWorldPos;\n${shader.vertexShader}`;
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <begin_vertex>",
-      `#include <begin_vertex>
-       vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
-    );
-    shader.fragmentShader = `varying vec3 vWorldPos;
-uniform sampler2D uDetail;
-uniform sampler2D uDetailN;
-uniform float uDetailScale;
-uniform vec2 uNapDir;
-uniform vec3 uGreenCenter;
-uniform vec3 uGreenRadii;
-uniform float uCourseWide;
-${shader.fragmentShader}`;
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <map_fragment>",
-      `#include <map_fragment>
-       vec2 world = vWorldPos.xz;
-       float h1 = fract(sin(dot(world, vec2(127.1, 311.7))) * 43758.5453);
-       float h2 = fract(sin(dot(world * 2.37, vec2(269.5, 183.3))) * 15731.2);
-       float h3 = fract(sin(dot(world * 5.13, vec2(419.2, 371.9))) * 97321.1);
-       float clump = h1 * 0.42 + h2 * 0.36 + h3 * 0.22;
-       vec2 warp = vec2(
-         sin(world.x * 0.061 + world.y * 0.093 + h1 * 6.1),
-         cos(world.x * 0.077 - world.y * 0.049 + h2 * 5.3)
-       ) * (1.65 + h3);
-       vec2 wUv = world * 0.071 + warp * 0.28 + vec2(h1, h2) * 0.19;
-       vec2 wUv2 = vec2(wUv.y * 0.69 - wUv.x * 0.73, wUv.x * 0.61 + wUv.y * 0.79) * 1.28 + 4.2;
-       vec3 detail = (texture2D(uDetail, wUv).rgb + texture2D(uDetail, wUv2).rgb) * 0.5;
-       float detailMix = uCourseWide > 0.5 ? 0.08 : 0.06;
-       diffuseColor.rgb *= mix(vec3(1.0), detail, detailMix);
-       vec2 d = world - uGreenCenter.xy;
-       float ca = cos(-uGreenCenter.z);
-       float sa = sin(-uGreenCenter.z);
-       vec2 local = vec2(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
-       float radial = length(local / max(uGreenRadii.xy, vec2(0.001)));
-       vec2 viewXZ = cameraPosition.xz - world;
-       float vlen = max(length(viewXZ), 0.001);
-       vec2 viewN = viewXZ / vlen;
-       vec2 nap = normalize(uNapDir);
-       float along = dot(viewN, nap);
-       float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
-       float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
-       float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float prox = 1.0 - smoothstep(3.2, 24.0, vlen);
-       float napTerm = 0.95 + along * 0.07 + clump * 0.03;
-       float wet = onGreen * smoothstep(0.22, 0.74, h2);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 1.14, 0.88) * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.70, 0.86, 0.78), wet * (0.22 + prox * 0.2));
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.06, 0.86) * (0.96 + clump * 0.04), onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.08, 0.78) * (0.94 + clump * 0.06 + prox * 0.06), onFringe);
-       float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.08, 0.86) * (0.97 + clump * 0.035), fairway * uCourseWide);
-       float nearMix = mix(detailMix, min(0.34, detailMix + 0.24), prox * (onGreen + onFringe + onCollar));
-       diffuseColor.rgb *= mix(vec3(1.0), detail, max(0.0, nearMix - detailMix));`
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <roughnessmap_fragment>",
-      `#include <roughnessmap_fragment>
-       float rGrain = fract(sin(dot(vWorldPos.xz, vec2(19.1, 47.3))) * 43758.5);
-       float vlenR = max(length(cameraPosition.xz - vWorldPos.xz), 0.001);
-       float proxR = 1.0 - smoothstep(3.2, 24.0, vlenR);
-       float wetR = smoothstep(0.28, 0.78, fract(sin(dot(vWorldPos.xz * 2.37, vec2(269.5, 183.3))) * 15731.2));
-       roughnessFactor = clamp(roughnessFactor * (0.74 + rGrain * 0.18) - wetR * proxR * 0.22, 0.1, 1.0);`,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <normal_fragment_maps>",
-      `#include <normal_fragment_maps>
-       vec2 nWarp = vec2(
-         sin(vWorldPos.x * 0.061 + vWorldPos.z * 0.093),
-         cos(vWorldPos.x * 0.077 - vWorldPos.z * 0.049)
-       ) * 1.4;
-       vec2 nUv = vWorldPos.xz * 0.09 + nWarp * 0.22;
-       vec2 nUv2 = vec2(nUv.y * 0.67 - nUv.x * 0.74, nUv.x * 0.58 + nUv.y * 0.81) * 1.22 + 2.4;
-       vec3 dn = mix(texture2D(uDetailN, nUv).xyz, texture2D(uDetailN, nUv2).xyz, 0.5) * 2.0 - 1.0;
-       float nProx = 1.0 - smoothstep(3.2, 22.0, length(cameraPosition.xz - vWorldPos.xz));
-       float nAmt = (uCourseWide > 0.5 ? 0.22 : 0.56) + nProx * 0.36;
-       normal = normalize(normal + dn * nAmt);`
-    );
-  };
-  mat.customProgramCacheKey = () => `turf-nap-v13-${detailScale}-${courseWide ? "w" : "g"}`;
-}
-
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {
   const [nx, nz] = napDirection(hole);
   const napDir = mat.userData.napDir as { value: THREE.Vector2 } | undefined;
@@ -412,33 +357,21 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   const pad = 1.55;
   const tw = g.rx * 2 * pad;
   const th = g.ry * 2 * pad;
-  const cols = 96;
-  const rows = 72;
+  const cols = 64;
+  const rows = 48;
   const geo = new THREE.PlaneGeometry(tw, th, cols, rows);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  const ox = g.cx - tw / 2;
-  const oz = g.cy - th / 2;
   for (let i = 0; i < pos.count; i++) {
     const lx = pos.getX(i);
     const lz = pos.getZ(i);
     const x = g.cx + lx * Math.cos(g.rotation) - lz * Math.sin(g.rotation);
     const z = g.cy + lx * Math.sin(g.rotation) + lz * Math.cos(g.rotation);
     pos.setXYZ(i, x, groundHeight(hole, x, z) + 0.018, z);
-    uv.setXY(i, (x - ox) / tw, (z - oz) / th);
   }
   geo.computeVertexNormals();
-  const maps = bakeTurfMaps(hole, ox, oz, tw, th, 1024);
-  mat.map = maps.albedo;
-  mat.roughnessMap = maps.rough;
-  mat.normalMap = maps.normal;
-  mat.normalScale.set(2.25, 2.25);
-  mat.needsUpdate = true;
-  applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.renderOrder = 1;
-  mesh.userData.maps = maps;
   return mesh;
 }
