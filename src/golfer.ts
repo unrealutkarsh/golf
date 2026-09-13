@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const GOLFER_MESH_COUNT = 45;
+export const GOLFER_MESH_COUNT = 60;
 export const GOLFER_BONE_COUNT = 14;
 
 function clothPique(): THREE.DataTexture {
@@ -65,12 +65,19 @@ export function buildAddressGolfer(): THREE.Group {
 
   const pique = clothPique();
   const twill = clothTwill();
-  const slacks = new THREE.MeshStandardMaterial({ map: twill, color: 0x8aa4b4, roughness: 0.76 });
-  const shirt = new THREE.MeshStandardMaterial({ map: pique, color: 0xf6f2ea, roughness: 0.5 });
-  const shirtShade = new THREE.MeshStandardMaterial({ map: pique, color: 0xddd6cb, roughness: 0.54 });
-  const glove = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.55 });
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc49a74, roughness: 0.46 });
-  const shoe = new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.4 });
+  const slacks = new THREE.MeshStandardMaterial({ map: twill, color: 0x7e96a4, roughness: 0.8 });
+  const shirt = new THREE.MeshStandardMaterial({ map: pique, color: 0xf4efe6, roughness: 0.62 });
+  const shirtShade = new THREE.MeshStandardMaterial({ map: pique, color: 0xd8d0c4, roughness: 0.66 });
+  const glove = new THREE.MeshStandardMaterial({ color: 0xe4e0d6, roughness: 0.58 });
+  const skin = new THREE.MeshPhysicalMaterial({
+    color: 0xc49a74,
+    roughness: 0.5,
+    metalness: 0,
+    sheen: 0.32,
+    sheenColor: new THREE.Color(0xe8c4a0),
+    sheenRoughness: 0.62,
+  });
+  const shoe = new THREE.MeshStandardMaterial({ color: 0xf2eee6, roughness: 0.46 });
   const sole = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.7 });
   const cap = new THREE.MeshStandardMaterial({ color: 0x1e3840, roughness: 0.48 });
   const hair = new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.7 });
@@ -255,6 +262,54 @@ export function buildAddressGolfer(): THREE.Group {
   collar.position.set(-0.01, 1.46, 0.2);
   collar.rotation.x = 1.15;
 
+  const placket = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.22, 0.012), shirtShade);
+  placket.position.set(-0.01, 1.22, 0.18);
+  placket.rotation.x = 0.38;
+  placket.rotation.z = 0.16;
+  const btn1 = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 8), shirt);
+  btn1.position.set(-0.01, 1.28, 0.2);
+  btn1.rotation.x = 1.2;
+  const btn2 = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 8), shirt);
+  btn2.position.set(-0.005, 1.16, 0.22);
+  btn2.rotation.x = 1.2;
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.028, 0.012), steel);
+  buckle.position.set(0.01, 0.95, 0.12);
+
+  const lEye = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), hair);
+  lEye.position.set(-0.045, 1.62, 0.35);
+  const rEye = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), hair);
+  rEye.position.set(0.01, 1.62, 0.35);
+  const mouth = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.028, 4, 8), skin);
+  mouth.position.set(-0.018, 1.545, 0.35);
+  mouth.rotation.z = Math.PI / 2;
+  mouth.scale.set(1, 0.45, 0.7);
+
+  const lToe = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), shoe);
+  lToe.position.set(-0.17, 0.042, 0.22);
+  lToe.scale.set(1.1, 0.55, 0.9);
+  const rToe = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), shoe);
+  rToe.position.set(0.2, 0.042, 0.05);
+  rToe.scale.set(1.1, 0.55, 0.9);
+
+  const lF1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.032, 4, 8), glove);
+  lF1.position.set(-0.02, 0.86, 0.54);
+  lF1.rotation.x = 0.9;
+  const lF2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.03, 4, 8), glove);
+  lF2.position.set(-0.04, 0.855, 0.545);
+  lF2.rotation.x = 0.95;
+  const lF3 = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.026, 4, 8), glove);
+  lF3.position.set(-0.055, 0.85, 0.53);
+  lF3.rotation.x = 1.0;
+  const rF1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.032, 4, 8), skin);
+  rF1.position.set(0.04, 0.84, 0.56);
+  rF1.rotation.x = 0.9;
+  const rF2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.03, 4, 8), skin);
+  rF2.position.set(0.02, 0.835, 0.565);
+  rF2.rotation.x = 0.95;
+  const rF3 = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.026, 4, 8), skin);
+  rF3.position.set(0.005, 0.83, 0.55);
+  rF3.rotation.x = 1.0;
+
   body.add(
     lFoot,
     lSole,
@@ -296,6 +351,21 @@ export function buildAddressGolfer(): THREE.Group {
     lThumb,
     rThumb,
     collar,
+    placket,
+    btn1,
+    btn2,
+    buckle,
+    lEye,
+    rEye,
+    mouth,
+    lToe,
+    rToe,
+    lF1,
+    lF2,
+    lF3,
+    rF1,
+    rF2,
+    rF3,
   );
 
   const club = new THREE.Group();

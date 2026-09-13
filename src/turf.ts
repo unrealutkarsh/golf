@@ -162,12 +162,12 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
     const band = turfBand(hole, x, z);
     const n = fbm(x * 0.22, z * 0.22);
     const micro = hashNoise(x * 6.4, z * 6.4);
-    if (band === "green") return n * 0.05 + micro * 0.025;
-    if (band === "collar") return n * 0.09 + micro * 0.05;
-    if (band === "fringe") return n * 0.14 + micro * 0.08;
-    if (band === "fairway" || band === "tee") return n * 0.16 + micro * 0.12;
-    if (band === "rough") return n * 0.34 + micro * 0.22;
-    if (band === "bunker") return n * 0.2;
+    if (band === "green") return n * 0.07 + micro * 0.04;
+    if (band === "collar") return n * 0.12 + micro * 0.07;
+    if (band === "fringe") return n * 0.18 + micro * 0.1;
+    if (band === "fairway" || band === "tee") return n * 0.22 + micro * 0.16;
+    if (band === "rough") return n * 0.42 + micro * 0.28;
+    if (band === "bunker") return n * 0.28 + micro * 0.12;
     return n * 0.28;
   };
   for (let j = 0; j < h; j++) {
@@ -176,14 +176,15 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       const z = oz + (j / (h - 1)) * th;
       const band = turfBand(hole, x, z);
       const wet = Math.max(0, 0.55 - fbm(x * 0.09 + 3, z * 0.09));
+      const micro = hashNoise(x * 7.2, z * 7.2);
       const [r, g, b] = turfAlbedoRgb(band, x, z, napX, napZ);
       let rk = 0.92;
-      if (band === "green") rk = 0.42 + wet * 0.16;
-      else if (band === "collar") rk = 0.55 + wet * 0.12;
-      else if (band === "fringe") rk = 0.72 + wet * 0.1;
-      else if (band === "fairway" || band === "tee") rk = 0.64 + wet * 0.12;
-      else if (band === "rough") rk = 0.94;
-      else if (band === "bunker") rk = 0.96;
+      if (band === "green") rk = 0.38 + wet * 0.22 + micro * 0.08;
+      else if (band === "collar") rk = 0.52 + wet * 0.16 + micro * 0.06;
+      else if (band === "fringe") rk = 0.7 + wet * 0.12 + micro * 0.08;
+      else if (band === "fairway" || band === "tee") rk = 0.58 + wet * 0.16 + micro * 0.1;
+      else if (band === "rough") rk = 0.88 + micro * 0.08;
+      else if (band === "bunker") rk = 0.9 + micro * 0.06;
       else if (band === "water") rk = 0.1;
       const idx = (j * w + i) * 4;
       cimg.data[idx] = Math.round(Math.min(1, r) * 255);
@@ -237,10 +238,10 @@ export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStand
   const mat = new THREE.MeshStandardMaterial({
     roughness: 0.9,
     metalness: 0,
-    envMapIntensity: 0.1,
+    envMapIntensity: 0.16,
     vertexColors: true,
-    emissive: new THREE.Color(0x1a2a10),
-    emissiveIntensity: 0.03,
+    emissive: new THREE.Color(0x141e10),
+    emissiveIntensity: 0.02,
   });
   attachTurfShader(mat, detail, 72, true);
   return mat;
@@ -248,11 +249,11 @@ export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStand
 
 export function createGreenMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.54,
+    roughness: 0.48,
     metalness: 0,
-    envMapIntensity: 0.1,
-    emissive: new THREE.Color(0x142818),
-    emissiveIntensity: 0.03,
+    envMapIntensity: 0.14,
+    emissive: new THREE.Color(0x101810),
+    emissiveIntensity: 0.02,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -313,8 +314,8 @@ ${shader.fragmentShader}`;
       "#include <map_fragment>",
       `#include <map_fragment>
        vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       float detailMix = uCourseWide > 0.5 ? 0.26 : 0.16;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.12, detailMix);
+       float detailMix = uCourseWide > 0.5 ? 0.34 : 0.22;
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.08, detailMix);
        vec2 world = vWorldPos.xz;
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
@@ -339,10 +340,16 @@ ${shader.fragmentShader}`;
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
        float fwGrain = 0.5 + 0.5 * sin(world.x * 2.4 + world.y * 1.8);
        float fwClump = 0.5 + 0.5 * sin(world.x * 0.55 + world.y * 0.42);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.05, 1.02, 0.9) * (0.97 + fwGrain * 0.04 + fwClump * 0.035), fairway * uCourseWide);`
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 1.02, 0.88) * (0.97 + fwGrain * 0.04 + fwClump * 0.035), fairway * uCourseWide);`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <roughnessmap_fragment>",
+      `#include <roughnessmap_fragment>
+       float rGrain = fract(sin(dot(vWorldPos.xz, vec2(19.1, 47.3))) * 43758.5);
+       roughnessFactor = clamp(roughnessFactor * (0.86 + rGrain * 0.2), 0.22, 1.0);`,
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-v5-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v6-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {
@@ -381,7 +388,7 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   mat.map = maps.albedo;
   mat.roughnessMap = maps.rough;
   mat.normalMap = maps.normal;
-  mat.normalScale.set(1.55, 1.55);
+  mat.normalScale.set(2.15, 2.15);
   mat.needsUpdate = true;
   applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);

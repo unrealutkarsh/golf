@@ -44,26 +44,26 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.32, 0.54, 0.76);
-    vec3 mid = vec3(0.5, 0.68, 0.84);
-    vec3 horizon = vec3(0.74, 0.8, 0.84);
-    vec3 ground = vec3(0.64, 0.72, 0.78);
-    vec3 col = mix(ground, horizon, smoothstep(-0.12, 0.05, h));
-    col = mix(col, mid, smoothstep(0.02, 0.28, h));
-    col = mix(col, zenith, smoothstep(0.18, 0.82, h));
-    float haze = pow(1.0 - clamp(h * 0.92 + 0.08, 0.0, 1.0), 1.35);
-    col = mix(col, vec3(0.7, 0.78, 0.84), haze * 0.55);
-    vec3 sunD = normalize(vec3(0.42, 0.62, 0.28));
-    float glow = pow(max(dot(dir, sunD), 0.0), 7.0);
-    float wash = pow(max(dot(dir, sunD), 0.0), 2.1);
-    col += vec3(1.0, 0.94, 0.82) * glow * 0.16;
-    col += vec3(0.92, 0.88, 0.8) * wash * 0.06;
-    vec2 cuv = dir.xz / max(abs(h) + 0.28, 0.16);
-    float cloud = fbm(cuv * 0.85 + vec2(0.4, 0.1));
-    float wisps = fbm(cuv * 2.1 + 6.0);
-    float mask = smoothstep(0.08, 0.3, h) * smoothstep(0.78, 0.22, h);
-    float banks = smoothstep(0.48, 0.74, cloud + wisps * 0.2) * mask;
-    col = mix(col, vec3(0.9, 0.92, 0.94), banks * 0.42);
+    vec3 zenith = vec3(0.18, 0.42, 0.74);
+    vec3 mid = vec3(0.4, 0.64, 0.86);
+    vec3 horizon = vec3(0.82, 0.78, 0.68);
+    vec3 ground = vec3(0.62, 0.68, 0.58);
+    vec3 col = mix(ground, horizon, smoothstep(-0.14, 0.06, h));
+    col = mix(col, mid, smoothstep(0.04, 0.32, h));
+    col = mix(col, zenith, smoothstep(0.22, 0.88, h));
+    float haze = pow(1.0 - clamp(h * 0.88 + 0.1, 0.0, 1.0), 1.45);
+    col = mix(col, vec3(0.74, 0.78, 0.7), haze * 0.48);
+    vec3 sunD = normalize(vec3(0.38, 0.66, 0.24));
+    float glow = pow(max(dot(dir, sunD), 0.0), 6.5);
+    float wash = pow(max(dot(dir, sunD), 0.0), 1.9);
+    col += vec3(1.0, 0.9, 0.72) * glow * 0.2;
+    col += vec3(0.96, 0.88, 0.7) * wash * 0.08;
+    vec2 cuv = dir.xz / max(abs(h) + 0.3, 0.18);
+    float cloud = fbm(cuv * 0.72 + vec2(0.35, 0.08));
+    float wisps = fbm(cuv * 1.9 + 5.4);
+    float mask = smoothstep(0.1, 0.34, h) * smoothstep(0.8, 0.24, h);
+    float banks = smoothstep(0.5, 0.76, cloud + wisps * 0.18) * mask;
+    col = mix(col, vec3(0.93, 0.92, 0.88), banks * 0.38);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -117,29 +117,29 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x7a9cb4, 1);
+    this.renderer.setClearColor(0x6e8caa, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 0.98;
+    this.renderer.toneMappingExposure = 1.02;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x94aebc, 640, 3800);
+    this.scene.fog = new THREE.Fog(0xa8b8a4, 720, 4000);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc8d4c4, 0.82));
-    const hemi = new THREE.HemisphereLight(0xd6e2ea, 0x748454, 1.22);
+    this.scene.add(new THREE.AmbientLight(0xc6d0c2, 0.74));
+    const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x6e7c48, 1.28);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xd8e2dc, 0.88);
+    const fill = new THREE.DirectionalLight(0xdce6e0, 0.72);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xb4c478, 0.4);
+    const bounce = new THREE.DirectionalLight(0xb8c87a, 0.38);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff2d6, 0.8);
+    this.sun = new THREE.DirectionalLight(0xffefd0, 0.86);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -213,12 +213,26 @@ export class CourseScene {
     const softMap = new THREE.CanvasTexture(makeSoftShadowCard());
     this.shadow = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({ map: softMap, transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false }),
+      new THREE.MeshBasicMaterial({
+        map: softMap,
+        color: 0x2c341c,
+        transparent: true,
+        opacity: 0.16,
+        depthWrite: false,
+        toneMapped: false,
+      }),
     );
     this.shadow.rotation.x = -Math.PI / 2;
     this.softShadow = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({ map: softMap, transparent: true, opacity: 0.12, depthWrite: false, toneMapped: false }),
+      new THREE.MeshBasicMaterial({
+        map: softMap,
+        color: 0x3a4424,
+        transparent: true,
+        opacity: 0.08,
+        depthWrite: false,
+        toneMapped: false,
+      }),
     );
     this.softShadow.rotation.x = -Math.PI / 2;
     this.scene.add(this.shadow, this.softShadow);
@@ -368,7 +382,7 @@ export class CourseScene {
     this.turfMat.map = maps.albedo;
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(1.35, 1.35);
+    this.turfMat.normalScale.set(1.9, 1.9);
     this.turfMat.vertexColors = true;
     this.turfMat.needsUpdate = true;
     applyNapUniforms(this.turfMat, hole);
@@ -420,10 +434,10 @@ export class CourseScene {
     sandMap.colorSpace = THREE.SRGBColorSpace;
     const sand = new THREE.MeshStandardMaterial({
       map: sandMap,
-      color: 0xead2a0,
-      roughness: 0.96,
+      color: 0xe4c894,
+      roughness: 0.92,
       metalness: 0,
-      envMapIntensity: 0.08,
+      envMapIntensity: 0.12,
     });
     const lip = new THREE.MeshStandardMaterial({ color: 0x6a7c40, roughness: 0.96 });
     const profile = [
@@ -618,11 +632,11 @@ export class CourseScene {
     this.ball.rotation.x += (air > 0.15 ? 0.12 : spin * 0.02);
     this.shadow.position.set(p.x, gh + 0.018, p.y);
     this.softShadow.position.set(p.x, gh + 0.012, p.y);
-    const tight = Math.max(0.07, 0.18 - air * 0.007);
+    const tight = Math.max(0.1, 0.26 - air * 0.008);
     this.shadow.scale.setScalar(tight);
-    this.softShadow.scale.setScalar(Math.max(0.35, 1.15 - air * 0.03));
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.025 : 0.1;
-    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.012 : 0.06;
+    this.softShadow.scale.setScalar(Math.max(0.55, 1.55 - air * 0.04));
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.02 : 0.07;
+    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.01 : 0.045;
     const halo = this.halo.material as THREE.MeshBasicMaterial;
     halo.opacity = air > 1.4 ? Math.min(0.42, 0.1 + air * 0.016) : 0.03;
     const marker = this.ball.getObjectByName("air-marker") as THREE.Sprite | undefined;
@@ -937,11 +951,11 @@ function makeSoftShadowCard(): HTMLCanvasElement {
   c.height = 128;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-  g.addColorStop(0, "rgba(0,0,0,0.45)");
-  g.addColorStop(0.35, "rgba(0,0,0,0.18)");
-  g.addColorStop(0.7, "rgba(0,0,0,0.05)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
+  const g = ctx.createRadialGradient(64, 64, 3, 64, 64, 62);
+  g.addColorStop(0, "rgba(28, 34, 18, 0.38)");
+  g.addColorStop(0.28, "rgba(28, 34, 18, 0.16)");
+  g.addColorStop(0.62, "rgba(28, 34, 18, 0.05)");
+  g.addColorStop(1, "rgba(28, 34, 18, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
   return c;
