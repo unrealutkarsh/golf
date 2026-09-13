@@ -127,11 +127,12 @@ export class CourseScene {
     this.renderer.setClearColor(0x6a88b0, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    const software = isSoftwareGL(this.renderer);
+    this.renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = software ? 1.0 : 0.98;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xb4c2cc, 220, 3200);
+    this.scene.fog = new THREE.Fog(0xb8c6d0, 380, 3600);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
@@ -297,7 +298,7 @@ export class CourseScene {
     this.scene.add(this.pin, this.golfer, this.grid);
     this.buildGolfer();
     this.resize();
-    this.initComposer();
+    if (!software) this.initComposer();
     window.addEventListener("resize", () => this.resize());
   }
 
@@ -409,7 +410,7 @@ export class CourseScene {
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
       const grain = 0.97 + 0.05 * hashNoise(x * 2.1, z * 2.1);
-      const boost = lie === "green" ? 1.02 * grain : lie === "fairway" || lie === "tee" ? 1.05 * grain : 0.96;
+      const boost = lie === "green" ? 1.04 * grain : lie === "fairway" || lie === "tee" ? 1.1 * grain : 0.98;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;
@@ -946,6 +947,17 @@ export function makeGolfBallGeometry(radius = BALL_RADIUS): THREE.BufferGeometry
 
 export function golferMeshCount(): number {
   return countGolferMeshes();
+}
+
+function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
+  try {
+    const gl = renderer.getContext();
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+    return /swiftshader|llvmpipe|software|microsoft basic render/i.test(name);
+  } catch {
+    return false;
+  }
 }
 
 function makeSky(): THREE.Mesh {
