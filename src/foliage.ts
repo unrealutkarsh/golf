@@ -420,7 +420,6 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const oakTrunks: THREE.Matrix4[] = [];
   const oakDark: THREE.Matrix4[] = [];
   const oakLit: THREE.Matrix4[] = [];
-  const cards: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
   for (let i = 0; i < 260 && n < 168; i++) {
@@ -460,14 +459,6 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
         (lit ? oakLit : oakDark).push(dummy.matrix.clone());
       }
     }
-    dummy.position.set(x, ground + h * 0.52, z);
-    dummy.lookAt(x + 4, ground + 4, z + 2);
-    dummy.scale.set(r * 1.7, h * 0.85, 1);
-    dummy.updateMatrix();
-    cards.push(dummy.matrix.clone());
-    dummy.rotation.y += Math.PI * 0.4;
-    dummy.updateMatrix();
-    cards.push(dummy.matrix.clone());
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));
@@ -476,7 +467,6 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   parent.add(makeInstanced(kit.trunk, kit.bark, oakTrunks, false));
   parent.add(makeInstanced(kit.oakBlob, kit.oak, oakDark, false));
   parent.add(makeInstanced(kit.oakBlob, kit.oakLit, oakLit, false));
-  parent.add(makeInstanced(kit.card, kit.oakCard, cards, false));
 }
 
 function makeInstanced(
