@@ -120,7 +120,7 @@ export class CourseScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.96;
+    this.renderer.toneMappingExposure = 1.06;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0xa8b8b4, 0.00072);
@@ -129,15 +129,15 @@ export class CourseScene {
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x5a6240, 0.92);
+    const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x5a6240, 0.72);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xc5d4e0, 0.55);
+    const fill = new THREE.DirectionalLight(0xc5d4e0, 0.48);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0x8a9a58, 0.22);
+    const bounce = new THREE.DirectionalLight(0x8a9a58, 0.18);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xffe8c4, 1.15);
+    this.sun = new THREE.DirectionalLight(0xffe8c4, 1.85);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0004;
@@ -700,7 +700,7 @@ export class CourseScene {
     const show = session.screen === "play" && path.length > 1;
     this.groundLine.visible = show && aiming;
     this.landing.visible = show && aiming && session.club().id !== "putter";
-    if (this.flightMesh) this.flightMesh.visible = show && aiming && session.club().id !== "putter";
+    if (this.flightMesh) this.flightMesh.visible = false;
     if (!show) return;
     const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
     this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xff9a4a : 0xffe27a);
@@ -973,14 +973,14 @@ function attachDetailMap(mat: THREE.MeshStandardMaterial, tex: THREE.Texture, sc
       "#include <map_fragment>",
       `#include <map_fragment>
        vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.15, 0.48);`,
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.45, 0.26);`
     );
   };
   mat.customProgramCacheKey = () => `turf-detail-${scale}`;
 }
 
 function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", ["#355224", "#4a6e30", "#2a3f1c", "#6a8a3c", "#1e3014", "#587838"], 256, 5200);
+  const tile = grassTile("ptg-grass-detail", ["#5a7a38", "#6e8f44", "#4a682c", "#8aaa52", "#3e5824", "#7a9848"], 256, 5200);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -1228,15 +1228,15 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
       let rk = 0.92;
       if (lie === "green") {
         const nap = 0.82 + stripe * 0.22;
-        r = (0.1 + micro * 0.03) * nap;
-        g = (0.32 + n * 0.04) * nap;
-        b = (0.22 + micro * 0.02) * nap;
+        r = (0.12 + micro * 0.03) * nap;
+        g = (0.4 + n * 0.04) * nap;
+        b = (0.26 + micro * 0.02) * nap;
         rk = 0.52 + wet * 0.18;
       } else if (lie === "fairway") {
         const sheen = 0.7 + stripe * 0.36 + n * 0.06;
-        r = (0.2 + micro * 0.06) * sheen;
-        g = (0.38 + micro * 0.05) * sheen;
-        b = (0.12 + micro * 0.03) * sheen;
+        r = (0.24 + micro * 0.06) * sheen;
+        g = (0.46 + micro * 0.05) * sheen;
+        b = (0.14 + micro * 0.03) * sheen;
         rk = 0.66 + wet * 0.12 + clump * 0.08;
       } else if (lie === "tee") {
         r = 0.18 + n * 0.03 + micro * 0.04;
