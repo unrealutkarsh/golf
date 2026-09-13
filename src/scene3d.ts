@@ -51,8 +51,8 @@ const SKY_FRAG = /* glsl */ `
     col = mix(col, mid, smoothstep(0.0, 0.2, h));
     col = mix(col, zenith, smoothstep(0.1, 0.72, h));
     vec3 sunD = normalize(vec3(0.52, 0.48, 0.38));
-    float sun = pow(max(dot(dir, sunD), 0.0), 110.0);
-    float glow = pow(max(dot(dir, sunD), 0.0), 8.0);
+    float sun = pow(max(dot(dir, sunD), 0.0), 48.0);
+    float glow = pow(max(dot(dir, sunD), 0.0), 5.5);
     float wash = pow(max(dot(dir, sunD), 0.0), 2.4);
     col += vec3(1.0, 0.96, 0.86) * sun * 1.2;
     col += vec3(1.0, 0.88, 0.62) * glow * 0.22;
@@ -314,6 +314,7 @@ export class CourseScene {
 
   render(): void {
     this.sky.position.copy(this.camera.position);
+    this.sky.rotation.z = Math.PI / 2;
     this.haze.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   }
@@ -871,7 +872,7 @@ export function golferMeshCount(): number {
 
 function makeSky(): THREE.Mesh {
   return new THREE.Mesh(
-    new THREE.SphereGeometry(2800, 64, 36),
+    new THREE.BoxGeometry(4200, 4200, 4200),
     new THREE.ShaderMaterial({
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
