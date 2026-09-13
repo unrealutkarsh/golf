@@ -1,6 +1,6 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
-import { dist, type Vec2 } from "./math";
+import { dist, ellipseRadial, type Vec2 } from "./math";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -61,16 +61,19 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
   const p = { x, y };
   const n = fbm(x * 0.16, y * 0.16);
   const stripe = 0.5 + 0.5 * Math.sin(x * 0.42 + y * 0.05);
+  const radial = ellipseRadial(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation);
   if (inWater(hole, p)) return [0.07 + n * 0.03, 0.26 + n * 0.05, 0.36 + n * 0.06];
   const lie = lieAt(hole, p);
   if (lie === "bunker") return [0.82 + n * 0.08, 0.7 + n * 0.05, 0.46 + n * 0.04];
   if (lie === "green" || onGreen(hole, p)) {
-    const sheen = 0.97 + stripe * 0.035;
-    return [(0.16 + n * 0.02) * sheen, (0.48 + n * 0.03) * sheen, (0.32 + n * 0.02) * sheen];
+    if (radial >= 0.88) return [0.24 + n * 0.02, 0.46 + n * 0.03, 0.24 + n * 0.015];
+    const sheen = 0.92 + stripe * 0.1;
+    return [(0.2 + n * 0.02) * sheen, (0.52 + n * 0.03) * sheen, (0.3 + n * 0.02) * sheen];
   }
+  if (radial < 1.3 && lie !== "ob") return [0.3 + n * 0.03, 0.44 + n * 0.03, 0.16 + n * 0.015];
   if (lie === "tee") return [0.28 + n * 0.02, 0.5 + n * 0.03, 0.2 + n * 0.015];
   if (lie === "fairway") {
-    const sheen = 0.96 + stripe * 0.03;
+    const sheen = 0.96 + stripe * 0.06;
     return [(0.32 + n * 0.04) * sheen, (0.5 + n * 0.04) * sheen, (0.18 + n * 0.02) * sheen];
   }
   if (lie === "rough") return [0.22 + n * 0.05, 0.32 + n * 0.04, 0.11 + n * 0.025];

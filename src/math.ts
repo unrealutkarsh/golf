@@ -82,6 +82,23 @@ export function pointInPolygon(p: Vec2, poly: Vec2[]): boolean {
   return inside;
 }
 
+export function ellipseRadial(
+  p: Vec2,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  rotation: number,
+): number {
+  const dx = p.x - cx;
+  const dy = p.y - cy;
+  const c = Math.cos(-rotation);
+  const s = Math.sin(-rotation);
+  const x = dx * c - dy * s;
+  const y = dx * s + dy * c;
+  return Math.hypot(x / Math.max(rx, 1e-4), y / Math.max(ry, 1e-4));
+}
+
 export function pointInEllipse(
   p: Vec2,
   cx: number,
@@ -90,13 +107,7 @@ export function pointInEllipse(
   ry: number,
   rotation: number,
 ): boolean {
-  const dx = p.x - cx;
-  const dy = p.y - cy;
-  const c = Math.cos(-rotation);
-  const s = Math.sin(-rotation);
-  const x = dx * c - dy * s;
-  const y = dx * s + dy * c;
-  return (x * x) / (rx * rx) + (y * y) / (ry * ry) <= 1;
+  return ellipseRadial(p, cx, cy, rx, ry, rotation) <= 1;
 }
 
 export function closestPointOnSegment(p: Vec2, a: Vec2, b: Vec2): Vec2 {
