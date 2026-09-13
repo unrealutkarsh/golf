@@ -108,7 +108,6 @@ export class CourseScene {
   private sky: THREE.Mesh;
   private foliageKit: FoliageKit;
   private greenMat: THREE.MeshStandardMaterial;
-  private haze: THREE.Mesh;
   private ribbon: THREE.Mesh;
   private ribbonGeo: THREE.BufferGeometry;
   private time = 0;
@@ -129,10 +128,7 @@ export class CourseScene {
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
-    this.sky.rotation.z = Math.PI / 2;
     this.scene.add(this.sky);
-    this.haze = makeHaze();
-    this.scene.add(this.haze);
 
     this.scene.add(new THREE.AmbientLight(0xc8d8ec, 0.62));
     const hemi = new THREE.HemisphereLight(0xd8e8f8, 0x7a8a50, 1.35);
@@ -314,8 +310,6 @@ export class CourseScene {
 
   render(): void {
     this.sky.position.copy(this.camera.position);
-    this.sky.rotation.z = Math.PI / 2;
-    this.haze.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -877,28 +871,6 @@ function makeSky(): THREE.Mesh {
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
       side: THREE.BackSide,
-      depthWrite: false,
-      fog: false,
-      toneMapped: false,
-    }),
-  );
-}
-
-function makeHaze(): THREE.Mesh {
-  return new THREE.Mesh(
-    new THREE.SphereGeometry(2600, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.52),
-    new THREE.ShaderMaterial({
-      vertexShader: `varying vec3 vDir; void main(){ vDir=normalize(position); gl_Position=projectionMatrix*viewMatrix*modelMatrix*vec4(position,1.0); }`,
-      fragmentShader: `
-        varying vec3 vDir;
-        void main() {
-          float h = vDir.y;
-          float a = smoothstep(0.1, -0.03, h) * 0.1;
-          gl_FragColor = vec4(0.62, 0.78, 0.94, a);
-        }
-      `,
-      side: THREE.BackSide,
-      transparent: true,
       depthWrite: false,
       fog: false,
       toneMapped: false,
