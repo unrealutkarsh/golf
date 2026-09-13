@@ -129,6 +129,7 @@ export class CourseScene {
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
+    this.sky.rotation.z = Math.PI / 2;
     this.scene.add(this.sky);
     this.haze = makeHaze();
     this.scene.add(this.haze);
