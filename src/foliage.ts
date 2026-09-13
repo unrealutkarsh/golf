@@ -6,11 +6,12 @@ import type { Hole } from "./types";
 
 export const PINE_CANOPY_LAYERS = 8;
 export const PINE_CLUSTERS_PER_LAYER = 2;
-export const OAK_CANOPY_BLOBS = 20;
+export const OAK_CANOPY_BLOBS = 32;
+export const MAPLE_CANOPY_BLOBS = 24;
 export const OAK_BRANCHES = 5;
-export const LEAF_CARDS_PER_TREE = 12;
-export const SPRAY_CARDS_PER_TREE = 8;
-export const MID_RANGE_CARDS_PER_TREE = 8;
+export const LEAF_CARDS_PER_TREE = 22;
+export const SPRAY_CARDS_PER_TREE = 16;
+export const MID_RANGE_CARDS_PER_TREE = 14;
 export const TRUNK_PARTS = 2;
 export const VOLUME_TREE_PARTS = 28;
 
@@ -70,7 +71,7 @@ function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
   ];
   const tones = needles ? pine : oak;
   const clumps: Array<[number, number, number, number]> = [];
-  for (let k = 0; k < (needles ? 9 : 11); k++) {
+  for (let k = 0; k < (needles ? 18 : 22); k++) {
     const a = (k / 10) * Math.PI * 2 + seed * 0.2;
     const rad = 0.12 + hashNoise(k + seed, 3) * 0.28;
     clumps.push([
@@ -90,8 +91,8 @@ function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
         const e = Math.hypot((u - cx) / cr, (v - cy) / (cr * (needles ? 1.35 : 0.92)));
         if (e < 1) cover += (1 - e) * wgt;
       }
-      const holes = hashNoise(x * 2.1 + seed, y * 1.8) > (needles ? 0.16 : 0.2) ? 1 : 0.08;
-      const a = Math.min(1, cover * 0.85) * holes * (0.72 + n * 0.28);
+      const holes = hashNoise(x * 2.1 + seed, y * 1.8) > (needles ? 0.04 : 0.05) ? 1 : 0.62;
+      const a = Math.min(1, cover * 1.18) * holes * (0.88 + n * 0.12);
       const tone = tones[(x + y * 3 + Math.floor(n * 8)) % tones.length];
       const i = (y * w + x) * 4;
       data[i] = tone[0];
@@ -152,28 +153,31 @@ function makeBarkMaps(): { color: THREE.DataTexture; normal: THREE.DataTexture; 
 }
 
 function leafMat(map: THREE.DataTexture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  return new THREE.MeshPhysicalMaterial({
     map,
     color: 0x3e5c2c,
     transparent: true,
-    alphaTest: 0.22,
+    alphaTest: 0.18,
     side: THREE.DoubleSide,
-    roughness: 0.92,
+    roughness: 0.78,
     metalness: 0,
     depthWrite: true,
+    sheen: 0.42,
+    sheenColor: new THREE.Color(0x6a8c42),
+    sheenRoughness: 0.76,
     emissive: new THREE.Color(0x0e1008),
-    emissiveIntensity: 0.015,
+    emissiveIntensity: 0.012,
   });
 }
 
 function solidFoliage(color: number): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.88,
+    roughness: 0.8,
     metalness: 0,
     flatShading: false,
     vertexColors: true,
-    emissive: new THREE.Color(color).multiplyScalar(0.03),
+    emissive: new THREE.Color(color).multiplyScalar(0.028),
     emissiveIntensity: 0.02,
   });
 }
@@ -350,8 +354,8 @@ function addEdgeCards(
     const card = new THREE.Mesh(kit.card, i % 2 === 0 ? cardMat : alt);
     const a = (i / count) * Math.PI * 2 + hashNoise(i, 3) * 0.4;
     const lift = 0.42 + (i % 5) * 0.09 + hashNoise(i, 7) * 0.05;
-    const rad = w * (0.28 + (i % 4) * 0.06);
-    card.scale.set(w * (0.22 + (i % 5) * 0.04), h * (0.16 + (i % 3) * 0.03), 1);
+    const rad = w * (0.16 + (i % 5) * 0.07);
+    card.scale.set(w * (0.38 + (i % 5) * 0.07), h * (0.26 + (i % 3) * 0.05), 1);
     card.position.set(Math.cos(a) * rad, h * lift, Math.sin(a) * rad * 0.92);
     card.rotation.y = a + 0.55;
     card.rotation.x = (hashNoise(i, 4) - 0.5) * 0.35;
@@ -483,7 +487,7 @@ function addMaple(
     br.rotation.x = -Math.sin(a) * 0.9;
     group.add(br);
   }
-  const blobs = compact ? 7 : 16;
+  const blobs = compact ? 7 : MAPLE_CANOPY_BLOBS;
   for (let i = 0; i < blobs; i++) {
     const blob = new THREE.Mesh(kit.oakBlob, mat);
     const a = i * 2.2 + hashNoise(i, r);
@@ -772,7 +776,7 @@ export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {
     return TRUNK_PARTS + PINE_CANOPY_LAYERS * PINE_CLUSTERS_PER_LAYER + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
   }
   if (kind === "maple") {
-    return TRUNK_PARTS + 4 + 16 + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
+    return TRUNK_PARTS + 4 + MAPLE_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
   }
   return TRUNK_PARTS + OAK_BRANCHES + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
 }

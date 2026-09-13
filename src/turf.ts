@@ -68,9 +68,9 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.16 + micro * 0.02 + n * 0.015) * nap,
-      (0.46 + micro * 0.03 + n * 0.025) * nap,
-      (0.14 + micro * 0.012) * nap,
+      (0.13 + micro * 0.018 + n * 0.012) * nap,
+      (0.44 + micro * 0.028 + n * 0.022) * nap,
+      (0.16 + micro * 0.014) * nap,
     ];
   }
   if (band === "collar") {
@@ -163,9 +163,9 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
     const n = fbm(x * 0.22, z * 0.22);
     const micro = hashNoise(x * 6.4, z * 6.4);
     const blade = hashNoise(x * 18.4, z * 17.1);
-    if (band === "green") return n * 0.08 + micro * 0.055 + blade * 0.03;
-    if (band === "collar") return n * 0.14 + micro * 0.09 + blade * 0.04;
-    if (band === "fringe") return n * 0.22 + micro * 0.14 + blade * 0.06;
+    if (band === "green") return n * 0.1 + micro * 0.07 + blade * 0.045;
+    if (band === "collar") return n * 0.16 + micro * 0.11 + blade * 0.055;
+    if (band === "fringe") return n * 0.28 + micro * 0.18 + blade * 0.08;
     if (band === "fairway" || band === "tee") return n * 0.26 + micro * 0.2 + blade * 0.08;
     if (band === "rough") return n * 0.5 + micro * 0.34 + blade * 0.12;
     if (band === "bunker") return n * 0.34 + micro * 0.18 + hashNoise(x * 22, z * 19) * 0.1;
@@ -180,9 +180,9 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       const micro = hashNoise(x * 7.2, z * 7.2);
       const [r, g, b] = turfAlbedoRgb(band, x, z, napX, napZ);
       let rk = 0.92;
-      if (band === "green") rk = 0.32 + wet * 0.28 + micro * 0.1;
-      else if (band === "collar") rk = 0.48 + wet * 0.2 + micro * 0.08;
-      else if (band === "fringe") rk = 0.64 + wet * 0.16 + micro * 0.1;
+      if (band === "green") rk = 0.16 + wet * 0.14 + micro * 0.07;
+      else if (band === "collar") rk = 0.36 + wet * 0.16 + micro * 0.08;
+      else if (band === "fringe") rk = 0.54 + wet * 0.14 + micro * 0.1;
       else if (band === "fairway" || band === "tee") rk = 0.5 + wet * 0.22 + micro * 0.12;
       else if (band === "rough") rk = 0.82 + wet * 0.08 + micro * 0.1;
       else if (band === "bunker") rk = 0.78 + micro * 0.14 + wet * 0.06;
@@ -198,7 +198,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       rimg.data[idx + 2] = rv;
       rimg.data[idx + 3] = 255;
       const eps = tw / w;
-      const scale = band === "green" ? 4.2 : band === "fringe" ? 3.0 : band === "rough" ? 2.4 : 2.1;
+      const scale = band === "green" ? 6.2 : band === "fringe" ? 4.6 : band === "collar" ? 5.0 : band === "rough" ? 2.4 : 2.1;
       const [nx, ny, nz] = heightToNormal(heightAt(x - eps, z), heightAt(x + eps, z), heightAt(x, z - eps), heightAt(x, z + eps), scale);
       const packed = packNormalRgb(nx, ny, nz);
       nimg.data[idx] = Math.round(packed[0] * 255);
@@ -245,29 +245,35 @@ export function makeGrassDetailNormal(): THREE.CanvasTexture {
 
 export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.86,
+    roughness: 0.84,
     metalness: 0,
-    envMapIntensity: 0.18,
+    envMapIntensity: 0.24,
     vertexColors: true,
     emissive: new THREE.Color(0x142818),
-    emissiveIntensity: 0.02,
+    emissiveIntensity: 0.016,
   });
   attachTurfShader(mat, detail, detailN, 72, true);
   return mat;
 }
 
-export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.42,
+export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshPhysicalMaterial {
+  const mat = new THREE.MeshPhysicalMaterial({
+    roughness: 0.38,
     metalness: 0,
-    envMapIntensity: 0.16,
-    emissive: new THREE.Color(0x102418),
-    emissiveIntensity: 0.018,
+    envMapIntensity: 0.36,
+    sheen: 0.78,
+    sheenColor: new THREE.Color(0x4a8a3c),
+    sheenRoughness: 0.52,
+    clearcoat: 0.07,
+    clearcoatRoughness: 0.62,
+    ior: 1.22,
+    emissive: new THREE.Color(0x08140c),
+    emissiveIntensity: 0.01,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-  attachTurfShader(mat, detail, detailN, 28, false);
+  attachTurfShader(mat, detail, detailN, 22, false);
   return mat;
 }
 
@@ -352,18 +358,26 @@ ${shader.fragmentShader}`;
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.95 + along * 0.06 + clump * 0.035;
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.90, 1.10, 0.94) * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.98, 1.04, 0.90) * (0.97 + clump * 0.03), onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.02, 0.86) * (0.96 + clump * 0.04), onFringe);
+       float prox = 1.0 - smoothstep(3.2, 24.0, vlen);
+       float napTerm = 0.95 + along * 0.07 + clump * 0.03;
+       float wet = onGreen * smoothstep(0.22, 0.74, h2);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 1.14, 0.88) * napTerm, onGreen);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.70, 0.86, 0.78), wet * (0.22 + prox * 0.2));
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.06, 0.86) * (0.96 + clump * 0.04), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.08, 0.78) * (0.94 + clump * 0.06 + prox * 0.06), onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.08, 0.86) * (0.97 + clump * 0.035), fairway * uCourseWide);`
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.08, 0.86) * (0.97 + clump * 0.035), fairway * uCourseWide);
+       float nearMix = mix(detailMix, min(0.34, detailMix + 0.24), prox * (onGreen + onFringe + onCollar));
+       diffuseColor.rgb *= mix(vec3(1.0), detail, max(0.0, nearMix - detailMix));`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <roughnessmap_fragment>",
       `#include <roughnessmap_fragment>
        float rGrain = fract(sin(dot(vWorldPos.xz, vec2(19.1, 47.3))) * 43758.5);
-       roughnessFactor = clamp(roughnessFactor * (0.82 + rGrain * 0.22), 0.16, 1.0);`,
+       float vlenR = max(length(cameraPosition.xz - vWorldPos.xz), 0.001);
+       float proxR = 1.0 - smoothstep(3.2, 24.0, vlenR);
+       float wetR = smoothstep(0.28, 0.78, fract(sin(dot(vWorldPos.xz * 2.37, vec2(269.5, 183.3))) * 15731.2));
+       roughnessFactor = clamp(roughnessFactor * (0.74 + rGrain * 0.18) - wetR * proxR * 0.22, 0.1, 1.0);`,
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <normal_fragment_maps>",
@@ -375,11 +389,12 @@ ${shader.fragmentShader}`;
        vec2 nUv = vWorldPos.xz * 0.09 + nWarp * 0.22;
        vec2 nUv2 = vec2(nUv.y * 0.67 - nUv.x * 0.74, nUv.x * 0.58 + nUv.y * 0.81) * 1.22 + 2.4;
        vec3 dn = mix(texture2D(uDetailN, nUv).xyz, texture2D(uDetailN, nUv2).xyz, 0.5) * 2.0 - 1.0;
-       float nAmt = uCourseWide > 0.5 ? 0.18 : 0.42;
-       normal = normalize(normal + dn * nAmt);`,
+       float nProx = 1.0 - smoothstep(3.2, 22.0, length(cameraPosition.xz - vWorldPos.xz));
+       float nAmt = (uCourseWide > 0.5 ? 0.22 : 0.56) + nProx * 0.36;
+       normal = normalize(normal + dn * nAmt);`
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-v11-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v13-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {
@@ -397,8 +412,8 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   const pad = 1.55;
   const tw = g.rx * 2 * pad;
   const th = g.ry * 2 * pad;
-  const cols = 72;
-  const rows = 56;
+  const cols = 96;
+  const rows = 72;
   const geo = new THREE.PlaneGeometry(tw, th, cols, rows);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -418,7 +433,7 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   mat.map = maps.albedo;
   mat.roughnessMap = maps.rough;
   mat.normalMap = maps.normal;
-  mat.normalScale.set(1.55, 1.55);
+  mat.normalScale.set(2.25, 2.25);
   mat.needsUpdate = true;
   applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);

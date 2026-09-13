@@ -205,50 +205,50 @@ function kit() {
     slacks: new THREE.MeshPhysicalMaterial({
       map: twill,
       normalMap: twillN,
-      normalScale: new THREE.Vector2(0.42, 0.42),
+      normalScale: new THREE.Vector2(0.16, 0.16),
       color: 0x3a4652,
-      roughness: 0.86,
-      sheen: 0.22,
-      sheenColor: new THREE.Color(0x6a7884),
-      sheenRoughness: 0.78,
+      roughness: 0.88,
+      sheen: 0.42,
+      sheenColor: new THREE.Color(0x7a8894),
+      sheenRoughness: 0.86,
     }),
     shirt: new THREE.MeshPhysicalMaterial({
       map: pique,
       normalMap: piqueN,
-      normalScale: new THREE.Vector2(0.48, 0.48),
+      normalScale: new THREE.Vector2(0.18, 0.18),
       color: 0xf2eee4,
-      roughness: 0.62,
-      sheen: 0.44,
+      roughness: 0.7,
+      sheen: 0.68,
       sheenColor: new THREE.Color(0xffffff),
-      sheenRoughness: 0.64,
+      sheenRoughness: 0.74,
     }),
     shirtShade: new THREE.MeshPhysicalMaterial({
       map: pique,
       color: 0xd0cbc0,
-      roughness: 0.68,
-      sheen: 0.26,
+      roughness: 0.72,
+      sheen: 0.4,
     }),
     glove: new THREE.MeshPhysicalMaterial({
       map: leather,
       color: 0xe4d8be,
-      roughness: 0.54,
-      sheen: 0.16,
+      roughness: 0.62,
+      sheen: 0.18,
     }),
     skin: new THREE.MeshPhysicalMaterial({
       color: 0xc69a76,
-      roughness: 0.4,
+      roughness: 0.56,
       metalness: 0,
-      sheen: 0.48,
-      sheenColor: new THREE.Color(0xecc4a2),
+      sheen: 0.78,
+      sheenColor: new THREE.Color(0xf0ccaa),
       sheenRoughness: 0.52,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.62,
+      clearcoat: 0.02,
+      clearcoatRoughness: 0.88,
     }),
     shoe: new THREE.MeshPhysicalMaterial({
       map: leather,
       color: 0xf2eee6,
-      roughness: 0.46,
-      sheen: 0.16,
+      roughness: 0.5,
+      sheen: 0.14,
     }),
     saddle: new THREE.MeshPhysicalMaterial({ map: leather, color: 0x5a4030, roughness: 0.55 }),
     sole: new THREE.MeshStandardMaterial({ color: 0x1c1c1a, roughness: 0.82 }),
@@ -322,10 +322,10 @@ export function buildAddressGolfer(): THREE.Group {
   addShoe(body, lAnkle, m, 0.04);
   addShoe(body, rAnkle, m, 0.04);
 
-  limb(body, lHip.x, lHip.y, lHip.z, lKnee.x, lKnee.y, lKnee.z, [0.072, 0.07, 0.058, 0.05], m.slacks);
-  limb(body, rHip.x, rHip.y, rHip.z, rKnee.x, rKnee.y, rKnee.z, [0.072, 0.07, 0.058, 0.05], m.slacks);
-  limb(body, lKnee.x, lKnee.y, lKnee.z, lAnkle.x, lAnkle.y, lAnkle.z, [0.048, 0.046, 0.042, 0.034], m.slacks);
-  limb(body, rKnee.x, rKnee.y, rKnee.z, rAnkle.x, rAnkle.y, rAnkle.z, [0.048, 0.046, 0.042, 0.034], m.slacks);
+  limb(body, lHip.x, lHip.y, lHip.z, lKnee.x, lKnee.y, lKnee.z, [0.084, 0.078, 0.066, 0.055], m.slacks);
+  limb(body, rHip.x, rHip.y, rHip.z, rKnee.x, rKnee.y, rKnee.z, [0.084, 0.078, 0.066, 0.055], m.slacks);
+  limb(body, lKnee.x, lKnee.y, lKnee.z, lAnkle.x, lAnkle.y, lAnkle.z, [0.056, 0.05, 0.046, 0.038], m.slacks);
+  limb(body, rKnee.x, rKnee.y, rKnee.z, rAnkle.x, rAnkle.y, rAnkle.z, [0.056, 0.05, 0.046, 0.038], m.slacks);
   ball(body, 0.046, m.slacks, lKnee.x, lKnee.y, lKnee.z, 1.05, 0.85, 0.95);
   ball(body, 0.046, m.slacks, rKnee.x, rKnee.y, rKnee.z, 1.05, 0.85, 0.95);
 
@@ -362,7 +362,7 @@ export function buildAddressGolfer(): THREE.Group {
     ),
   );
   torso.position.set(0.01, 0.98, 0.04);
-  torso.scale.set(1.1, 1, 0.78);
+  torso.scale.set(1.14, 1, 0.82);
   torso.rotation.x = 0.4;
   const chestPad = ball(body, 0.09, m.shirt, 0.01, 1.28, 0.12, 1.35, 0.7, 0.85);
   void chestPad;
@@ -381,10 +381,10 @@ export function buildAddressGolfer(): THREE.Group {
   collar.position.set(0.01, 1.46, 0.16);
   collar.rotation.x = 1.22;
 
-  limb(body, lShoulder.x, lShoulder.y, lShoulder.z, lElbow.x, lElbow.y, lElbow.z, [0.052, 0.05, 0.044, 0.038], m.shirt);
-  limb(body, rShoulder.x, rShoulder.y, rShoulder.z, rElbow.x, rElbow.y, rElbow.z, [0.052, 0.05, 0.044, 0.038], m.shirt);
-  limb(body, lElbow.x, lElbow.y, lElbow.z, hands.x - 0.018, hands.y + 0.02, hands.z, [0.034, 0.032, 0.028, 0.024], m.skin);
-  limb(body, rElbow.x, rElbow.y, rElbow.z, hands.x + 0.02, hands.y - 0.02, hands.z + 0.01, [0.034, 0.032, 0.028, 0.024], m.skin);
+  limb(body, lShoulder.x, lShoulder.y, lShoulder.z, lElbow.x, lElbow.y, lElbow.z, [0.06, 0.055, 0.048, 0.042], m.shirt);
+  limb(body, rShoulder.x, rShoulder.y, rShoulder.z, rElbow.x, rElbow.y, rElbow.z, [0.06, 0.055, 0.048, 0.042], m.shirt);
+  limb(body, lElbow.x, lElbow.y, lElbow.z, hands.x - 0.018, hands.y + 0.02, hands.z, [0.038, 0.036, 0.032, 0.028], m.skin);
+  limb(body, rElbow.x, rElbow.y, rElbow.z, hands.x + 0.02, hands.y - 0.02, hands.z + 0.01, [0.038, 0.036, 0.032, 0.028], m.skin);
   ball(body, 0.054, m.shirt, lShoulder.x, lShoulder.y, lShoulder.z, 1.15, 0.9, 1.05);
   ball(body, 0.054, m.shirt, rShoulder.x, rShoulder.y, rShoulder.z, 1.15, 0.9, 1.05);
   ball(body, 0.032, m.skin, lElbow.x, lElbow.y, lElbow.z);

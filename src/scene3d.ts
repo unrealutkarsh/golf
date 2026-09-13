@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
-import { buildGreenBladeField, createBladeMaterial, updateGreenBladeLod } from "./blades";
+import { buildFringeBladeField, buildGreenBladeField, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
 import { addCourseFoliage, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { buildAddressGolfer, golferMeshCount as countGolferMeshes, poseGolferClub, snapGolferToBall } from "./golfer";
@@ -110,9 +110,12 @@ export class CourseScene {
   private sun: THREE.DirectionalLight;
   private sky: THREE.Mesh;
   private foliageKit: FoliageKit;
-  private greenMat: THREE.MeshStandardMaterial;
+  private greenMat: THREE.MeshPhysicalMaterial;
   private bladeMat: THREE.MeshStandardMaterial;
+  private fringeMat: THREE.MeshStandardMaterial;
   private greenBlades: THREE.InstancedMesh | null = null;
+  private fringeBlades: THREE.InstancedMesh | null = null;
+  private waterTime = { value: 0 };
   private ribbon: THREE.Mesh;
   private ribbonGeo: THREE.BufferGeometry;
   private time = 0;
@@ -132,33 +135,37 @@ export class CourseScene {
     this.renderer.toneMappingExposure = software ? 1.28 : 1.1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x9ec4e6, 1100, 5200);
+    this.scene.fog = new THREE.Fog(0xa8cce8, 1600, 5600);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.12, 6800);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xc4d4e8, software ? 0.78 : 0.4));
-    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd4e8ff, software ? 0x3a6a28 : 0x2e4a22, software ? 1.22 : 0.95);
+    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xb0c4dc, software ? 0.78 : 0.2));
+    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd4ecff, software ? 0x3a6a28 : 0x1e3014, software ? 1.22 : 0.7);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(software ? 0xc4d8b8 : 0xb8d0f0, software ? 0.36 : 0.3);
+    const fill = new THREE.DirectionalLight(software ? 0xc4d8b8 : 0xc8d8f4, software ? 0.36 : 0.2);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(software ? 0x5a7a3c : 0x3a5a2c, software ? 0.14 : 0.07);
+    const bounce = new THREE.DirectionalLight(software ? 0x5a7a3c : 0x3e5c2a, software ? 0.14 : 0.12);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff6e8, software ? 1.55 : 1.38);
+    const wrap = new THREE.DirectionalLight(0xffe2b8, software ? 0.08 : 0.22);
+    wrap.position.set(70, 28, 40);
+    this.scene.add(wrap);
+    this.sun = new THREE.DirectionalLight(0xfff1cc, software ? 1.55 : 1.78);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
-    this.sun.shadow.bias = -0.00022;
+    const map = software ? 1024 : 4096;
+    this.sun.shadow.mapSize.set(map, map);
+    this.sun.shadow.bias = -0.00016;
     this.sun.shadow.normalBias = 0.14;
-    this.sun.shadow.radius = 10;
-    this.sun.shadow.camera.near = 4;
-    this.sun.shadow.camera.far = 540;
-    this.sun.shadow.camera.left = -210;
-    this.sun.shadow.camera.right = 210;
-    this.sun.shadow.camera.top = 170;
-    this.sun.shadow.camera.bottom = -170;
+    this.sun.shadow.radius = software ? 6 : 24;
+    this.sun.shadow.camera.near = 6;
+    this.sun.shadow.camera.far = 520;
+    this.sun.shadow.camera.left = -140;
+    this.sun.shadow.camera.right = 140;
+    this.sun.shadow.camera.top = 120;
+    this.sun.shadow.camera.bottom = -120;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
@@ -176,6 +183,7 @@ export class CourseScene {
     this.turfMat = createTurfMaterial(detail, detailN);
     this.greenMat = createGreenMaterial(detail, detailN);
     this.bladeMat = createBladeMaterial();
+    this.fringeMat = createFringeBladeMaterial();
     this.foliageKit = createFoliageKit();
 
     const puttGeo = new THREE.BufferGeometry();
@@ -319,7 +327,7 @@ export class CourseScene {
     try {
       const composer = new EffectComposer(this.renderer);
       composer.addPass(new RenderPass(this.scene, this.camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(this.w, this.h), 0.14, 0.28, 0.84);
+      const bloom = new UnrealBloomPass(new THREE.Vector2(this.w, this.h), 0.16, 0.42, 0.74);
       composer.addPass(bloom);
       composer.addPass(new OutputPass());
       this.composer = composer;
@@ -370,8 +378,11 @@ export class CourseScene {
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
     this.updateCamera(session, hole, view, putting, dt);
+    this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
-    updateGreenBladeLod(this.greenBlades, putting && session.screen === "play", camDist);
+    const play = session.screen === "play";
+    updateGreenBladeLod(this.greenBlades, putting && play, camDist);
+    updateFringeBladeLod(this.fringeBlades, play && (putting || camDist < 26), camDist);
   }
 
   render(): void {
@@ -394,6 +405,7 @@ export class CourseScene {
     if (this.normalTex) this.normalTex.dispose();
     this.albedoTex = this.roughTex = this.normalTex = null;
     this.greenBlades = null;
+    this.fringeBlades = null;
     this.trailCount = 0;
 
     const b = hole.bounds;
@@ -447,7 +459,8 @@ export class CourseScene {
     this.holeGroup.add(terrain);
     this.holeGroup.add(buildGreenOverlay(hole, this.greenMat));
     this.greenBlades = buildGreenBladeField(hole, this.bladeMat);
-    this.holeGroup.add(this.greenBlades);
+    this.fringeBlades = buildFringeBladeField(hole, this.fringeMat);
+    this.holeGroup.add(this.greenBlades, this.fringeBlades);
 
     this.addRollingCountry(hole, cx, cz);
     this.addWater(hole);
@@ -462,22 +475,15 @@ export class CourseScene {
   }
 
   private addWater(hole: Hole): void {
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: 0x1a6580,
-      roughness: 0.08,
-      metalness: 0.12,
-      transmission: 0.18,
-      transparent: true,
-      opacity: 0.86,
-      envMapIntensity: 0.9,
-    });
+    const mat = createWaterMaterial(this.waterTime);
     for (const poly of hole.water) {
       if (poly.length < 3) continue;
       const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x, p.y)));
-      const geo = new THREE.ShapeGeometry(shape);
+      const geo = new THREE.ShapeGeometry(shape, 40);
       geo.rotateX(-Math.PI / 2);
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = -0.16;
+      mesh.position.y = -0.14;
+      mesh.receiveShadow = true;
       this.holeGroup.add(mesh);
     }
   }
@@ -972,6 +978,76 @@ function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
   } catch {
     return false;
   }
+}
+
+function createWaterMaterial(time: { value: number }): THREE.MeshPhysicalMaterial {
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0x0a4a58,
+    roughness: 0.18,
+    metalness: 0.0,
+    transmission: 0.38,
+    thickness: 2.4,
+    transparent: true,
+    opacity: 0.88,
+    ior: 1.333,
+    envMapIntensity: 1.15,
+    clearcoat: 0.28,
+    clearcoatRoughness: 0.34,
+    attenuationColor: new THREE.Color(0x063038),
+    attenuationDistance: 4.5,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = time;
+    shader.vertexShader = `varying vec3 vWorldPos;\nuniform float uTime;\n${shader.vertexShader}`;
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+       float wt = uTime * 0.24;
+       transformed.y += sin(position.x * 0.42 + wt * 1.5) * 0.03 + cos(position.z * 0.34 - wt) * 0.024;
+       vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+    );
+    shader.fragmentShader = `varying vec3 vWorldPos;
+uniform float uTime;
+${shader.fragmentShader}`;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <map_fragment>",
+      `#include <map_fragment>
+       vec2 w = vWorldPos.xz;
+       float t = uTime * 0.22;
+       float r1 = sin(w.x * 0.48 + t * 1.6) * cos(w.y * 0.38 - t);
+       float r2 = sin(w.x * 1.05 - w.y * 0.72 + t * 2.0);
+       float r3 = sin(length(w) * 0.16 - t * 0.65);
+       float ripple = r1 * 0.42 + r2 * 0.34 + r3 * 0.24;
+       vec3 deep = vec3(0.02, 0.16, 0.20);
+       vec3 mid = vec3(0.05, 0.28, 0.30);
+       vec3 shoal = vec3(0.10, 0.38, 0.34);
+       vec3 foam = vec3(0.70, 0.84, 0.80);
+       vec3 viewW = normalize(cameraPosition - vWorldPos);
+       float fres = pow(1.0 - clamp(abs(viewW.y), 0.0, 1.0), 2.6);
+       float depthHint = smoothstep(-0.4, 0.8, ripple);
+       diffuseColor.rgb = mix(deep, mid, 0.35 + ripple * 0.2);
+       diffuseColor.rgb = mix(diffuseColor.rgb, shoal, depthHint * 0.28);
+       diffuseColor.rgb = mix(diffuseColor.rgb, foam, smoothstep(0.78, 0.96, ripple) * 0.1);
+       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.78, 0.82), fres * 0.28);`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <roughnessmap_fragment>",
+      `#include <roughnessmap_fragment>
+       float rw = sin(vWorldPos.x * 0.62 + uTime * 0.35) * 0.5 + 0.5;
+       roughnessFactor = clamp(0.12 + rw * 0.2, 0.08, 0.38);`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <normal_fragment_maps>",
+      `#include <normal_fragment_maps>
+       float t = uTime * 0.3;
+       vec2 w = vWorldPos.xz;
+       float nx = cos(w.x * 0.78 + t * 1.5) * 0.22 + cos(w.y * 1.05 - t) * 0.12;
+       float nz = sin(w.y * 0.64 - t * 1.2) * 0.2 + sin(w.x * 0.9 + t * 0.75) * 0.1;
+       normal = normalize(normal + vec3(nx, 0.0, nz));`,
+    );
+  };
+  mat.customProgramCacheKey = () => "ptg-water-v3";
+  return mat;
 }
 
 function makeSky(): THREE.Mesh {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GREEN_BLADE_FAR, GREEN_BLADE_NEAR, greenBladeLod, shouldShowGreenBlades } from "./blades";
+import { FRINGE_BLADE_FAR, GREEN_BLADE_FAR, GREEN_BLADE_NEAR, greenBladeLod, shouldShowGreenBlades } from "./blades";
 
 describe("green blade LOD", () => {
   it("is dense at putt distance and gone from the tee", () => {
@@ -15,5 +15,9 @@ describe("green blade LOD", () => {
     expect(shouldShowGreenBlades(true, 4)).toBe(true);
     expect(shouldShowGreenBlades(false, 4)).toBe(false);
     expect(shouldShowGreenBlades(true, 40)).toBe(false);
+  });
+
+  it("keeps fringe nap visible farther than the putting-surface cards", () => {
+    expect(FRINGE_BLADE_FAR).toBeGreaterThan(GREEN_BLADE_FAR);
   });
 });
