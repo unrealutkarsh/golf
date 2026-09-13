@@ -23,10 +23,12 @@ describe("turf bands and nap", () => {
     expect(wr).toBeGreaterThan(gr);
   });
 
-  it("has readable green directionality", () => {
+  it("has readable green directionality without neon mower stripes", () => {
     const contrast = napContrast(hole, hole.green.cx, hole.green.cy);
-    expect(contrast).toBeGreaterThan(0.04);
+    expect(contrast).toBeGreaterThan(0.03);
+    expect(contrast).toBeLessThan(0.22);
     expect(napShade("green", 0, 0, 1, 0)).not.toBe(napShade("green", 1.2, 0.1, 1, 0));
     expect(napShade("green", 0, 0, 1, 0)).toBeGreaterThan(0.65);
+    expect(napShade("green", 0, 0, 1, 0)).toBeLessThan(1.2);
   });
 });

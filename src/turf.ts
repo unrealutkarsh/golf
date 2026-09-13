@@ -36,27 +36,29 @@ export function turfBand(hole: Hole, x: number, z: number): TurfBand {
   return "waste";
 }
 
-/** View-independent nap / stripe term used by the baker and tests. */
+/** View-independent nap / grain term. Subtle on purpose — mower stripes read as neon banding. */
 export function napShade(band: TurfBand, x: number, z: number, napX: number, napZ: number): number {
   const across = x * -napZ + z * napX;
   if (band === "green") {
-    const stripe = 0.5 + 0.5 * Math.sin(across * 2.15);
-    const fine = 0.5 + 0.5 * Math.sin(across * 11 + x * 0.28);
-    return 0.7 + stripe * 0.48 + fine * 0.1;
+    const nap = 0.5 + 0.5 * Math.sin(across * 3.6);
+    const grain = hashNoise(x * 4.2, z * 4.2);
+    const clump = fbm(x * 1.6, z * 1.6);
+    return 0.91 + nap * 0.09 + grain * 0.05 + clump * 0.04;
   }
   if (band === "collar") {
-    const stripe = 0.5 + 0.5 * Math.sin(across * 2.4);
-    return 0.88 + stripe * 0.1;
+    const grain = hashNoise(x * 3.1, z * 3.1);
+    return 0.94 + grain * 0.06;
   }
   if (band === "fringe") {
     const clump = fbm(x * 0.7, z * 0.7);
-    return 0.86 + clump * 0.12;
+    return 0.9 + clump * 0.08;
   }
   if (band === "fairway" || band === "tee") {
-    const stripe = 0.5 + 0.5 * Math.sin(x * 0.22 + z * 0.04);
-    return 0.76 + stripe * 0.32;
+    const clump = fbm(x * 0.85, z * 0.85);
+    const grain = hashNoise(x * 3.8, z * 3.8);
+    return 0.93 + clump * 0.06 + grain * 0.04;
   }
-  return 0.92;
+  return 0.94;
 }
 
 export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number, napZ: number): [number, number, number] {
@@ -66,34 +68,34 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.3 + micro * 0.06 + n * 0.03) * nap,
-      (0.58 + micro * 0.05 + n * 0.04) * nap,
-      (0.22 + micro * 0.02) * nap,
+      (0.24 + micro * 0.05 + n * 0.03) * nap,
+      (0.38 + micro * 0.04 + n * 0.03) * nap,
+      (0.18 + micro * 0.02) * nap,
     ];
   }
   if (band === "collar") {
     return [
-      (0.34 + micro * 0.03) * nap,
-      (0.54 + n * 0.03) * nap,
-      (0.22 + micro * 0.02) * nap,
+      (0.3 + micro * 0.03) * nap,
+      (0.42 + n * 0.03) * nap,
+      (0.18 + micro * 0.02) * nap,
     ];
   }
   if (band === "fringe") {
     return [
-      (0.4 + micro * 0.05 + clump * 0.04) * nap,
-      (0.54 + n * 0.03 + micro * 0.02) * nap,
-      (0.18 + micro * 0.02) * nap,
+      (0.34 + micro * 0.05 + clump * 0.04) * nap,
+      (0.44 + n * 0.03 + micro * 0.02) * nap,
+      (0.16 + micro * 0.02) * nap,
     ];
   }
   if (band === "fairway") {
     return [
-      (0.4 + micro * 0.05 + n * 0.03) * nap,
-      (0.6 + micro * 0.04 + n * 0.04) * nap,
-      (0.18 + micro * 0.02) * nap,
+      (0.36 + micro * 0.06 + n * 0.04 + clump * 0.03) * nap,
+      (0.48 + micro * 0.05 + n * 0.04) * nap,
+      (0.16 + micro * 0.02) * nap,
     ];
   }
   if (band === "tee") {
-    return [0.26 + n * 0.03 + micro * 0.04, 0.48 + n * 0.04, 0.18 + micro * 0.02];
+    return [0.34 + n * 0.04 + micro * 0.05, 0.46 + n * 0.04, 0.16 + micro * 0.02];
   }
   if (band === "rough") {
     return [0.2 + n * 0.07 + clump * 0.05, 0.3 + n * 0.05, 0.1 + n * 0.02];
@@ -222,7 +224,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
 }
 
 export function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", ["#6a8c3c", "#8aaa50", "#547428", "#a8c466", "#4a6824", "#7e9a44", "#c0d878"], 256, 7800);
+  const tile = grassTile("ptg-grass-detail", ["#5a7040", "#6a8048", "#4a6034", "#7a8c52", "#546838", "#687848", "#8a9a5c"], 256, 7800);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -237,8 +239,8 @@ export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStand
     metalness: 0,
     envMapIntensity: 0.1,
     vertexColors: true,
-    emissive: new THREE.Color(0x243c14),
-    emissiveIntensity: 0.12,
+    emissive: new THREE.Color(0x1a2a10),
+    emissiveIntensity: 0.03,
   });
   attachTurfShader(mat, detail, 72, true);
   return mat;
@@ -246,11 +248,11 @@ export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStand
 
 export function createGreenMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.38,
+    roughness: 0.54,
     metalness: 0,
-    envMapIntensity: 0.18,
-    emissive: new THREE.Color(0x2a5a22),
-    emissiveIntensity: 0.18,
+    envMapIntensity: 0.1,
+    emissive: new THREE.Color(0x142818),
+    emissiveIntensity: 0.03,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -311,8 +313,8 @@ ${shader.fragmentShader}`;
       "#include <map_fragment>",
       `#include <map_fragment>
        vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       float detailMix = uCourseWide > 0.5 ? 0.38 : 0.26;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.55, detailMix);
+       float detailMix = uCourseWide > 0.5 ? 0.26 : 0.16;
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.12, detailMix);
        vec2 world = vWorldPos.xz;
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
@@ -325,25 +327,22 @@ ${shader.fragmentShader}`;
        vec2 nap = normalize(uNapDir);
        float along = dot(viewN, nap);
        float across = local.x * -nap.y + local.y * nap.x;
-       float stripe = 0.5 + 0.5 * sin(across * 2.2);
-       float fine = 0.5 + 0.5 * sin(across * 12.0 + along * 2.0);
+       float grain = 0.5 + 0.5 * sin(across * 9.0 + along * 1.5);
+       float clump = 0.5 + 0.5 * sin(world.x * 1.7 + world.y * 1.3);
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.72 + along * 0.2 + stripe * 0.32 + fine * 0.08;
-       float fringeTerm = 0.86 + (0.5 + 0.5 * sin(across * 1.4)) * 0.16;
-       vec3 greenLift = vec3(1.16, 1.12, 0.88);
-       vec3 fringeTint = vec3(1.22, 1.04, 0.7);
-       diffuseColor.rgb *= mix(vec3(1.0), greenLift * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.06, 0.86) * (0.86 + stripe * 0.16), onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), fringeTint * fringeTerm, onFringe);
+       float napTerm = 0.97 + along * 0.035 + grain * 0.03;
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.98, 1.0, 0.95) * napTerm, onGreen);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.9) * (0.97 + grain * 0.03), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 1.0, 0.88) * (0.96 + clump * 0.04), onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.16 + world.y * 0.028);
-       float fwFine = 0.5 + 0.5 * sin(world.x * 1.8 + world.y * 0.2);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.76 + fwStripe * 0.38 + fwFine * 0.06, 0.84 + fwStripe * 0.28 + fwFine * 0.05, 0.68 + fwStripe * 0.12), fairway * uCourseWide);`
+       float fwGrain = 0.5 + 0.5 * sin(world.x * 2.4 + world.y * 1.8);
+       float fwClump = 0.5 + 0.5 * sin(world.x * 0.55 + world.y * 0.42);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.05, 1.02, 0.9) * (0.97 + fwGrain * 0.04 + fwClump * 0.035), fairway * uCourseWide);`
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v5-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {

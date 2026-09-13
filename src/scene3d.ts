@@ -44,29 +44,26 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.12, 0.4, 0.86);
-    vec3 mid = vec3(0.3, 0.58, 0.94);
-    vec3 horizon = vec3(0.5, 0.72, 0.96);
-    vec3 ground = vec3(0.46, 0.66, 0.88);
-    vec3 col = mix(ground, horizon, smoothstep(-0.1, 0.04, h));
-    col = mix(col, mid, smoothstep(0.0, 0.2, h));
-    col = mix(col, zenith, smoothstep(0.1, 0.72, h));
-    vec3 sunD = normalize(vec3(0.52, 0.48, 0.38));
-    float sun = pow(max(dot(dir, sunD), 0.0), 48.0);
-    float glow = pow(max(dot(dir, sunD), 0.0), 5.5);
-    float wash = pow(max(dot(dir, sunD), 0.0), 2.4);
-    col += vec3(1.0, 0.96, 0.86) * sun * 1.2;
-    col += vec3(1.0, 0.88, 0.62) * glow * 0.22;
-    col += vec3(0.9, 0.86, 0.78) * wash * 0.05;
-    vec2 cuv = dir.xz / max(abs(h) + 0.22, 0.12);
-    float cloud = fbm(cuv * 1.05 + vec2(0.4, 0.1));
-    float wisps = fbm(cuv * 2.6 + 6.0);
-    float mask = smoothstep(0.06, 0.32, h) * smoothstep(0.82, 0.26, h);
-    float banks = smoothstep(0.42, 0.7, cloud + wisps * 0.24) * mask;
-    float thick = smoothstep(0.58, 0.84, cloud) * mask;
-    col = mix(col, vec3(0.94, 0.96, 0.98), banks * 0.78);
-    col = mix(col, vec3(1.0, 1.0, 0.99), thick * 0.6);
-    col = mix(col, vec3(0.88, 0.86, 0.84), thick * wash * 0.12);
+    vec3 zenith = vec3(0.32, 0.54, 0.76);
+    vec3 mid = vec3(0.5, 0.68, 0.84);
+    vec3 horizon = vec3(0.74, 0.8, 0.84);
+    vec3 ground = vec3(0.64, 0.72, 0.78);
+    vec3 col = mix(ground, horizon, smoothstep(-0.12, 0.05, h));
+    col = mix(col, mid, smoothstep(0.02, 0.28, h));
+    col = mix(col, zenith, smoothstep(0.18, 0.82, h));
+    float haze = pow(1.0 - clamp(h * 0.92 + 0.08, 0.0, 1.0), 1.35);
+    col = mix(col, vec3(0.7, 0.78, 0.84), haze * 0.55);
+    vec3 sunD = normalize(vec3(0.42, 0.62, 0.28));
+    float glow = pow(max(dot(dir, sunD), 0.0), 7.0);
+    float wash = pow(max(dot(dir, sunD), 0.0), 2.1);
+    col += vec3(1.0, 0.94, 0.82) * glow * 0.16;
+    col += vec3(0.92, 0.88, 0.8) * wash * 0.06;
+    vec2 cuv = dir.xz / max(abs(h) + 0.28, 0.16);
+    float cloud = fbm(cuv * 0.85 + vec2(0.4, 0.1));
+    float wisps = fbm(cuv * 2.1 + 6.0);
+    float mask = smoothstep(0.08, 0.3, h) * smoothstep(0.78, 0.22, h);
+    float banks = smoothstep(0.48, 0.74, cloud + wisps * 0.2) * mask;
+    col = mix(col, vec3(0.9, 0.92, 0.94), banks * 0.42);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -120,29 +117,29 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x5a96d8, 1);
+    this.renderer.setClearColor(0x7a9cb4, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 0.98;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8eb6d8, 780, 4200);
+    this.scene.fog = new THREE.Fog(0x8aa8bc, 240, 3600);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc8d8ec, 0.62));
-    const hemi = new THREE.HemisphereLight(0xd8e8f8, 0x7a8a50, 1.35);
+    this.scene.add(new THREE.AmbientLight(0xc4d2de, 0.78));
+    const hemi = new THREE.HemisphereLight(0xd4e0ea, 0x6a7848, 1.18);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xd4e4f4, 0.78);
+    const fill = new THREE.DirectionalLight(0xd0dce8, 0.86);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xb4c870, 0.42);
+    const bounce = new THREE.DirectionalLight(0xa8b870, 0.36);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff4dc, 0.92);
+    this.sun = new THREE.DirectionalLight(0xfff1d8, 0.74);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -356,8 +353,8 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const stripe = 0.68 + 0.4 * Math.sin(x * 0.18 + z * 0.03);
-      const boost = lie === "green" ? 1.1 + stripe * 0.12 : lie === "fairway" || lie === "tee" ? 0.82 + stripe * 0.36 : 0.94;
+      const grain = 0.97 + 0.05 * hashNoise(x * 2.1, z * 2.1);
+      const boost = lie === "green" ? 1.02 * grain : lie === "fairway" || lie === "tee" ? 1.05 * grain : 0.96;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;
@@ -419,33 +416,34 @@ export class CourseScene {
   private addBunkerLips(hole: Hole): void {
     const sandMap = new THREE.CanvasTexture(makeSandCard());
     sandMap.wrapS = sandMap.wrapT = THREE.RepeatWrapping;
-    sandMap.repeat.set(2.1, 2.1);
+    sandMap.repeat.set(3.4, 3.4);
     sandMap.colorSpace = THREE.SRGBColorSpace;
     const sand = new THREE.MeshStandardMaterial({
       map: sandMap,
-      color: 0xf4ddaa,
-      roughness: 0.9,
+      color: 0xead2a0,
+      roughness: 0.96,
       metalness: 0,
-      envMapIntensity: 0.16,
+      envMapIntensity: 0.08,
     });
-    const lip = new THREE.MeshStandardMaterial({ color: 0x7c8e46, roughness: 0.95 });
+    const lip = new THREE.MeshStandardMaterial({ color: 0x6a7c40, roughness: 0.96 });
     const profile = [
-      new THREE.Vector2(0, -0.3),
-      new THREE.Vector2(0.28, -0.26),
-      new THREE.Vector2(0.58, -0.16),
-      new THREE.Vector2(0.82, -0.04),
-      new THREE.Vector2(0.94, 0.05),
-      new THREE.Vector2(1.0, 0.08),
+      new THREE.Vector2(0, -0.34),
+      new THREE.Vector2(0.22, -0.3),
+      new THREE.Vector2(0.48, -0.2),
+      new THREE.Vector2(0.7, -0.08),
+      new THREE.Vector2(0.86, 0.02),
+      new THREE.Vector2(0.96, 0.07),
+      new THREE.Vector2(1.04, 0.05),
     ];
     for (const bunker of hole.bunkers) {
       const y = groundHeight(hole, bunker.cx, bunker.cy);
-      const dish = new THREE.LatheGeometry(profile, 96);
+      const dish = new THREE.LatheGeometry(profile, 80);
       const pos = dish.attributes.position;
       for (let i = 0; i < pos.count; i++) {
         const vx = pos.getX(i);
         const vz = pos.getZ(i);
         const a = Math.atan2(vz, vx);
-        const jitter = 1 + Math.sin(a * 5.2 + bunker.cx) * 0.045 + (hashNoise(a * 4, bunker.cy) - 0.5) * 0.05;
+        const jitter = 1 + Math.sin(a * 3.1 + bunker.cx) * 0.11 + Math.sin(a * 7.4 + bunker.cy) * 0.06 + (hashNoise(a * 5, bunker.cy) - 0.5) * 0.08;
         pos.setX(i, vx * jitter);
         pos.setZ(i, vz * jitter);
       }
@@ -455,26 +453,48 @@ export class CourseScene {
       bowl.rotation.y = bunker.rotation;
       bowl.position.set(bunker.cx, y + 0.06, bunker.cy);
       bowl.receiveShadow = true;
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.048, 8, 80), lip);
-      rim.scale.set(bunker.rx * 0.98, bunker.ry * 0.98, 0.55);
+      const lobe = new THREE.Mesh(dish.clone(), sand);
+      const ox = Math.cos(bunker.rotation) * bunker.rx * 0.22;
+      const oz = Math.sin(bunker.rotation) * bunker.ry * 0.18;
+      lobe.scale.set(bunker.rx * 0.62, 0.85, bunker.ry * 0.7);
+      lobe.rotation.y = bunker.rotation + 0.4;
+      lobe.position.set(bunker.cx + ox, y + 0.04, bunker.cy + oz);
+      lobe.receiveShadow = true;
+      const rimGeo = new THREE.TorusGeometry(1, 0.07, 10, 64);
+      const rimPos = rimGeo.attributes.position;
+      for (let i = 0; i < rimPos.count; i++) {
+        const j = 1 + (hashNoise(i * 0.3, bunker.cx) - 0.5) * 0.12;
+        rimPos.setX(i, rimPos.getX(i) * j);
+        rimPos.setY(i, rimPos.getY(i) * j);
+      }
+      rimGeo.computeVertexNormals();
+      const rim = new THREE.Mesh(rimGeo, lip);
+      rim.scale.set(bunker.rx * 0.96, bunker.ry * 0.96, 0.7);
       rim.rotation.x = Math.PI / 2;
       rim.rotation.z = bunker.rotation;
-      rim.position.set(bunker.cx, y + 0.12, bunker.cy);
-      const collar = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.2, 80), lip);
+      rim.position.set(bunker.cx, y + 0.1, bunker.cy);
+      const collarGeo = new THREE.RingGeometry(0.92, 1.28, 64);
+      const cpos = collarGeo.attributes.position;
+      for (let i = 0; i < cpos.count; i++) {
+        const j = 1 + (hashNoise(i, bunker.cy) - 0.5) * 0.1;
+        cpos.setX(i, cpos.getX(i) * j);
+        cpos.setY(i, cpos.getY(i) * j);
+      }
+      const collar = new THREE.Mesh(collarGeo, lip);
       collar.scale.set(bunker.rx, bunker.ry, 1);
       collar.rotation.x = -Math.PI / 2;
       collar.rotation.z = bunker.rotation;
-      collar.position.set(bunker.cx, y + 0.08, bunker.cy);
-      this.holeGroup.add(bowl, rim, collar);
+      collar.position.set(bunker.cx, y + 0.07, bunker.cy);
+      this.holeGroup.add(bowl, lobe, rim, collar);
     }
   }
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
     const grass = new THREE.MeshStandardMaterial({
-      color: 0x6e8c42,
-      roughness: 0.95,
-      emissive: new THREE.Color(0x2a4018),
-      emissiveIntensity: 0.08,
+      color: 0x5e7440,
+      roughness: 0.96,
+      emissive: new THREE.Color(0x1a2810),
+      emissiveIntensity: 0.03,
     });
     const far = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600, 96, 96), grass);
     far.rotation.x = -Math.PI / 2;
