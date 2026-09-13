@@ -43,7 +43,7 @@ export function napShade(band: TurfBand, x: number, z: number, napX: number, nap
     const nap = 0.5 + 0.5 * Math.sin(across * 3.6);
     const grain = hashNoise(x * 4.2, z * 4.2);
     const clump = fbm(x * 1.6, z * 1.6);
-    return 0.91 + nap * 0.09 + grain * 0.05 + clump * 0.04;
+    return 0.90 + nap * 0.08 + grain * 0.045 + clump * 0.035;
   }
   if (band === "collar") {
     const grain = hashNoise(x * 3.1, z * 3.1);
@@ -68,37 +68,37 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.28 + micro * 0.03 + n * 0.02) * nap,
-      (0.42 + micro * 0.03 + n * 0.025) * nap,
-      (0.16 + micro * 0.015) * nap,
+      (0.14 + micro * 0.02 + n * 0.015) * nap,
+      (0.40 + micro * 0.03 + n * 0.025) * nap,
+      (0.18 + micro * 0.015) * nap,
     ];
   }
   if (band === "collar") {
     return [
-      (0.3 + micro * 0.03) * nap,
-      (0.43 + n * 0.025) * nap,
-      (0.17 + micro * 0.015) * nap,
+      (0.18 + micro * 0.02) * nap,
+      (0.40 + n * 0.022) * nap,
+      (0.16 + micro * 0.012) * nap,
     ];
   }
   if (band === "fringe") {
     return [
-      (0.4 + micro * 0.04 + clump * 0.03) * nap,
-      (0.44 + n * 0.025 + micro * 0.02) * nap,
-      (0.2 + micro * 0.015) * nap,
+      (0.30 + micro * 0.03 + clump * 0.025) * nap,
+      (0.40 + n * 0.022 + micro * 0.018) * nap,
+      (0.14 + micro * 0.012) * nap,
     ];
   }
   if (band === "fairway") {
     return [
-      (0.36 + micro * 0.04 + n * 0.025 + clump * 0.025) * nap,
-      (0.48 + micro * 0.03 + n * 0.03) * nap,
-      (0.18 + micro * 0.015) * nap,
+      (0.24 + micro * 0.03 + n * 0.02 + clump * 0.02) * nap,
+      (0.46 + micro * 0.03 + n * 0.028) * nap,
+      (0.14 + micro * 0.012) * nap,
     ];
   }
   if (band === "tee") {
-    return [0.34 + n * 0.03 + micro * 0.03, 0.46 + n * 0.03, 0.18 + micro * 0.015];
+    return [0.22 + n * 0.025 + micro * 0.02, 0.44 + n * 0.028, 0.14 + micro * 0.012];
   }
   if (band === "rough") {
-    return [0.26 + n * 0.05 + clump * 0.04, 0.36 + n * 0.04, 0.12 + n * 0.02];
+    return [0.18 + n * 0.04 + clump * 0.03, 0.32 + n * 0.035, 0.10 + n * 0.016];
   }
   if (band === "bunker") {
     return [0.74 + n * 0.1 + micro * 0.08, 0.6 + n * 0.07, 0.34 + n * 0.03];
@@ -106,7 +106,7 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   if (band === "water") {
     return [0.07, 0.24, 0.32];
   }
-  return [0.5 + n * 0.1, 0.44 + n * 0.06, 0.28 + n * 0.04];
+  return [0.28 + n * 0.06, 0.34 + n * 0.05, 0.16 + n * 0.03];
 }
 
 export function napDirection(hole: Hole): [number, number] {
@@ -226,7 +226,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
 }
 
 export function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", ["#6a7048", "#7a7850", "#5a5840", "#8a8860", "#646848", "#747058", "#9a9870"], 256, 7800);
+  const tile = grassTile("ptg-grass-detail", ["#2f5c28", "#3d7040", "#245022", "#4a7c38", "#326434", "#3a6830", "#2a5424"], 256, 6400);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -245,12 +245,12 @@ export function makeGrassDetailNormal(): THREE.CanvasTexture {
 
 export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.88,
+    roughness: 0.86,
     metalness: 0,
-    envMapIntensity: 0.22,
+    envMapIntensity: 0.18,
     vertexColors: true,
-    emissive: new THREE.Color(0x12140e),
-    emissiveIntensity: 0.01,
+    emissive: new THREE.Color(0x0a1608),
+    emissiveIntensity: 0.008,
   });
   attachTurfShader(mat, detail, detailN, 72, true);
   return mat;
@@ -258,11 +258,11 @@ export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.C
 
 export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.44,
+    roughness: 0.42,
     metalness: 0,
-    envMapIntensity: 0.2,
-    emissive: new THREE.Color(0x10120e),
-    emissiveIntensity: 0.01,
+    envMapIntensity: 0.16,
+    emissive: new THREE.Color(0x081208),
+    emissiveIntensity: 0.008,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -326,15 +326,18 @@ ${shader.fragmentShader}`;
       "#include <map_fragment>",
       `#include <map_fragment>
        vec2 world = vWorldPos.xz;
+       float h1 = fract(sin(dot(world, vec2(127.1, 311.7))) * 43758.5453);
+       float h2 = fract(sin(dot(world * 2.37, vec2(269.5, 183.3))) * 15731.2);
+       float h3 = fract(sin(dot(world * 5.13, vec2(419.2, 371.9))) * 97321.1);
+       float clump = h1 * 0.42 + h2 * 0.36 + h3 * 0.22;
        vec2 warp = vec2(
-         sin(world.x * 0.19 + world.y * 0.13),
-         cos(world.x * 0.11 - world.y * 0.17)
-       ) * 0.42;
-       vec2 wUv = (world + warp) * 0.27;
-       vec2 wUv2 = vec2(wUv.x * 0.62 - wUv.y * 0.78, wUv.x * 0.78 + wUv.y * 0.62) * 1.85;
-       vec2 wUv3 = (world - warp * 0.7) * 0.11 + vec2(0.37, 0.18);
-       vec3 detail = (texture2D(uDetail, wUv).rgb + texture2D(uDetail, wUv2).rgb + texture2D(uDetail, wUv3).rgb) / 3.0;
-       float detailMix = uCourseWide > 0.5 ? 0.16 : 0.1;
+         sin(world.x * 0.061 + world.y * 0.093 + h1 * 6.1),
+         cos(world.x * 0.077 - world.y * 0.049 + h2 * 5.3)
+       ) * (1.65 + h3);
+       vec2 wUv = world * 0.071 + warp * 0.28 + vec2(h1, h2) * 0.19;
+       vec2 wUv2 = vec2(wUv.y * 0.69 - wUv.x * 0.73, wUv.x * 0.61 + wUv.y * 0.79) * 1.28 + 4.2;
+       vec3 detail = (texture2D(uDetail, wUv).rgb + texture2D(uDetail, wUv2).rgb) * 0.5;
+       float detailMix = uCourseWide > 0.5 ? 0.08 : 0.06;
        diffuseColor.rgb *= mix(vec3(1.0), detail, detailMix);
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
@@ -346,16 +349,15 @@ ${shader.fragmentShader}`;
        vec2 viewN = viewXZ / vlen;
        vec2 nap = normalize(uNapDir);
        float along = dot(viewN, nap);
-       float clump = fract(sin(dot(world, vec2(12.7, 31.1))) * 43758.5);
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.97 + along * 0.04 + clump * 0.03;
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.02, 0.9) * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.9) * (0.97 + clump * 0.03), onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 1.0, 0.86) * (0.96 + clump * 0.04), onFringe);
+       float napTerm = 0.95 + along * 0.06 + clump * 0.035;
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.90, 1.10, 0.94) * napTerm, onGreen);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.98, 1.04, 0.90) * (0.97 + clump * 0.03), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.02, 0.86) * (0.96 + clump * 0.04), onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 1.04, 0.88) * (0.97 + clump * 0.04), fairway * uCourseWide);`
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.96, 1.08, 0.86) * (0.97 + clump * 0.035), fairway * uCourseWide);`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <roughnessmap_fragment>",
@@ -367,17 +369,17 @@ ${shader.fragmentShader}`;
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
        vec2 nWarp = vec2(
-         sin(vWorldPos.x * 0.19 + vWorldPos.z * 0.13),
-         cos(vWorldPos.x * 0.11 - vWorldPos.z * 0.17)
-       ) * 0.42;
-       vec2 nUv = (vWorldPos.xz + nWarp) * 0.34;
-       vec2 nUv2 = vec2(nUv.x * 0.55 - nUv.y * 0.83, nUv.x * 0.83 + nUv.y * 0.55) * 1.55;
+         sin(vWorldPos.x * 0.061 + vWorldPos.z * 0.093),
+         cos(vWorldPos.x * 0.077 - vWorldPos.z * 0.049)
+       ) * 1.4;
+       vec2 nUv = vWorldPos.xz * 0.09 + nWarp * 0.22;
+       vec2 nUv2 = vec2(nUv.y * 0.67 - nUv.x * 0.74, nUv.x * 0.58 + nUv.y * 0.81) * 1.22 + 2.4;
        vec3 dn = mix(texture2D(uDetailN, nUv).xyz, texture2D(uDetailN, nUv2).xyz, 0.5) * 2.0 - 1.0;
-       float nAmt = uCourseWide > 0.5 ? 0.24 : 0.36;
+       float nAmt = uCourseWide > 0.5 ? 0.18 : 0.42;
        normal = normalize(normal + dn * nAmt);`,
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-v10-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v11-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {

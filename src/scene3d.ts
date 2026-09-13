@@ -48,27 +48,27 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.08, 0.32, 0.78);
-    vec3 mid = vec3(0.30, 0.56, 0.92);
-    vec3 horizon = vec3(0.58, 0.74, 0.90);
-    vec3 ground = vec3(0.36, 0.50, 0.46);
-    vec3 col = mix(ground, horizon, smoothstep(-0.16, 0.06, h));
-    col = mix(col, mid, smoothstep(0.04, 0.34, h));
-    col = mix(col, zenith, smoothstep(0.22, 0.92, h));
-    float haze = pow(1.0 - clamp(h * 1.05 + 0.04, 0.0, 1.0), 1.5);
-    col = mix(col, vec3(0.66, 0.78, 0.90), haze * 0.28);
-    vec3 sunD = normalize(vec3(0.42, 0.62, 0.22));
-    float glow = pow(max(dot(dir, sunD), 0.0), 8.0);
-    float wash = pow(max(dot(dir, sunD), 0.0), 2.2);
-    col += vec3(1.0, 0.92, 0.74) * glow * 0.28;
-    col += vec3(0.96, 0.9, 0.76) * wash * 0.1;
-    vec2 cuv = dir.xz / max(abs(h) + 0.28, 0.16);
-    float cloud = fbm(cuv * 0.62 + vec2(0.28, 0.1));
-    float wisps = fbm(cuv * 1.7 + 4.8);
-    float mask = smoothstep(0.08, 0.32, h) * smoothstep(0.84, 0.22, h);
-    float banks = smoothstep(0.48, 0.78, cloud + wisps * 0.22) * mask;
-    float lit = 0.78 + 0.22 * max(dot(dir, sunD), 0.0);
-    col = mix(col, vec3(0.94, 0.95, 0.96) * lit, banks * 0.52);
+    vec3 zenith = vec3(0.10, 0.38, 0.86);
+    vec3 mid = vec3(0.36, 0.64, 0.96);
+    vec3 horizon = vec3(0.70, 0.84, 0.96);
+    vec3 ground = vec3(0.16, 0.28, 0.22);
+    vec3 col = mix(ground, horizon, smoothstep(-0.18, 0.04, h));
+    col = mix(col, mid, smoothstep(0.02, 0.38, h));
+    col = mix(col, zenith, smoothstep(0.28, 0.94, h));
+    float haze = pow(1.0 - clamp(h * 1.12 + 0.02, 0.0, 1.0), 1.65);
+    col = mix(col, vec3(0.74, 0.86, 0.96), haze * 0.22);
+    vec3 sunD = normalize(vec3(0.48, 0.72, 0.18));
+    float glow = pow(max(dot(dir, sunD), 0.0), 18.0);
+    float wash = pow(max(dot(dir, sunD), 0.0), 3.4);
+    col += vec3(1.0, 0.94, 0.78) * glow * 0.55;
+    col += vec3(1.0, 0.93, 0.80) * wash * 0.12;
+    vec2 cuv = dir.xz / max(abs(h) + 0.32, 0.18);
+    float cloud = fbm(cuv * 0.48 + vec2(0.22, 0.08));
+    float wisps = fbm(cuv * 1.35 + 5.2);
+    float mask = smoothstep(0.10, 0.36, h) * smoothstep(0.88, 0.28, h);
+    float banks = smoothstep(0.56, 0.82, cloud + wisps * 0.18) * mask;
+    float lit = 0.82 + 0.18 * max(dot(dir, sunD), 0.0);
+    col = mix(col, vec3(0.96, 0.97, 0.98) * lit, banks * 0.42);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -124,30 +124,30 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x4a7ab8, 1);
+    this.renderer.setClearColor(0x6aa0d4, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const software = isSoftwareGL(this.renderer);
     this.renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = software ? 1.0 : 0.98;
+    this.renderer.toneMappingExposure = software ? 1.06 : 1.12;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8eacc8, 520, 4200);
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
+    this.scene.fog = new THREE.Fog(0x9ec4e6, 1100, 5200);
+    this.camera = new THREE.PerspectiveCamera(52, 1, 0.12, 6800);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xb4c4d8, 0.52));
-    const hemi = new THREE.HemisphereLight(0xc8e4ff, 0x4a5c34, 1.18);
+    this.scene.add(new THREE.AmbientLight(0xc4d4e8, 0.38));
+    const hemi = new THREE.HemisphereLight(0xd4e8ff, 0x2e4a22, 0.92);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xc4d8f0, 0.48);
+    const fill = new THREE.DirectionalLight(0xb8d0f0, 0.28);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0x7a8c48, 0.16);
+    const bounce = new THREE.DirectionalLight(0x3a5a2c, 0.07);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff4dc, 1.18);
+    this.sun = new THREE.DirectionalLight(0xfff6e8, 1.42);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -226,6 +226,19 @@ export class CourseScene {
     marker.name = "air-marker";
     marker.scale.set(0.32, 0.32, 1);
     this.ball.add(marker);
+    const outline = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(makeDiscSprite()),
+        color: 0x142028,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    outline.name = "air-outline";
+    outline.scale.set(0.48, 0.48, 1);
+    this.ball.add(outline);
     this.scene.add(this.ball);
 
     const softMap = new THREE.CanvasTexture(makeSoftShadowCard());
@@ -269,9 +282,9 @@ export class CourseScene {
     this.scene.add(this.groundLine);
     this.trailPos = new Float32Array(TRAIL_LEN * 3);
     this.trail = makeLine(this.trailPos, 0xffffff);
-    (this.trail.material as THREE.LineBasicMaterial).opacity = 0.95;
-    this.trailGlow = makeLine(this.trailPos, 0xffc85a);
-    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = 0.5;
+    (this.trail.material as THREE.LineBasicMaterial).opacity = 1;
+    this.trailGlow = makeLine(this.trailPos, 0xffd078);
+    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = 0.78;
     this.scene.add(this.trail, this.trailGlow);
     this.ribbonGeo = new THREE.BufferGeometry();
     this.ribbonGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRAIL_LEN * 2 * 3), 3));
@@ -284,10 +297,10 @@ export class CourseScene {
     this.ribbon = new THREE.Mesh(
       this.ribbonGeo,
       new THREE.MeshBasicMaterial({
-        color: 0xfff4d2,
+        color: 0xfff8e0,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.78,
         depthWrite: false,
         toneMapped: false,
       }),
@@ -409,8 +422,8 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const grain = 0.97 + 0.05 * hashNoise(x * 2.1, z * 2.1);
-      const boost = lie === "green" ? 1.04 * grain : lie === "fairway" || lie === "tee" ? 1.1 * grain : 0.98;
+      const grain = 0.98 + 0.04 * hashNoise(x * 2.1, z * 2.1);
+      const boost = lie === "green" ? 1.02 * grain : lie === "fairway" || lie === "tee" ? 1.06 * grain : 0.96;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;
@@ -443,7 +456,7 @@ export class CourseScene {
     this.buildPin();
     this.buildGrid(hole);
 
-    this.sun.position.set(cx + 130, 98, cz - 150);
+    this.sun.position.set(cx + 160, 128, cz - 180);
     this.sun.target.position.set(cx, 0, cz);
     this.sun.target.updateMatrixWorld();
   }
@@ -547,12 +560,12 @@ export class CourseScene {
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
     const grass = new THREE.MeshStandardMaterial({
-      color: 0x5a6c38,
-      roughness: 0.97,
-      emissive: new THREE.Color(0x1c2410),
-      emissiveIntensity: 0.02,
+      color: 0x2e4a22,
+      roughness: 0.98,
+      emissive: new THREE.Color(0x0a1408),
+      emissiveIntensity: 0.012,
     });
-    const far = new THREE.Mesh(new THREE.PlaneGeometry(4200, 4200, 80, 80), grass);
+    const far = new THREE.Mesh(new THREE.PlaneGeometry(4600, 4600, 80, 80), grass);
     far.rotation.x = -Math.PI / 2;
     const pos = far.geometry.attributes.position;
     const b = hole.bounds;
@@ -562,27 +575,27 @@ export class CourseScene {
       const x = lx + cx;
       const z = lz + cz;
       const inPlay = x > b.x - 40 && x < b.x + b.w + 40 && z > b.y - 40 && z < b.y + b.h + 40;
-      const dune = hashNoise(x * 0.008, z * 0.008) * 16 + hashNoise(x * 0.02, z * 0.02) * 7;
-      pos.setZ(i, inPlay ? -2.2 : -1.4 + dune);
+      const dune = hashNoise(x * 0.008, z * 0.008) * 14 + hashNoise(x * 0.02, z * 0.02) * 6;
+      pos.setZ(i, inPlay ? -2.4 : -1.8 + dune);
     }
     far.geometry.computeVertexNormals();
     far.position.set(cx, 0, cz);
     far.receiveShadow = true;
     this.holeGroup.add(far);
     const spots = [
-      [b.x - 260, b.y - 220, 90, 0.14],
-      [b.x + b.w + 240, b.y + 40, 100, 0.12],
-      [b.x + 40, b.y - 320, 88, 0.11],
-      [b.x + b.w * 0.55, b.y + b.h + 260, 110, 0.13],
-      [b.x - 180, b.y + b.h + 200, 80, 0.12],
-      [cx + 420, cz + 360, 130, 0.1],
-      [cx - 460, cz - 340, 120, 0.1],
-      [cx + 280, cz - 420, 140, 0.09],
+      [b.x - 380, b.y - 340, 110, 0.1],
+      [b.x + b.w + 360, b.y + 80, 120, 0.09],
+      [b.x + 60, b.y - 460, 104, 0.08],
+      [b.x + b.w * 0.55, b.y + b.h + 400, 130, 0.1],
+      [b.x - 280, b.y + b.h + 320, 96, 0.09],
+      [cx + 620, cz + 520, 150, 0.08],
+      [cx - 660, cz - 500, 140, 0.08],
+      [cx + 420, cz - 600, 160, 0.07],
     ];
     for (const [x, z, r, sy] of spots) {
       const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), grass);
       hill.scale.set(1 + hashNoise(x, z) * 0.22, sy, 0.85 + hashNoise(z, x) * 0.28);
-      hill.position.set(x, r * sy * 0.08, z);
+      hill.position.set(x, r * sy * 0.05, z);
       hill.receiveShadow = true;
       this.holeGroup.add(hill);
     }
@@ -678,13 +691,20 @@ export class CourseScene {
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.02 : 0.07;
     (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.01 : 0.045;
     const halo = this.halo.material as THREE.MeshBasicMaterial;
-    halo.opacity = air > 1.2 ? Math.min(0.58, 0.16 + air * 0.022) : 0.04;
+    halo.opacity = air > 1.2 ? Math.min(0.72, 0.22 + air * 0.028) : 0.05;
     const marker = this.ball.getObjectByName("air-marker") as THREE.Sprite | undefined;
     if (marker) {
       const mat = marker.material as THREE.SpriteMaterial;
-      mat.opacity = air > 1.6 ? Math.min(0.78, 0.28 + air * 0.022) : 0;
-      const s = 0.3 + Math.min(0.55, air * 0.018);
+      mat.opacity = air > 1.2 ? Math.min(0.92, 0.4 + air * 0.028) : 0;
+      const s = 0.38 + Math.min(0.72, air * 0.022);
       marker.scale.set(s, s, 1);
+    }
+    const outline = this.ball.getObjectByName("air-outline") as THREE.Sprite | undefined;
+    if (outline) {
+      const mat = outline.material as THREE.SpriteMaterial;
+      mat.opacity = air > 1.2 ? Math.min(0.55, 0.22 + air * 0.012) : 0;
+      const s = 0.58 + Math.min(0.95, air * 0.03);
+      outline.scale.set(s, s, 1);
     }
   }
 
@@ -774,7 +794,7 @@ export class CourseScene {
     this.ribbon.visible = n > 2;
     if (n < 3) return;
     const pos = this.ribbonGeo.getAttribute("position") as THREE.BufferAttribute;
-    const half = 0.11;
+    const half = 0.16;
     for (let i = 0; i < n; i++) {
       const x = this.trailPos[i * 3];
       const y = this.trailPos[i * 3 + 1];
@@ -851,22 +871,22 @@ export class CourseScene {
       const back = fromAngle(aim + Math.PI, 3.9 + Math.min(2.2, pinDist * 0.18));
       const side = fromAngle(aim + Math.PI / 2, 1.42);
       desired.set(ball.x + back.x + side.x, bh + 1.62 + Math.min(0.36, pinDist * 0.028), ball.y + back.y + side.y);
-      look.set(ball.x * 0.2 + pin.x * 0.8, groundHeight(hole, pin.x, pin.y) + 0.18, ball.y * 0.2 + pin.y * 0.8);
+      look.set(ball.x * 0.18 + pin.x * 0.82, groundHeight(hole, pin.x, pin.y) + 0.26, ball.y * 0.18 + pin.y * 0.82);
       fov = 48;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
-      const back = fromAngle(heading + Math.PI, 24 + Math.min(14, session.ball.z * 0.4));
+      const back = fromAngle(heading + Math.PI, 22 + Math.min(16, session.ball.z * 0.42));
       const side = fromAngle(heading + Math.PI / 2, session.shape * -2.2);
-      desired.set(ball.x + back.x + side.x, 9.2 + session.ball.z * 0.38, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(heading) * 16, bh + 0.35, ball.y + Math.sin(heading) * 16);
-      fov = 50;
+      desired.set(ball.x + back.x + side.x, 8.6 + session.ball.z * 0.34, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(heading) * 20, bh + 0.55, ball.y + Math.sin(heading) * 20);
+      fov = 52;
     } else {
-      const back = fromAngle(aim + Math.PI, 4.85);
-      const side = fromAngle(aim + Math.PI / 2, 1.58);
-      desired.set(ball.x + back.x + side.x, bh + 1.74, ball.y + back.y + side.y);
-      look.set(ball.x + Math.cos(aim) * 11, bh + 0.42, ball.y + Math.sin(aim) * 11);
-      fov = 50;
+      const back = fromAngle(aim + Math.PI, 5.2);
+      const side = fromAngle(aim + Math.PI / 2, 1.64);
+      desired.set(ball.x + back.x + side.x, bh + 1.86, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 58, bh + 0.92, ball.y + Math.sin(aim) * 58);
+      fov = 54;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.36 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));

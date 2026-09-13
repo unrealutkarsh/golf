@@ -84,16 +84,16 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
   const lie = lieAt(hole, p);
   if (lie === "bunker") return [0.82 + n * 0.08, 0.7 + n * 0.05, 0.46 + n * 0.04];
   if (lie === "green" || onGreen(hole, p)) {
-    if (radial >= 0.88) return [0.3 + n * 0.02, 0.42 + n * 0.025, 0.17 + n * 0.012];
-    return [0.27 + n * 0.02 + grain * 0.012, 0.4 + n * 0.025 + grain * 0.015, 0.15 + n * 0.01];
+    if (radial >= 0.88) return [0.18 + n * 0.016, 0.40 + n * 0.022, 0.16 + n * 0.01];
+    return [0.14 + n * 0.016 + grain * 0.01, 0.40 + n * 0.024 + grain * 0.012, 0.17 + n * 0.01];
   }
-  if (radial < 1.3 && lie !== "ob") return [0.4 + n * 0.025, 0.43 + n * 0.022, 0.19 + n * 0.012];
-  if (lie === "tee") return [0.34 + n * 0.025, 0.45 + n * 0.022, 0.17 + n * 0.012];
+  if (radial < 1.3 && lie !== "ob") return [0.30 + n * 0.02, 0.40 + n * 0.02, 0.14 + n * 0.01];
+  if (lie === "tee") return [0.22 + n * 0.02, 0.44 + n * 0.022, 0.14 + n * 0.01];
   if (lie === "fairway") {
-    return [0.35 + n * 0.03 + grain * 0.015, 0.46 + n * 0.025, 0.17 + n * 0.012];
+    return [0.24 + n * 0.025 + grain * 0.012, 0.46 + n * 0.024, 0.14 + n * 0.01];
   }
-  if (lie === "rough") return [0.26 + n * 0.04, 0.36 + n * 0.03, 0.13 + n * 0.018];
-  return [0.5 + n * 0.1, 0.44 + n * 0.06, 0.28 + n * 0.04];
+  if (lie === "rough") return [0.18 + n * 0.035, 0.32 + n * 0.028, 0.10 + n * 0.014];
+  return [0.26 + n * 0.06, 0.34 + n * 0.05, 0.16 + n * 0.03];
 }
 
 export function bladeHeight(lie: Lie): number {

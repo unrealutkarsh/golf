@@ -9,7 +9,7 @@ export const GREEN_BLADE_NEAR = 6;
 /** Hide blades beyond this camera distance (yards). */
 export const GREEN_BLADE_FAR = 14;
 /** Fine nap tufts — short, wide, overlapping. */
-export const GREEN_BLADE_MAX = 2400;
+export const GREEN_BLADE_MAX = 3200;
 
 export function greenBladeLod(camDistYards: number): { visible: boolean; opacity: number; density: number } {
   if (camDistYards >= GREEN_BLADE_FAR) return { visible: false, opacity: 0, density: 0 };
@@ -35,9 +35,9 @@ function makeNapCard(): THREE.DataTexture {
       const edge = Math.max(0, 1 - ellipse);
       const a = edge > 0.08 ? Math.min(1, edge * 1.15) * (0.35 + n * 0.22) : 0;
       const i = (y * w + x) * 4;
-      data[i] = 92 + n * 18;
-      data[i + 1] = 102 + n * 14;
-      data[i + 2] = 62 + n * 10;
+      data[i] = 58 + n * 16;
+      data[i + 1] = 108 + n * 18;
+      data[i + 2] = 52 + n * 12;
       data[i + 3] = Math.round(a * 255);
     }
   }
@@ -51,9 +51,9 @@ export function createBladeMaterial(): THREE.MeshStandardMaterial {
   const map = makeNapCard();
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x7a8458,
+    color: 0x4a7a3e,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.62,
     alphaTest: 0.12,
     side: THREE.DoubleSide,
     roughness: 0.9,
@@ -80,8 +80,8 @@ export function buildGreenBladeField(hole: Hole, mat: THREE.MeshStandardMaterial
     const band = turfBand(hole, x, z);
     if (band !== "green") continue;
     const y = groundHeight(hole, x, z) + 0.004;
-    const hgt = 0.0045 + hashNoise(i, 7) * 0.0055;
-    const w = 0.02 + hashNoise(i, 9) * 0.018;
+    const hgt = 0.0038 + hashNoise(i, 7) * 0.0048;
+    const w = 0.016 + hashNoise(i, 9) * 0.014;
     dummy.position.set(x, y + hgt * 0.35, z);
     dummy.rotation.set((hashNoise(i, 2) - 0.5) * 0.55, hashNoise(i, 3) * Math.PI * 2, (hashNoise(i, 5) - 0.5) * 0.35);
     dummy.scale.set(w, hgt, 1);

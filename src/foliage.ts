@@ -55,18 +55,18 @@ function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
   const h = 128;
   const data = new Uint8Array(w * h * 4);
   const pine: Array<[number, number, number]> = [
-    [74, 86, 52],
-    [88, 96, 58],
-    [64, 76, 46],
-    [96, 102, 64],
-    [70, 80, 48],
+    [46, 72, 36],
+    [58, 84, 42],
+    [38, 62, 30],
+    [68, 90, 46],
+    [42, 68, 34],
   ];
   const oak: Array<[number, number, number]> = [
-    [86, 92, 56],
-    [98, 102, 62],
-    [72, 82, 50],
-    [108, 108, 68],
-    [80, 88, 54],
+    [52, 78, 36],
+    [66, 88, 42],
+    [44, 70, 32],
+    [74, 94, 48],
+    [48, 74, 34],
   ];
   const tones = needles ? pine : oak;
   const clumps: Array<[number, number, number, number]> = [];
@@ -154,7 +154,7 @@ function makeBarkMaps(): { color: THREE.DataTexture; normal: THREE.DataTexture; 
 function leafMat(map: THREE.DataTexture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x6a7048,
+    color: 0x3e5c2c,
     transparent: true,
     alphaTest: 0.22,
     side: THREE.DoubleSide,
@@ -219,20 +219,20 @@ function makeTrunkGeo(): THREE.BufferGeometry {
 }
 
 export function createFoliageKit(): FoliageKit {
-  const pine = solidFoliage(0x4a5836);
-  const pineLit = solidFoliage(0x5a6840);
-  const oak = solidFoliage(0x556238);
-  const oakLit = solidFoliage(0x667446);
-  const maple = solidFoliage(0x6a6438);
-  const mapleLit = solidFoliage(0x7a7444);
-  const bush = solidFoliage(0x4a542e);
-  const fern = solidFoliage(0x3e4a28);
+  const pine = solidFoliage(0x2e4620);
+  const pineLit = solidFoliage(0x3e5c2c);
+  const oak = solidFoliage(0x345224);
+  const oakLit = solidFoliage(0x466830);
+  const maple = solidFoliage(0x3e4e1e);
+  const mapleLit = solidFoliage(0x526428);
+  const bush = solidFoliage(0x2a3c1c);
+  const fern = solidFoliage(0x243418);
   const pineCard = leafMat(makeLeafCardTex(true, 11));
   const pineCardB = leafMat(makeLeafCardTex(true, 41));
   const oakCard = leafMat(makeLeafCardTex(false, 27));
   const oakCardB = leafMat(makeLeafCardTex(false, 63));
   const mapleCard = leafMat(makeLeafCardTex(false, 81));
-  mapleCard.color.set(0x7a7048);
+  mapleCard.color.set(0x4a5c28);
   const impostor = leafMat(makeLeafCardTex(false, 9));
   const contactMap = makeContactShadow();
   const contact = new THREE.MeshBasicMaterial({
@@ -531,6 +531,8 @@ export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hol
   }
   addGreenGallery(parent, kit, hole);
   addTeeGallery(parent, kit, hole);
+  addCorridorWalls(parent, kit, hole);
+  addHorizonImpostors(parent, kit, hole);
   addInstancedWoods(parent, kit, hole);
 }
 
@@ -549,9 +551,9 @@ function addGreenGallery(parent: THREE.Group, kit: FoliageKit, hole: Hole): void
   const pz = Math.sin(back);
   const sx = Math.cos(back + Math.PI / 2);
   const sz = Math.sin(back + Math.PI / 2);
-  for (let i = 0; i < 22; i++) {
-    const lateral = ((i + 0.5) / 22 - 0.5) * 34;
-    const depth = 16 + hashNoise(i, 8) * 20 + (i % 4) * 3;
+  for (let i = 0; i < 28; i++) {
+    const lateral = ((i + 0.5) / 28 - 0.5) * 38;
+    const depth = 14 + hashNoise(i, 8) * 18 + (i % 4) * 2.6;
     plantIfRough(
       parent,
       kit,
@@ -605,18 +607,69 @@ function addTeeGallery(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
   const fz = Math.sin(aim);
   const sx = Math.cos(aim + Math.PI / 2);
   const sz = Math.sin(aim + Math.PI / 2);
-  for (let i = 0; i < 12; i++) {
-    const back = 7 + (i % 6) * 4.2;
-    const side = (i % 2 === 0 ? 1 : -1) * (22 + (i % 5) * 3.4);
-    plantIfRough(parent, kit, hole, hole.tee.x - fx * back + sx * side, hole.tee.y - fz * back + sz * side, 6.2 + (i % 3), i > 7);
+  for (let i = 0; i < 16; i++) {
+    const back = 6 + (i % 8) * 3.6;
+    const side = (i % 2 === 0 ? 1 : -1) * (18 + (i % 5) * 3.1);
+    plantIfRough(parent, kit, hole, hole.tee.x - fx * back + sx * side, hole.tee.y - fz * back + sz * side, 7.2 + (i % 3), i > 9);
   }
-  for (let i = 0; i < 24; i++) {
-    const t = 0.12 + (i / 24) * 0.72;
+  for (let i = 0; i < 10; i++) {
+    const a = aim + Math.PI + ((i / 9) - 0.5) * 2.35;
+    const rad = 15 + (i % 4) * 3.4 + hashNoise(i, 6) * 3;
+    plantIfRough(
+      parent,
+      kit,
+      hole,
+      hole.tee.x + Math.cos(a) * rad,
+      hole.tee.y + Math.sin(a) * rad,
+      7.6 + hashNoise(i, 2) * 2.2,
+      i % 2 === 0,
+    );
+  }
+  for (let i = 0; i < 28; i++) {
+    const t = 0.08 + (i / 28) * 0.78;
     const x0 = hole.tee.x + (hole.pin.x - hole.tee.x) * t;
     const z0 = hole.tee.y + (hole.pin.y - hole.tee.y) * t;
-    const side = (i % 2 === 0 ? 1 : -1) * (30 + hashNoise(i, 2) * 10 + (i % 5));
-    plantIfRough(parent, kit, hole, x0 + sx * side, z0 + sz * side, 7.4 + hashNoise(i, 4) * 2.8, i % 3 !== 0);
+    const side = (i % 2 === 0 ? 1 : -1) * (26 + hashNoise(i, 2) * 8 + (i % 5));
+    plantIfRough(parent, kit, hole, x0 + sx * side, z0 + sz * side, 8.0 + hashNoise(i, 4) * 2.6, i % 3 !== 0);
   }
+}
+
+function addCorridorWalls(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
+  const reach = Math.hypot(hole.pin.x - hole.tee.x, hole.pin.y - hole.tee.y) || 1;
+  const fx = (hole.pin.x - hole.tee.x) / reach;
+  const fz = (hole.pin.y - hole.tee.y) / reach;
+  const sx = -fz;
+  const sz = fx;
+  for (let i = 0; i < 40; i++) {
+    const t = 0.05 + (i / 40) * 0.9;
+    const x0 = hole.tee.x + fx * reach * t;
+    const z0 = hole.tee.y + fz * reach * t;
+    const side = (i % 2 === 0 ? 1 : -1) * (24 + (i % 5) * 2.1 + hashNoise(i, 7) * 3.4);
+    plantIfRough(parent, kit, hole, x0 + sx * side, z0 + sz * side, 8.4 + hashNoise(i, 3) * 2.8, true);
+  }
+}
+
+function addHorizonImpostors(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
+  const cx = (hole.tee.x + hole.pin.x) * 0.5;
+  const cz = (hole.tee.y + hole.pin.y) * 0.5;
+  const dummy = new THREE.Object3D();
+  const mats: THREE.Matrix4[] = [];
+  for (let i = 0; i < 96; i++) {
+    const a = (i / 96) * Math.PI * 2 + hashNoise(i, 2) * 0.08;
+    const rad = 118 + hashNoise(i, 5) * 72 + (i % 5) * 6;
+    const x = cx + Math.cos(a) * rad;
+    const z = cz + Math.sin(a) * rad;
+    if (playableLie(lieAt(hole, { x, y: z }))) continue;
+    const ground = groundHeight(hole, x, z);
+    const h = 16 + hashNoise(i, 9) * 14;
+    const w = 10 + hashNoise(i, 11) * 8;
+    dummy.position.set(x, ground + h * 0.46, z);
+    dummy.rotation.set(0, a + 0.4, (hashNoise(i, 4) - 0.5) * 0.08);
+    dummy.scale.set(w, h, 1);
+    dummy.updateMatrix();
+    mats.push(dummy.matrix.clone());
+  }
+  parent.add(makeInstanced(kit.card, kit.impostor, mats, false));
 }
 
 function playableLie(lie: ReturnType<typeof lieAt>): boolean {
@@ -639,10 +692,10 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const fz = (hole.pin.y - hole.tee.y) / reach;
   const sx = -fz;
   const sz = fx;
-  for (let i = 0; i < 420 && n < 168; i++) {
-    const along = -12 + hashNoise(i, 0.4) * (reach + 110);
+  for (let i = 0; i < 520 && n < 220; i++) {
+    const along = -8 + hashNoise(i, 0.4) * (reach + 90);
     const sideSign = i % 2 === 0 ? 1 : -1;
-    const sideDist = 28 + hashNoise(i, 1.2) * 22 + (i % 6) * 2.4;
+    const sideDist = 24 + hashNoise(i, 1.2) * 18 + (i % 6) * 2.1;
     const x = hole.tee.x + fx * along + sx * sideSign * sideDist + (hashNoise(i, 8) - 0.5) * 7;
     const z = hole.tee.y + fz * along + sz * sideSign * sideDist + (hashNoise(i, 9) - 0.5) * 7;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;

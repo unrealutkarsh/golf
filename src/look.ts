@@ -100,21 +100,13 @@ export function grassNormalTile(seed: string, size = 128): HTMLCanvasElement {
   if (!ctx) throw new Error("Grass normal unavailable");
   const rng = mulberry32(hashString(seed));
   const height = new Float32Array(size * size);
-  for (let i = 0; i < size * size; i++) height[i] = 0.42;
-  for (let i = 0; i < 2400; i++) {
-    const px = Math.floor(rng() * size);
-    const py = Math.floor(rng() * size);
-    const h = 0.35 + rng() * 0.65;
-    const w = 1 + Math.floor(rng() * 2);
-    const len = 3 + Math.floor(rng() * 7);
-    const tilt = Math.floor((rng() - 0.5) * 3);
-    for (let k = 0; k < len; k++) {
-      const x = (px + tilt * (k / len) + size) % size;
-      const y = (py - k + size) % size;
-      for (let t = 0; t < w; t++) {
-        const xx = (x + t) % size;
-        height[y * size + xx] = Math.max(height[y * size + xx], h * (1 - k / len));
-      }
+  const salt = rng() * 8;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      height[y * size + x] =
+        hashNoise(x * 0.21 + salt, y * 0.19) * 0.46 +
+        hashNoise(x * 0.73, y * 0.68) * 0.34 +
+        hashNoise(x * 1.9 + salt, y * 1.7) * 0.2;
     }
   }
   const img = ctx.createImageData(size, size);
