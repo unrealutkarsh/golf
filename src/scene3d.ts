@@ -4,7 +4,7 @@ import type { GameSession } from "./game";
 import { fbm, hashNoise, heightToNormal, packNormalRgb } from "./look";
 import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
-import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam } from "./terrain";
+import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
 const MAX_PATH = 140;
@@ -234,7 +234,7 @@ export class CourseScene {
     this.landing.rotation.x = -Math.PI / 2;
     this.scene.add(this.landing);
 
-    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0.62, toneMapped: false });
+    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0.28, toneMapped: false, depthWrite: false });
     this.groundPos = new Float32Array(MAX_PATH * 3);
     this.groundLine = makeLine(this.groundPos, 0x1a1a14);
     (this.groundLine.material as THREE.LineBasicMaterial).opacity = 0.22;
@@ -348,6 +348,19 @@ export class CourseScene {
       pos.setXYZ(i, x, groundHeight(hole, x, z), z);
       uv.setXY(i, (x - ox) / tw, (z - oz) / th);
     }
+    const colors = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const lie = lieAt(hole, { x, y: z });
+      const [cr, cg, cb] = surfaceColor(hole, x, z);
+      const stripe = 0.78 + 0.22 * Math.sin(x * 0.38 + z * 0.05);
+      const boost = lie === "fairway" || lie === "tee" || lie === "green" ? stripe : 0.72;
+      colors[i * 3] = cr * boost;
+      colors[i * 3 + 1] = cg * boost;
+      colors[i * 3 + 2] = cb * boost;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     const maps = bakeTurfMaps(hole, ox, oz, tw, th);
     this.albedoTex = maps.albedo;
@@ -357,6 +370,7 @@ export class CourseScene {
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
     this.turfMat.normalScale.set(0.95, 0.95);
+    this.turfMat.vertexColors = true;
     this.turfMat.needsUpdate = true;
     const terrain = new THREE.Mesh(geo, this.turfMat);
     terrain.receiveShadow = true;
@@ -458,12 +472,6 @@ export class CourseScene {
     wall.position.set(cx, 18, cz);
     wall.renderOrder = -1;
     this.holeGroup.add(wall);
-    const hills = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius + 38, radius + 70, 22, 28, 1, true),
-      new THREE.MeshStandardMaterial({ color: 0x6d7a52, roughness: 1, side: THREE.DoubleSide }),
-    );
-    hills.position.set(cx, 6, cz);
-    this.holeGroup.add(hills);
   }
 
   private addDunes(hole: Hole): void {
@@ -666,7 +674,7 @@ export class CourseScene {
     const show = session.screen === "play" && path.length > 1;
     this.groundLine.visible = show && aiming;
     this.landing.visible = show && aiming && session.club().id !== "putter";
-    if (this.flightMesh) this.flightMesh.visible = show && aiming;
+    if (this.flightMesh) this.flightMesh.visible = show && aiming && session.club().id !== "putter";
     if (!show) return;
     const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
     this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xff9a4a : 0xffe27a);
@@ -686,7 +694,7 @@ export class CourseScene {
     const key = `${n}:${last.pos.x.toFixed(1)}:${last.pos.y.toFixed(1)}:${last.z.toFixed(1)}`;
     if (key !== this.pathKey) {
       this.pathKey = key;
-      const radius = session.club().id === "putter" ? 0.028 : 0.048;
+      const radius = session.club().id === "putter" ? 0.012 : 0.028;
       this.setFlightTube(pts, radius);
     }
     const warn = nearOb(hole, last.pos) || lieAt(hole, last.pos) === "ob";
