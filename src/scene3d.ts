@@ -467,10 +467,11 @@ export class CourseScene {
     const b = hole.bounds;
     const cx = b.x + b.w / 2;
     const cz = b.y + b.h / 2;
-    const radius = Math.hypot(b.w, b.h) * 0.62 + 120;
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.04, 46, 40, 1, true), this.horizonMat);
-    wall.position.set(cx, 18, cz);
+    const radius = Math.hypot(b.w, b.h) * 0.72 + 160;
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.02, 14, 48, 1, true), this.horizonMat);
+    wall.position.set(cx, 6.5, cz);
     wall.renderOrder = -1;
+    this.horizonMat.depthWrite = false;
     this.holeGroup.add(wall);
   }
 
