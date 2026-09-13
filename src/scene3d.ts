@@ -48,8 +48,8 @@ const SKY_FRAG = /* glsl */ `
     col = mix(col, mid, smoothstep(0.0, 0.32, h));
     col = mix(col, zenith, smoothstep(0.24, 0.88, h));
     vec3 sunD = normalize(vec3(0.52, 0.48, 0.38));
-    float sun = pow(max(dot(dir, sunD), 0.0), 340.0);
-    float glow = pow(max(dot(dir, sunD), 0.0), 6.0);
+    float sun = pow(max(dot(dir, sunD), 0.0), 64.0);
+    float glow = pow(max(dot(dir, sunD), 0.0), 5.0);
     float wash = pow(max(dot(dir, sunD), 0.0), 1.6);
     col += vec3(1.0, 0.94, 0.72) * sun * 1.8;
     col += vec3(1.0, 0.72, 0.38) * glow * 0.42;
@@ -127,6 +127,7 @@ export class CourseScene {
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
+    this.sky.rotation.z = Math.PI / 2;
     this.scene.add(this.sky);
 
     const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x5a6240, 0.72);
