@@ -34,25 +34,35 @@ const SKY_FRAG = /* glsl */ `
     vec2 u = f * f * (3.0 - 2.0 * f);
     return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
   }
+  float fbm(vec2 p) {
+    return noise(p) * 0.52 + noise(p * 2.13 + 4.1) * 0.28 + noise(p * 4.7 + 9.2) * 0.14 + noise(p * 9.1) * 0.06;
+  }
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.18, 0.40, 0.72);
-    vec3 mid = vec3(0.48, 0.70, 0.88);
-    vec3 horizon = vec3(0.74, 0.80, 0.84);
-    vec3 haze = vec3(0.86, 0.82, 0.72);
-    vec3 col = mix(haze, horizon, smoothstep(-0.12, 0.03, h));
-    col = mix(col, mid, smoothstep(0.0, 0.28, h));
-    col = mix(col, zenith, smoothstep(0.22, 0.82, h));
-    vec3 sunD = normalize(vec3(0.48, 0.56, 0.42));
-    float sun = pow(max(dot(dir, sunD), 0.0), 260.0);
-    float glow = pow(max(dot(dir, sunD), 0.0), 8.0);
-    col += vec3(1.0, 0.93, 0.72) * sun * 1.35;
-    col += vec3(1.0, 0.74, 0.42) * glow * 0.28;
-    vec2 cuv = dir.xz / max(h + 0.18, 0.08);
-    float cloud = noise(cuv * 2.4) * 0.55 + noise(cuv * 5.1 + 8.0) * 0.3 + noise(cuv * 11.0) * 0.15;
-    cloud = smoothstep(0.48, 0.78, cloud) * smoothstep(0.06, 0.38, h) * smoothstep(0.85, 0.35, h);
-    col = mix(col, vec3(0.95, 0.96, 0.94), cloud * 0.55);
+    vec3 zenith = vec3(0.12, 0.32, 0.68);
+    vec3 mid = vec3(0.42, 0.64, 0.88);
+    vec3 horizon = vec3(0.78, 0.82, 0.86);
+    vec3 haze = vec3(0.90, 0.84, 0.70);
+    vec3 col = mix(haze, horizon, smoothstep(-0.18, 0.04, h));
+    col = mix(col, mid, smoothstep(0.0, 0.32, h));
+    col = mix(col, zenith, smoothstep(0.24, 0.88, h));
+    vec3 sunD = normalize(vec3(0.52, 0.48, 0.38));
+    float sun = pow(max(dot(dir, sunD), 0.0), 340.0);
+    float glow = pow(max(dot(dir, sunD), 0.0), 6.0);
+    float wash = pow(max(dot(dir, sunD), 0.0), 1.6);
+    col += vec3(1.0, 0.94, 0.72) * sun * 1.8;
+    col += vec3(1.0, 0.72, 0.38) * glow * 0.42;
+    col += vec3(1.0, 0.78, 0.5) * wash * 0.1;
+    vec2 cuv = dir.xz / max(abs(h) + 0.22, 0.12);
+    float cloud = fbm(cuv * 1.15 + vec2(0.4, 0.1));
+    float wisps = fbm(cuv * 2.8 + 6.0);
+    float mask = smoothstep(0.08, 0.34, h) * smoothstep(0.78, 0.28, h);
+    float banks = smoothstep(0.46, 0.72, cloud + wisps * 0.22) * mask;
+    float thick = smoothstep(0.6, 0.86, cloud) * mask;
+    col = mix(col, vec3(0.93, 0.94, 0.96), banks * 0.72);
+    col = mix(col, vec3(0.99, 0.99, 0.98), thick * 0.55);
+    col = mix(col, vec3(0.86, 0.82, 0.78), thick * wash * 0.18);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -83,7 +93,6 @@ export class CourseScene {
   private albedoTex: THREE.CanvasTexture | null = null;
   private roughTex: THREE.CanvasTexture | null = null;
   private normalTex: THREE.CanvasTexture | null = null;
-  private foliageMat: THREE.MeshStandardMaterial;
   private barkMat: THREE.MeshStandardMaterial;
   private raycaster = new THREE.Raycaster();
   private terrain: THREE.Mesh | null = null;
@@ -94,6 +103,12 @@ export class CourseScene {
   private lastView: ResolvedCam | "" = "";
   private viewAge = 1;
   private sun: THREE.DirectionalLight;
+  private sky: THREE.Mesh;
+  private pineMat: THREE.MeshStandardMaterial;
+  private oakMat: THREE.MeshStandardMaterial;
+  private horizonMat: THREE.MeshStandardMaterial;
+  private ribbon: THREE.Mesh;
+  private ribbonGeo: THREE.BufferGeometry;
   private time = 0;
   private w = 1;
   private h = 1;
@@ -103,15 +118,16 @@ export class CourseScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x7e96a6, 1);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.02;
+    this.renderer.toneMappingExposure = 1.08;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x8ea8b4, 0.00155);
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 1800);
+    this.scene.fog = new THREE.FogExp2(0x9aafb8, 0.00095);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
-    this.scene.add(makeSky());
+    this.sky = makeSky();
+    this.scene.add(this.sky);
 
     const hemi = new THREE.HemisphereLight(0xc9dcf0, 0x4e5a38, 0.55);
     this.scene.add(hemi);
@@ -133,30 +149,34 @@ export class CourseScene {
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(this.scene, 0.04).texture;
-    pmrem.dispose();
+    try {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const env = pmrem.fromScene(this.scene, 0.04);
+      this.scene.environment = env.texture;
+      pmrem.dispose();
+    } catch (err) {
+      console.warn("[ptg] PMREM env skip", err);
+    }
 
     this.turfMat = new THREE.MeshStandardMaterial({
       roughness: 1,
       metalness: 0,
-      envMapIntensity: 0.28,
+      envMapIntensity: 0.34,
     });
-    this.foliageMat = new THREE.MeshStandardMaterial({
-      map: new THREE.CanvasTexture(makeFoliageCard()),
-      transparent: true,
-      alphaTest: 0.3,
-      side: THREE.DoubleSide,
-      roughness: 0.88,
+    this.pineMat = makeCutoutMat(makePineCard());
+    this.oakMat = makeCutoutMat(makeOakCard());
+    this.horizonMat = makeCutoutMat(makeHorizonCard());
+    this.horizonMat.alphaTest = 0.12;
+    this.barkMat = new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(makeBarkCard()),
+      roughness: 0.94,
       metalness: 0,
-      depthWrite: true,
     });
-    (this.foliageMat.map as THREE.CanvasTexture).colorSpace = THREE.SRGBColorSpace;
-    this.barkMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.96 });
+    if (this.barkMat.map) this.barkMat.map.colorSpace = THREE.SRGBColorSpace;
 
     const puttGeo = new THREE.BufferGeometry();
     puttGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
-    this.puttAim = new THREE.Line(puttGeo, new THREE.LineBasicMaterial({ color: 0xf2e4b0, transparent: true, opacity: 0.7 }));
+    this.puttAim = new THREE.Line(puttGeo, new THREE.LineBasicMaterial({ color: 0xf2e4b0, transparent: true, opacity: 0.42 }));
     this.scene.add(this.puttAim);
 
     this.ball = new THREE.Mesh(
@@ -214,16 +234,38 @@ export class CourseScene {
     this.landing.rotation.x = -Math.PI / 2;
     this.scene.add(this.landing);
 
-    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0.9, toneMapped: false });
+    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0.62, toneMapped: false });
     this.groundPos = new Float32Array(MAX_PATH * 3);
-    this.groundLine = makeLine(this.groundPos, 0x111111);
+    this.groundLine = makeLine(this.groundPos, 0x1a1a14);
+    (this.groundLine.material as THREE.LineBasicMaterial).opacity = 0.22;
     this.scene.add(this.groundLine);
     this.trailPos = new Float32Array(TRAIL_LEN * 3);
     this.trail = makeLine(this.trailPos, 0xffffff);
     (this.trail.material as THREE.LineBasicMaterial).opacity = 0.95;
     this.trailGlow = makeLine(this.trailPos, 0xffc85a);
-    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = 0.45;
+    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = 0.5;
     this.scene.add(this.trail, this.trailGlow);
+    this.ribbonGeo = new THREE.BufferGeometry();
+    this.ribbonGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(TRAIL_LEN * 2 * 3), 3));
+    const ribbonIdx: number[] = [];
+    for (let i = 0; i < TRAIL_LEN - 1; i++) {
+      const a = i * 2;
+      ribbonIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    this.ribbonGeo.setIndex(ribbonIdx);
+    this.ribbon = new THREE.Mesh(
+      this.ribbonGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xfff4d2,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    this.ribbon.visible = false;
+    this.scene.add(this.ribbon);
 
     this.scene.add(this.pin, this.golfer, this.grid);
     this.buildGolfer();
@@ -272,6 +314,7 @@ export class CourseScene {
   }
 
   render(): void {
+    this.sky.position.copy(this.camera.position);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -313,7 +356,7 @@ export class CourseScene {
     this.turfMat.map = maps.albedo;
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(0.72, 0.72);
+    this.turfMat.normalScale.set(0.95, 0.95);
     this.turfMat.needsUpdate = true;
     const terrain = new THREE.Mesh(geo, this.turfMat);
     terrain.receiveShadow = true;
@@ -333,6 +376,7 @@ export class CourseScene {
     this.addBunkerLips(hole);
     this.addTrees(hole);
     this.addForest(hole);
+    this.addHorizon(hole);
     this.addDunes(hole);
     this.buildPin();
     this.buildGrid(hole);
@@ -378,14 +422,14 @@ export class CourseScene {
 
   private addTrees(hole: Hole): void {
     for (const tree of hole.trees) {
-      this.holeGroup.add(makeTree(tree.x, tree.y, tree.r * 1.2, groundHeight(hole, tree.x, tree.y), this.foliageMat, this.barkMat));
-      if (fbm(tree.x, tree.y) > 0.48) {
-        const jx = tree.x + (fbm(tree.x + 2, tree.y) - 0.5) * 8;
-        const jz = tree.y + (fbm(tree.x, tree.y + 3) - 0.5) * 8;
-        this.holeGroup.add(makeTree(jx, jz, tree.r * 0.78, groundHeight(hole, jx, jz), this.foliageMat, this.barkMat));
+      this.holeGroup.add(makeTree(tree.x, tree.y, tree.r * 1.35, groundHeight(hole, tree.x, tree.y), this.pineMat, this.oakMat, this.barkMat));
+      if (fbm(tree.x, tree.y) > 0.38) {
+        const jx = tree.x + (fbm(tree.x + 2, tree.y) - 0.5) * 10;
+        const jz = tree.y + (fbm(tree.x, tree.y + 3) - 0.5) * 10;
+        this.holeGroup.add(makeTree(jx, jz, tree.r * 0.92, groundHeight(hole, jx, jz), this.pineMat, this.oakMat, this.barkMat));
       }
-      if (fbm(tree.x * 0.3, tree.y) > 0.62) {
-        this.holeGroup.add(makeBush(tree.x + 3.2, tree.y - 2.4, 1.6, groundHeight(hole, tree.x + 3.2, tree.y - 2.4), this.foliageMat));
+      if (fbm(tree.x * 0.3, tree.y) > 0.5) {
+        this.holeGroup.add(makeBush(tree.x + 3.2, tree.y - 2.4, 2.1, groundHeight(hole, tree.x + 3.2, tree.y - 2.4), this.oakMat));
       }
     }
   }
@@ -393,15 +437,33 @@ export class CourseScene {
   private addForest(hole: Hole): void {
     const b = hole.bounds;
     let n = 0;
-    for (let i = 0; i < 110 && n < 84; i++) {
-      const t = i / 110;
+    for (let i = 0; i < 220 && n < 160; i++) {
+      const t = i / 220;
       const side = i % 2 === 0 ? -1 : 1;
-      const x = b.x - 20 + t * (b.w + 40);
-      const z = side < 0 ? b.y - 24 - fbm(i, 1) * 32 : b.y + b.h + 20 + fbm(i, 2) * 32;
-      if (lieAt(hole, { x, y: z }) === "fairway" || lieAt(hole, { x, y: z }) === "green") continue;
-      this.holeGroup.add(makeTree(x, z, 7.2 + (i % 5) * 0.4, groundHeight(hole, x, z), this.foliageMat, this.barkMat));
+      const x = b.x - 36 + t * (b.w + 72);
+      const z = side < 0 ? b.y - 18 - fbm(i, 1) * 46 : b.y + b.h + 14 + fbm(i, 2) * 46;
+      const lie = lieAt(hole, { x, y: z });
+      if (lie === "fairway" || lie === "green" || lie === "tee") continue;
+      this.holeGroup.add(makeTree(x, z, 8.4 + (i % 7) * 0.55, groundHeight(hole, x, z), this.pineMat, this.oakMat, this.barkMat));
       n += 1;
     }
+  }
+
+  private addHorizon(hole: Hole): void {
+    const b = hole.bounds;
+    const cx = b.x + b.w / 2;
+    const cz = b.y + b.h / 2;
+    const radius = Math.hypot(b.w, b.h) * 0.62 + 120;
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.04, 46, 40, 1, true), this.horizonMat);
+    wall.position.set(cx, 18, cz);
+    wall.renderOrder = -1;
+    this.holeGroup.add(wall);
+    const hills = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius + 38, radius + 70, 22, 28, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x6d7a52, roughness: 1, side: THREE.DoubleSide }),
+    );
+    hills.position.set(cx, 6, cz);
+    this.holeGroup.add(hills);
   }
 
   private addDunes(hole: Hole): void {
@@ -495,50 +557,62 @@ export class CourseScene {
 
   private buildGolfer(): void {
     this.golfer.clear();
-    const slacks = new THREE.MeshStandardMaterial({ color: 0x1e2a24, roughness: 0.74 });
-    const shirt = new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.56 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc4a07a, roughness: 0.5 });
-    const shoe = new THREE.MeshStandardMaterial({ color: 0xeeeae2, roughness: 0.4 });
-    const cap = new THREE.MeshStandardMaterial({ color: 0x2e4a38, roughness: 0.55 });
-    const grip = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.7 });
-    const steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.28, metalness: 0.55 });
+    const slacks = new THREE.MeshStandardMaterial({ color: 0x1a2420, roughness: 0.78 });
+    const shirt = new THREE.MeshStandardMaterial({ color: 0xf2eee4, roughness: 0.52 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xc49a74, roughness: 0.48 });
+    const shoe = new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.38 });
+    const cap = new THREE.MeshStandardMaterial({ color: 0x243c30, roughness: 0.5 });
+    const grip = new THREE.MeshStandardMaterial({ color: 0x222220, roughness: 0.7 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0xb0b6bc, roughness: 0.22, metalness: 0.62 });
 
-    const hips = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 0.16), slacks);
-    hips.position.y = 0.86;
-    const lLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.062, 0.72, 8), slacks);
-    lLeg.position.set(-0.08, 0.46, 0.02);
-    const rLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.062, 0.72, 8), slacks);
-    rLeg.position.set(0.09, 0.46, -0.04);
-    const lFoot = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.16), shoe);
-    lFoot.position.set(-0.08, 0.08, 0.04);
-    const rFoot = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.16), shoe);
-    rFoot.position.set(0.09, 0.08, -0.02);
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.48, 10), shirt);
-    torso.position.set(0.02, 1.16, 0);
-    torso.rotation.z = 0.08;
-    const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.042, 0.5, 7), shirt);
-    lArm.position.set(-0.2, 1.08, 0.1);
-    lArm.rotation.z = 0.72;
-    lArm.rotation.x = -0.25;
-    const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.042, 0.48, 7), skin);
-    rArm.position.set(0.22, 1.02, 0.08);
-    rArm.rotation.z = -0.55;
-    rArm.rotation.x = 0.15;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), skin);
-    head.position.set(0.03, 1.52, 0.02);
-    const hat = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), cap);
-    hat.position.set(0.03, 1.58, 0.02);
-    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.12), cap);
-    brim.position.set(0.03, 1.545, 0.12);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.013, 0.98, 6), steel);
-    shaft.position.set(0.28, 0.7, 0.12);
-    shaft.rotation.z = 0.38;
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.18, 6), grip);
-    handle.position.set(0.18, 1.05, 0.1);
-    handle.rotation.z = 0.38;
-    const headClub = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.04), steel);
-    headClub.position.set(0.4, 0.28, 0.14);
-    this.golfer.add(hips, lLeg, rLeg, lFoot, rFoot, torso, lArm, rArm, head, hat, brim, shaft, handle, headClub);
+    const hips = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.18), slacks);
+    hips.position.set(0, 0.84, 0.02);
+    const lThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.068, 0.4, 8), slacks);
+    lThigh.position.set(-0.1, 0.62, 0.06);
+    lThigh.rotation.x = 0.18;
+    const rThigh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.068, 0.4, 8), slacks);
+    rThigh.position.set(0.11, 0.62, -0.02);
+    rThigh.rotation.x = -0.08;
+    const lShin = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.055, 0.38, 8), slacks);
+    lShin.position.set(-0.11, 0.28, 0.1);
+    const rShin = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.055, 0.38, 8), slacks);
+    rShin.position.set(0.12, 0.28, 0.02);
+    const lFoot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.18), shoe);
+    lFoot.position.set(-0.11, 0.07, 0.14);
+    const rFoot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.18), shoe);
+    rFoot.position.set(0.12, 0.07, 0.06);
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.175, 0.46, 10), shirt);
+    torso.position.set(0.01, 1.12, 0.06);
+    torso.rotation.x = 0.28;
+    torso.rotation.z = 0.04;
+    const shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.1, 0.14), shirt);
+    shoulders.position.set(0.0, 1.32, 0.1);
+    shoulders.rotation.x = 0.22;
+    const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.042, 0.42, 7), shirt);
+    lArm.position.set(-0.12, 1.08, 0.22);
+    lArm.rotation.x = 1.05;
+    lArm.rotation.z = 0.18;
+    const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.4, 7), skin);
+    rArm.position.set(0.14, 1.04, 0.24);
+    rArm.rotation.x = 0.95;
+    rArm.rotation.z = -0.12;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), skin);
+    head.position.set(0.02, 1.5, 0.16);
+    const hat = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), cap);
+    hat.position.set(0.02, 1.56, 0.16);
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.014, 0.13), cap);
+    brim.position.set(0.02, 1.525, 0.26);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.014, 1.02, 6), steel);
+    shaft.position.set(0.08, 0.68, 0.28);
+    shaft.rotation.x = 0.18;
+    shaft.rotation.z = 0.22;
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.2, 6), grip);
+    handle.position.set(0.02, 1.08, 0.3);
+    handle.rotation.x = 0.18;
+    handle.rotation.z = 0.22;
+    const headClub = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 0.045), steel);
+    headClub.position.set(0.16, 0.22, 0.32);
+    this.golfer.add(hips, lThigh, rThigh, lShin, rShin, lFoot, rFoot, torso, shoulders, lArm, rArm, head, hat, brim, shaft, handle, headClub);
   }
 
   private placeBall(session: GameSession): void {
@@ -576,11 +650,11 @@ export class CourseScene {
     const p = session.ball.pos;
     const hole = session.hole();
     const aim = view === "putt" ? Math.atan2(hole.pin.y - p.y, hole.pin.x - p.x) : session.aim;
-    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.6 : 1.3);
-    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.92 : 0.12);
+    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.45 : 1.15);
+    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.86 : 0.22);
     this.golfer.position.set(p.x + back.x + left.x, groundHeight(hole, p.x, p.y), p.y + back.y + left.y);
     this.golfer.rotation.y = -aim + Math.PI / 2;
-    this.golfer.scale.setScalar(view === "putt" ? 0.88 : 1);
+    this.golfer.scale.setScalar(view === "putt" ? 0.92 : 1.08);
   }
 
   private updatePath(session: GameSession): void {
@@ -627,6 +701,7 @@ export class CourseScene {
     this.trailGlow.visible = show;
     if (!show) {
       this.trailCount = 0;
+      this.ribbon.visible = false;
       return;
     }
     const hole = session.hole();
@@ -645,6 +720,37 @@ export class CourseScene {
     }
     setLine(this.trail, this.trailCount);
     setLine(this.trailGlow, this.trailCount);
+    this.updateRibbon();
+  }
+
+  private updateRibbon(): void {
+    const n = this.trailCount;
+    this.ribbon.visible = n > 2;
+    if (n < 3) return;
+    const pos = this.ribbonGeo.getAttribute("position") as THREE.BufferAttribute;
+    const half = 0.11;
+    for (let i = 0; i < n; i++) {
+      const x = this.trailPos[i * 3];
+      const y = this.trailPos[i * 3 + 1];
+      const z = this.trailPos[i * 3 + 2];
+      let dx = 0;
+      let dz = 1;
+      if (i < n - 1) {
+        dx = this.trailPos[(i + 1) * 3] - x;
+        dz = this.trailPos[(i + 1) * 3 + 2] - z;
+      } else {
+        dx = x - this.trailPos[(i - 1) * 3];
+        dz = z - this.trailPos[(i - 1) * 3 + 2];
+      }
+      const len = Math.hypot(dx, dz) || 1;
+      const px = (-dz / len) * half;
+      const pz = (dx / len) * half;
+      const fade = 0.45 + 0.55 * (i / Math.max(n - 1, 1));
+      pos.setXYZ(i * 2, x - px, y, z - pz);
+      pos.setXYZ(i * 2 + 1, x + px * fade, y + 0.02, z + pz * fade);
+    }
+    pos.needsUpdate = true;
+    this.ribbonGeo.setDrawRange(0, Math.max(0, n - 1) * 6);
   }
 
   private setFlightTube(pts: THREE.Vector3[], radius: number): void {
@@ -696,29 +802,29 @@ export class CourseScene {
       fov = 48;
     } else if (view === "putt") {
       const pinDist = Math.max(2, dist(ball, pin));
-      const back = fromAngle(aim + Math.PI, 5.5 + Math.min(6.2, pinDist * 0.25));
-      const side = fromAngle(aim + Math.PI / 2, 0.26);
-      desired.set(ball.x + back.x + side.x, bh + 2.0 + Math.min(1.15, pinDist * 0.05), ball.y + back.y + side.y);
-      look.set(ball.x * 0.4 + pin.x * 0.6, groundHeight(hole, pin.x, pin.y) + 0.08, ball.y * 0.4 + pin.y * 0.6);
-      fov = 45;
+      const back = fromAngle(aim + Math.PI, 4.4 + Math.min(5.4, pinDist * 0.22));
+      const side = fromAngle(aim + Math.PI / 2, 0.55);
+      desired.set(ball.x + back.x + side.x, bh + 1.42 + Math.min(0.85, pinDist * 0.04), ball.y + back.y + side.y);
+      look.set(ball.x * 0.38 + pin.x * 0.62, groundHeight(hole, pin.x, pin.y) + 0.1, ball.y * 0.38 + pin.y * 0.62);
+      fov = 48;
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
       const landing = session.shotArc[session.shotArc.length - 1];
-      const back = fromAngle(heading + Math.PI, 21);
+      const back = fromAngle(heading + Math.PI, 18);
       const curve = session.ball.curve || session.shape * 24;
-      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 4);
-      desired.set(ball.x + back.x + side.x, 9.4, ball.y + back.y + side.y);
+      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 3.4);
+      desired.set(ball.x + back.x + side.x, 7.6, ball.y + back.y + side.y);
       const toLand = landing ? Math.hypot(landing.pos.x - ball.x, landing.pos.y - ball.y) : 40;
-      const ahead = Math.min(72, Math.max(26, toLand * 0.55));
-      look.set(ball.x + Math.cos(heading) * ahead, 0.4, ball.y + Math.sin(heading) * ahead);
-      fov = 44;
-    } else {
-      const lookDist = 28;
-      const back = fromAngle(aim + Math.PI, 12);
-      desired.set(ball.x + back.x, 6.9, ball.y + back.y);
-      look.set(ball.x + Math.cos(aim) * lookDist, 0.32, ball.y + Math.sin(aim) * lookDist);
+      const ahead = Math.min(64, Math.max(22, toLand * 0.5));
+      look.set(ball.x + Math.cos(heading) * ahead, 0.55, ball.y + Math.sin(heading) * ahead);
       fov = 46;
+    } else {
+      const back = fromAngle(aim + Math.PI, 6.05);
+      const side = fromAngle(aim + Math.PI / 2, 1.12);
+      desired.set(ball.x + back.x + side.x, bh + 1.68, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(aim) * 58, 0.7, ball.y + Math.sin(aim) * 58);
+      fov = 50;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));
@@ -792,20 +898,36 @@ export function makeGolfBallGeometry(radius = BALL_RADIUS): THREE.BufferGeometry
 }
 
 export function golferMeshCount(): number {
-  return 14;
+  return 17;
 }
 
 function makeSky(): THREE.Mesh {
   return new THREE.Mesh(
-    new THREE.SphereGeometry(860, 56, 32),
+    new THREE.SphereGeometry(2800, 64, 36),
     new THREE.ShaderMaterial({
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
       side: THREE.BackSide,
       depthWrite: false,
+      fog: false,
       toneMapped: false,
     }),
   );
+}
+
+function makeCutoutMat(canvas: HTMLCanvasElement): THREE.MeshStandardMaterial {
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  return new THREE.MeshStandardMaterial({
+    map,
+    transparent: true,
+    alphaTest: 0.28,
+    side: THREE.DoubleSide,
+    roughness: 0.86,
+    metalness: 0,
+    depthWrite: true,
+  });
 }
 
 function makeDiscSprite(): HTMLCanvasElement {
@@ -823,26 +945,132 @@ function makeDiscSprite(): HTMLCanvasElement {
   return c;
 }
 
-function makeFoliageCard(): HTMLCanvasElement {
+function makePineCard(): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = 256;
-  c.height = 256;
+  c.height = 384;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  ctx.clearRect(0, 0, 256, 256);
-  for (let i = 0; i < 90; i++) {
-    const x = 40 + Math.random() * 176;
-    const y = 36 + Math.random() * 184;
-    const r = 14 + Math.random() * 28;
-    const tone = 0.35 + Math.random() * 0.35;
-    const g = ctx.createRadialGradient(x, y, 1, x, y, r);
-    g.addColorStop(0, `rgba(${28 + tone * 40},${72 + tone * 70},${24 + tone * 28},${0.82})`);
-    g.addColorStop(0.65, `rgba(${18 + tone * 24},${48 + tone * 40},${16 + tone * 18},${0.5})`);
-    g.addColorStop(1, "rgba(12,28,12,0)");
-    ctx.fillStyle = g;
+  ctx.clearRect(0, 0, 256, 384);
+  ctx.fillStyle = "#4a3828";
+  ctx.fillRect(118, 250, 20, 120);
+  ctx.fillStyle = "#3a2c20";
+  ctx.fillRect(122, 250, 6, 120);
+  const layers: Array<[number, number, number, number, string]> = [
+    [128, 38, 46, 70, "#1d4a28"],
+    [128, 78, 62, 82, "#24572e"],
+    [128, 122, 78, 90, "#1b3f24"],
+    [128, 168, 94, 96, "#2a6434"],
+    [128, 214, 108, 100, "#173820"],
+  ];
+  for (const [x, y, hw, hh, col] of layers) {
+    ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.ellipse(x, y, r, r * (0.7 + Math.random() * 0.4), Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = "rgba(210,230,170,0.14)";
+    ctx.beginPath();
+    ctx.moveTo(x, y + 6);
+    ctx.lineTo(x + hw * 0.35, y + hh * 0.72);
+    ctx.lineTo(x, y + hh * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  }
+  return c;
+}
+
+function makeOakCard(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 320;
+  c.height = 320;
+  const ctx = c.getContext("2d");
+  if (!ctx) return c;
+  ctx.clearRect(0, 0, 320, 320);
+  ctx.fillStyle = "#4a3828";
+  ctx.beginPath();
+  ctx.moveTo(148, 168);
+  ctx.lineTo(178, 168);
+  ctx.lineTo(188, 312);
+  ctx.lineTo(136, 312);
+  ctx.closePath();
+  ctx.fill();
+  const blobs: Array<[number, number, number, number, string]> = [
+    [160, 118, 92, 78, "#1c3f22"],
+    [118, 132, 70, 58, "#2a5a30"],
+    [204, 128, 74, 60, "#245028"],
+    [150, 88, 64, 52, "#326838"],
+    [186, 96, 58, 48, "#1a3820"],
+    [128, 168, 62, 40, "#274e2c"],
+    [196, 170, 60, 38, "#1e4424"],
+  ];
+  for (const [x, y, rx, ry, col] of blobs) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "rgba(190,210,140,0.16)";
+  ctx.beginPath();
+  ctx.ellipse(148, 100, 36, 28, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  return c;
+}
+
+function makeHorizonCard(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 2048;
+  c.height = 512;
+  const ctx = c.getContext("2d");
+  if (!ctx) return c;
+  ctx.clearRect(0, 0, 2048, 512);
+  for (let i = 0; i < 28; i++) {
+    const x = (i / 28) * 2048;
+    const h = 140 + hashNoise(i * 3.1, 2) * 90;
+    ctx.fillStyle = i % 3 === 0 ? "#2a3d28" : "#1e3322";
+    ctx.beginPath();
+    ctx.moveTo(x - 40, 512);
+    ctx.lineTo(x, 512 - h);
+    ctx.lineTo(x + 48, 512);
+    ctx.closePath();
+    ctx.fill();
+  }
+  for (let i = 0; i < 36; i++) {
+    const x = 20 + (i / 36) * 2048;
+    const pine = hashNoise(i, 8) > 0.4;
+    const h = pine ? 210 + hashNoise(i, 1) * 120 : 160 + hashNoise(i, 4) * 90;
+    const w = pine ? 36 + hashNoise(i, 2) * 18 : 48 + hashNoise(i, 3) * 22;
+    ctx.fillStyle = pine ? "#16301c" : "#214228";
+    if (pine) {
+      ctx.beginPath();
+      ctx.moveTo(x, 512 - h);
+      ctx.lineTo(x + w, 512);
+      ctx.lineTo(x - w, 512);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(x, 512 - h * 0.45, w, h * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(x - 5, 512 - h * 0.35, 10, h * 0.35);
+    }
+  }
+  return c;
+}
+
+function makeBarkCard(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 128;
+  const ctx = c.getContext("2d");
+  if (!ctx) return c;
+  ctx.fillStyle = "#4a3828";
+  ctx.fillRect(0, 0, 64, 128);
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = i % 2 === 0 ? "#3a2c20" : "#5a4634";
+    ctx.fillRect(hashNoise(i, 1) * 64, i * 3, 2 + hashNoise(i, 2) * 4, 18);
   }
   return c;
 }
@@ -852,8 +1080,8 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
   rough: THREE.CanvasTexture;
   normal: THREE.CanvasTexture;
 } {
-  const w = 1280;
-  const h = 1280;
+  const w = 1024;
+  const h = 1024;
   const color = document.createElement("canvas");
   color.width = w;
   color.height = h;
@@ -901,27 +1129,27 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
       let b = 0.26;
       let rk = 0.92;
       if (lie === "green") {
-        const nap = 0.88 + stripe * 0.16;
-        r = (0.09 + micro * 0.03) * nap;
-        g = (0.4 + n * 0.03) * nap;
-        b = (0.3 + micro * 0.02) * nap;
-        rk = 0.58 + wet * 0.12;
+        const nap = 0.78 + stripe * 0.34;
+        r = (0.07 + micro * 0.025) * nap;
+        g = (0.38 + n * 0.04) * nap;
+        b = (0.28 + micro * 0.02) * nap;
+        rk = 0.48 + wet * 0.2;
       } else if (lie === "fairway") {
-        const sheen = 0.8 + stripe * 0.22 + n * 0.08;
-        r = (0.26 + micro * 0.08) * sheen;
-        g = (0.5 + micro * 0.06) * sheen;
-        b = (0.13 + micro * 0.03) * sheen;
-        rk = 0.7 + wet * 0.08 + clump * 0.08;
+        const sheen = 0.62 + stripe * 0.5 + n * 0.08;
+        r = (0.22 + micro * 0.07) * sheen;
+        g = (0.48 + micro * 0.05) * sheen;
+        b = (0.11 + micro * 0.03) * sheen;
+        rk = 0.62 + wet * 0.14 + clump * 0.08;
       } else if (lie === "tee") {
-        r = 0.2 + n * 0.03 + micro * 0.04;
-        g = 0.43 + n * 0.03;
-        b = 0.16;
-        rk = 0.66;
+        r = 0.18 + n * 0.03 + micro * 0.04;
+        g = 0.4 + n * 0.04 + stripe * 0.06;
+        b = 0.14;
+        rk = 0.6;
       } else if (lie === "rough") {
-        r = 0.14 + n * 0.07 + clump * 0.05;
-        g = 0.22 + n * 0.05 + micro * 0.04;
-        b = 0.07 + n * 0.02;
-        rk = 0.94;
+        r = 0.1 + n * 0.05 + clump * 0.04;
+        g = 0.16 + n * 0.04 + micro * 0.03;
+        b = 0.05 + n * 0.02;
+        rk = 0.95;
       } else if (lie === "bunker") {
         r = 0.8 + n * 0.08 + micro * 0.05;
         g = 0.67 + n * 0.05;
@@ -979,37 +1207,32 @@ function makeTree(
   z: number,
   r: number,
   ground: number,
-  foliage: THREE.MeshStandardMaterial,
+  pineMat: THREE.MeshStandardMaterial,
+  oakMat: THREE.MeshStandardMaterial,
   bark: THREE.MeshStandardMaterial,
 ): THREE.Group {
   const group = new THREE.Group();
-  const pine = fbm(x * 0.17, z * 0.17) > 0.22;
-  const h = pine ? 11.2 + (r - 7) * 0.75 : 8.6 + (r - 7) * 0.48;
+  const pine = fbm(x * 0.17, z * 0.17) > 0.34;
+  const foliage = pine ? pineMat : oakMat;
+  const h = pine ? 13.5 + (r - 7) * 0.95 : 10.2 + (r - 7) * 0.62;
+  const w = pine ? r * 1.15 : r * 1.55;
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(pine ? 0.15 : 0.2, pine ? 0.32 : 0.38, h * (pine ? 0.72 : 0.5), 8),
+    new THREE.CylinderGeometry(pine ? 0.16 : 0.22, pine ? 0.34 : 0.42, h * (pine ? 0.62 : 0.48), 8),
     bark,
   );
-  trunk.position.y = h * (pine ? 0.34 : 0.25);
+  trunk.position.y = h * (pine ? 0.3 : 0.24);
   trunk.castShadow = true;
   group.add(trunk);
-  const cards = pine ? 7 : 9;
-  for (let i = 0; i < cards; i++) {
-    const t = i / Math.max(cards - 1, 1);
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(pine ? r * 1.05 : r * 1.35, pine ? h * 0.34 : h * 0.4), foliage);
-    if (pine) {
-      card.position.set((fbm(x + i, z) - 0.5) * 1.1, h * (0.38 + t * 0.12), (fbm(z, x + i) - 0.5) * 1.1);
-      card.scale.setScalar(1.05 - t * 0.42);
-    } else {
-      const a = t * Math.PI * 2;
-      card.position.set(Math.cos(a) * r * 0.28, h * (0.48 + (i % 3) * 0.08), Math.sin(a) * r * 0.28);
-    }
-    card.rotation.y = t * 1.7 + fbm(x, i) * 2;
-    card.rotation.x = (fbm(i, z) - 0.5) * 0.25;
+  for (let i = 0; i < 3; i++) {
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(w, h), foliage);
+    card.position.y = h * 0.52;
+    card.rotation.y = (i / 3) * Math.PI + fbm(x, i) * 0.15;
     card.castShadow = true;
     group.add(card);
   }
   group.position.set(x, ground, z);
   group.rotation.y = fbm(x, z) * Math.PI * 2;
+  group.scale.y = 0.92 + fbm(z, x) * 0.22;
   return group;
 }
 
@@ -1047,7 +1270,10 @@ export function createCourseScene(canvas: HTMLCanvasElement): CourseScene | null
       powerPreference: "high-performance",
     });
     return new CourseScene(renderer);
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? `${err.name}: ${err.message}\n${err.stack ?? ""}` : String(err);
+    console.error("[ptg] 3D init failed", err);
+    (window as unknown as { __ptg3dError?: string }).__ptg3dError = message;
     return null;
   }
 }

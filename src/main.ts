@@ -15,6 +15,7 @@ const renderer = new Renderer(canvas);
 const scene3d = glCanvas ? createCourseScene(glCanvas) : null;
 const ui = new UI(overlay, hud);
 if (scene3d) document.body.classList.add("has-3d");
+(window as unknown as { __ptg3d?: boolean }).__ptg3d = Boolean(scene3d);
 
 function handleAction(action: string, payload?: string): void {
   session.audio.unlock();
