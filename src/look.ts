@@ -46,11 +46,11 @@ export function grassTile(seed: string, colors: string[], size = 128, specks = 2
     const tone = colors[1 + Math.floor(rng() * (colors.length - 1))];
     ctx.globalAlpha = 0.1 + rng() * 0.42;
     ctx.fillStyle = tone;
-    const w = 0.6 + rng() * 2.4;
-    const h = 1.1 + rng() * 3.4;
+    const w = 0.45 + rng() * 1.6;
+    const h = 2.2 + rng() * 5.6;
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate((rng() - 0.5) * 0.7);
+    ctx.rotate((rng() - 0.5) * 0.35);
     ctx.fillRect(-w * 0.5, -h, w, h);
     ctx.restore();
   }

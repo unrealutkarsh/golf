@@ -40,9 +40,9 @@ export function turfBand(hole: Hole, x: number, z: number): TurfBand {
 export function napShade(band: TurfBand, x: number, z: number, napX: number, napZ: number): number {
   const across = x * -napZ + z * napX;
   if (band === "green") {
-    const stripe = 0.5 + 0.5 * Math.sin(across * 3.6);
-    const fine = 0.5 + 0.5 * Math.sin(across * 17 + x * 0.4);
-    return 0.68 + stripe * 0.4 + fine * 0.08;
+    const stripe = 0.5 + 0.5 * Math.sin(across * 2.15);
+    const fine = 0.5 + 0.5 * Math.sin(across * 11 + x * 0.28);
+    return 0.7 + stripe * 0.48 + fine * 0.1;
   }
   if (band === "collar") {
     const stripe = 0.5 + 0.5 * Math.sin(across * 2.4);
@@ -66,30 +66,30 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.16 + micro * 0.04 + n * 0.02) * nap,
-      (0.5 + micro * 0.03 + n * 0.04) * nap,
-      (0.28 + micro * 0.02) * nap,
+      (0.3 + micro * 0.06 + n * 0.03) * nap,
+      (0.58 + micro * 0.05 + n * 0.04) * nap,
+      (0.22 + micro * 0.02) * nap,
     ];
   }
   if (band === "collar") {
     return [
-      (0.24 + micro * 0.03) * nap,
-      (0.48 + n * 0.03) * nap,
-      (0.24 + micro * 0.02) * nap,
+      (0.34 + micro * 0.03) * nap,
+      (0.54 + n * 0.03) * nap,
+      (0.22 + micro * 0.02) * nap,
     ];
   }
   if (band === "fringe") {
     return [
-      (0.3 + micro * 0.04 + clump * 0.03) * nap,
-      (0.46 + n * 0.03 + micro * 0.02) * nap,
-      (0.16 + micro * 0.02) * nap,
+      (0.4 + micro * 0.05 + clump * 0.04) * nap,
+      (0.54 + n * 0.03 + micro * 0.02) * nap,
+      (0.18 + micro * 0.02) * nap,
     ];
   }
   if (band === "fairway") {
     return [
-      (0.3 + micro * 0.05 + n * 0.02) * nap,
-      (0.5 + micro * 0.04 + n * 0.03) * nap,
-      (0.16 + micro * 0.02) * nap,
+      (0.4 + micro * 0.05 + n * 0.03) * nap,
+      (0.6 + micro * 0.04 + n * 0.04) * nap,
+      (0.18 + micro * 0.02) * nap,
     ];
   }
   if (band === "tee") {
@@ -222,7 +222,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
 }
 
 export function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", ["#5a7a38", "#6e8f44", "#4a682c", "#8aaa52", "#3e5824", "#7a9848"], 256, 5200);
+  const tile = grassTile("ptg-grass-detail", ["#6a8c3c", "#8aaa50", "#547428", "#a8c466", "#4a6824", "#7e9a44", "#c0d878"], 256, 7800);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -233,20 +233,24 @@ export function makeGrassDetailTex(): THREE.CanvasTexture {
 
 export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 1,
+    roughness: 0.9,
     metalness: 0,
-    envMapIntensity: 0.2,
+    envMapIntensity: 0.1,
     vertexColors: true,
+    emissive: new THREE.Color(0x243c14),
+    emissiveIntensity: 0.12,
   });
-  attachTurfShader(mat, detail, 64, true);
+  attachTurfShader(mat, detail, 72, true);
   return mat;
 }
 
 export function createGreenMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.48,
+    roughness: 0.38,
     metalness: 0,
-    envMapIntensity: 0.28,
+    envMapIntensity: 0.18,
+    emissive: new THREE.Color(0x2a5a22),
+    emissiveIntensity: 0.18,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -307,8 +311,8 @@ ${shader.fragmentShader}`;
       "#include <map_fragment>",
       `#include <map_fragment>
        vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       float detailMix = uCourseWide > 0.5 ? 0.2 : 0.12;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.35, detailMix);
+       float detailMix = uCourseWide > 0.5 ? 0.28 : 0.22;
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.45, detailMix);
        vec2 world = vWorldPos.xz;
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
@@ -321,21 +325,21 @@ ${shader.fragmentShader}`;
        vec2 nap = normalize(uNapDir);
        float along = dot(viewN, nap);
        float across = local.x * -nap.y + local.y * nap.x;
-       float stripe = 0.5 + 0.5 * sin(across * 3.5);
-       float fine = 0.5 + 0.5 * sin(across * 16.0 + along * 2.4);
+       float stripe = 0.5 + 0.5 * sin(across * 2.2);
+       float fine = 0.5 + 0.5 * sin(across * 12.0 + along * 2.0);
        float onGreen = 1.0 - smoothstep(0.86, 1.02, radial);
        float onCollar = smoothstep(0.84, 0.94, radial) * (1.0 - smoothstep(1.0, 1.08, radial));
        float onFringe = smoothstep(0.96, 1.06, radial) * (1.0 - smoothstep(1.22, 1.34, radial));
-       float napTerm = 0.78 + along * 0.22 + stripe * 0.16 + fine * 0.06;
-       float fringeTerm = 0.88 + (0.5 + 0.5 * sin(across * 1.6)) * 0.12;
-       vec3 greenLift = vec3(1.08, 1.18, 1.05);
-       vec3 fringeTint = vec3(1.18, 1.02, 0.78);
+       float napTerm = 0.72 + along * 0.2 + stripe * 0.32 + fine * 0.08;
+       float fringeTerm = 0.86 + (0.5 + 0.5 * sin(across * 1.4)) * 0.16;
+       vec3 greenLift = vec3(1.16, 1.12, 0.88);
+       vec3 fringeTint = vec3(1.22, 1.04, 0.7);
        diffuseColor.rgb *= mix(vec3(1.0), greenLift * napTerm, onGreen);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.06, 1.08, 0.94) * (0.88 + stripe * 0.12), onCollar);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.06, 0.86) * (0.86 + stripe * 0.16), onCollar);
        diffuseColor.rgb *= mix(vec3(1.0), fringeTint * fringeTerm, onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.34 + world.y * 0.05);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.9 + fwStripe * 0.22, 0.94 + fwStripe * 0.16, 0.86 + fwStripe * 0.08), fairway * uCourseWide);`
+       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.28 + world.y * 0.04);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.92 + fwStripe * 0.2, 0.96 + fwStripe * 0.14, 0.82 + fwStripe * 0.06), fairway * uCourseWide);`
     );
   };
   mat.customProgramCacheKey = () => `turf-nap-${detailScale}-${courseWide ? "w" : "g"}`;
@@ -373,11 +377,11 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
     uv.setXY(i, (x - ox) / tw, (z - oz) / th);
   }
   geo.computeVertexNormals();
-  const maps = bakeTurfMaps(hole, ox, oz, tw, th, 768);
+  const maps = bakeTurfMaps(hole, ox, oz, tw, th, 1024);
   mat.map = maps.albedo;
   mat.roughnessMap = maps.rough;
   mat.normalMap = maps.normal;
-  mat.normalScale.set(1.35, 1.35);
+  mat.normalScale.set(1.55, 1.55);
   mat.needsUpdate = true;
   applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);

@@ -66,15 +66,15 @@ export function surfaceColor(hole: Hole, x: number, y: number): [number, number,
   const lie = lieAt(hole, p);
   if (lie === "bunker") return [0.82 + n * 0.08, 0.7 + n * 0.05, 0.46 + n * 0.04];
   if (lie === "green" || onGreen(hole, p)) {
-    if (radial >= 0.88) return [0.24 + n * 0.02, 0.46 + n * 0.03, 0.24 + n * 0.015];
-    const sheen = 0.92 + stripe * 0.1;
-    return [(0.2 + n * 0.02) * sheen, (0.52 + n * 0.03) * sheen, (0.3 + n * 0.02) * sheen];
+    if (radial >= 0.88) return [0.36 + n * 0.02, 0.54 + n * 0.03, 0.22 + n * 0.015];
+    const sheen = 0.9 + stripe * 0.2;
+    return [(0.32 + n * 0.03) * sheen, (0.58 + n * 0.04) * sheen, (0.22 + n * 0.02) * sheen];
   }
-  if (radial < 1.3 && lie !== "ob") return [0.3 + n * 0.03, 0.44 + n * 0.03, 0.16 + n * 0.015];
+  if (radial < 1.3 && lie !== "ob") return [0.36 + n * 0.03, 0.48 + n * 0.03, 0.16 + n * 0.015];
   if (lie === "tee") return [0.28 + n * 0.02, 0.5 + n * 0.03, 0.2 + n * 0.015];
   if (lie === "fairway") {
-    const sheen = 0.96 + stripe * 0.06;
-    return [(0.32 + n * 0.04) * sheen, (0.5 + n * 0.04) * sheen, (0.18 + n * 0.02) * sheen];
+    const sheen = 0.94 + stripe * 0.1;
+    return [(0.38 + n * 0.04) * sheen, (0.56 + n * 0.04) * sheen, (0.18 + n * 0.02) * sheen];
   }
   if (lie === "rough") return [0.22 + n * 0.05, 0.32 + n * 0.04, 0.11 + n * 0.025];
   return [0.5 + n * 0.1, 0.44 + n * 0.06, 0.28 + n * 0.04];
