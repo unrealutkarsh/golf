@@ -311,8 +311,8 @@ ${shader.fragmentShader}`;
       "#include <map_fragment>",
       `#include <map_fragment>
        vec3 detail = texture2D(uDetail, vMapUv * uDetailScale).rgb;
-       float detailMix = uCourseWide > 0.5 ? 0.28 : 0.22;
-       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.45, detailMix);
+       float detailMix = uCourseWide > 0.5 ? 0.38 : 0.26;
+       diffuseColor.rgb *= mix(vec3(1.0), detail * 1.55, detailMix);
        vec2 world = vWorldPos.xz;
        vec2 d = world - uGreenCenter.xy;
        float ca = cos(-uGreenCenter.z);
@@ -338,8 +338,9 @@ ${shader.fragmentShader}`;
        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.06, 0.86) * (0.86 + stripe * 0.16), onCollar);
        diffuseColor.rgb *= mix(vec3(1.0), fringeTint * fringeTerm, onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.2 + world.y * 0.03);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82 + fwStripe * 0.32, 0.88 + fwStripe * 0.24, 0.74 + fwStripe * 0.1), fairway * uCourseWide);`
+       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.16 + world.y * 0.028);
+       float fwFine = 0.5 + 0.5 * sin(world.x * 1.8 + world.y * 0.2);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.76 + fwStripe * 0.38 + fwFine * 0.06, 0.84 + fwStripe * 0.28 + fwFine * 0.05, 0.68 + fwStripe * 0.12), fairway * uCourseWide);`
     );
   };
   mat.customProgramCacheKey = () => `turf-nap-${detailScale}-${courseWide ? "w" : "g"}`;

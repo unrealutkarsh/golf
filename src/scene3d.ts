@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
+import { buildGreenBladeField, createBladeMaterial, updateGreenBladeLod } from "./blades";
 import { addCourseFoliage, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { buildAddressGolfer, golferMeshCount as countGolferMeshes, poseGolferClub, snapGolferToBall } from "./golfer";
@@ -108,6 +109,8 @@ export class CourseScene {
   private sky: THREE.Mesh;
   private foliageKit: FoliageKit;
   private greenMat: THREE.MeshStandardMaterial;
+  private bladeMat: THREE.MeshStandardMaterial;
+  private greenBlades: THREE.InstancedMesh | null = null;
   private ribbon: THREE.Mesh;
   private ribbonGeo: THREE.BufferGeometry;
   private time = 0;
@@ -166,6 +169,7 @@ export class CourseScene {
     const detail = makeGrassDetailTex();
     this.turfMat = createTurfMaterial(detail);
     this.greenMat = createGreenMaterial(detail);
+    this.bladeMat = createBladeMaterial();
     this.foliageKit = createFoliageKit();
 
     const puttGeo = new THREE.BufferGeometry();
@@ -306,6 +310,8 @@ export class CourseScene {
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
     this.updateCamera(session, hole, view, putting, dt);
+    const camDist = this.camera.position.distanceTo(this.ball.position);
+    updateGreenBladeLod(this.greenBlades, putting && session.screen === "play", camDist);
   }
 
   render(): void {
@@ -321,6 +327,7 @@ export class CourseScene {
     if (this.roughTex) this.roughTex.dispose();
     if (this.normalTex) this.normalTex.dispose();
     this.albedoTex = this.roughTex = this.normalTex = null;
+    this.greenBlades = null;
     this.trailCount = 0;
 
     const b = hole.bounds;
@@ -349,8 +356,8 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const stripe = 0.72 + 0.36 * Math.sin(x * 0.22 + z * 0.035);
-      const boost = lie === "green" ? 1.1 + stripe * 0.12 : lie === "fairway" || lie === "tee" ? 0.88 + stripe * 0.28 : 0.94;
+      const stripe = 0.68 + 0.4 * Math.sin(x * 0.18 + z * 0.03);
+      const boost = lie === "green" ? 1.1 + stripe * 0.12 : lie === "fairway" || lie === "tee" ? 0.82 + stripe * 0.36 : 0.94;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;
@@ -364,7 +371,7 @@ export class CourseScene {
     this.turfMat.map = maps.albedo;
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(1.2, 1.2);
+    this.turfMat.normalScale.set(1.35, 1.35);
     this.turfMat.vertexColors = true;
     this.turfMat.needsUpdate = true;
     applyNapUniforms(this.turfMat, hole);
@@ -373,6 +380,8 @@ export class CourseScene {
     this.terrain = terrain;
     this.holeGroup.add(terrain);
     this.holeGroup.add(buildGreenOverlay(hole, this.greenMat));
+    this.greenBlades = buildGreenBladeField(hole, this.bladeMat);
+    this.holeGroup.add(this.greenBlades);
 
     this.addRollingCountry(hole, cx, cz);
     this.addWater(hole);

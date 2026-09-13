@@ -6,8 +6,10 @@ import type { Hole } from "./types";
 
 export const PINE_CANOPY_LAYERS = 6;
 export const OAK_CANOPY_BLOBS = 10;
-export const LEAF_CARDS_PER_TREE = 4;
-export const VOLUME_TREE_PARTS = 16;
+export const LEAF_CARDS_PER_TREE = 10;
+export const SPRAY_CARDS_PER_TREE = 8;
+export const MID_RANGE_CARDS_PER_TREE = 8;
+export const VOLUME_TREE_PARTS = 24;
 
 export type TreeKind = "pine" | "oak";
 
@@ -21,7 +23,9 @@ export interface FoliageKit {
   oak: THREE.MeshStandardMaterial;
   oakLit: THREE.MeshStandardMaterial;
   pineCard: THREE.MeshStandardMaterial;
+  pineCardB: THREE.MeshStandardMaterial;
   oakCard: THREE.MeshStandardMaterial;
+  oakCardB: THREE.MeshStandardMaterial;
   bush: THREE.MeshStandardMaterial;
   bark: THREE.MeshStandardMaterial;
   impostor: THREE.MeshStandardMaterial;
@@ -230,8 +234,10 @@ export function createFoliageKit(): FoliageKit {
   const oak = solidFoliage(0x4a7834);
   const oakLit = solidFoliage(0x86b84e);
   const bush = solidFoliage(0x3e6a2c);
-  const pineCard = cutout(makeFoliageCard(true, 11), 0.18);
-  const oakCard = cutout(makeFoliageCard(false, 27), 0.18);
+  const pineCard = cutout(makeFoliageCard(true, 11), 0.22);
+  const pineCardB = cutout(makeFoliageCard(true, 41), 0.22);
+  const oakCard = cutout(makeFoliageCard(false, 27), 0.22);
+  const oakCardB = cutout(makeFoliageCard(false, 63), 0.22);
   const impostor = cutout(makeImpostorCard(9), 0.1);
   const barkMap = new THREE.CanvasTexture(makeBarkCard());
   barkMap.colorSpace = THREE.SRGBColorSpace;
@@ -246,7 +252,9 @@ export function createFoliageKit(): FoliageKit {
     oak,
     oakLit,
     pineCard,
+    pineCardB,
     oakCard,
+    oakCardB,
     bush,
     bark,
     impostor,
@@ -293,16 +301,38 @@ function addLeafCards(
   group: THREE.Group,
   kit: FoliageKit,
   cardMat: THREE.MeshStandardMaterial,
+  alt: THREE.MeshStandardMaterial,
   w: number,
   h: number,
-  y: number,
   count: number,
 ): void {
   for (let i = 0; i < count; i++) {
+    const card = new THREE.Mesh(kit.card, i % 2 === 0 ? cardMat : alt);
+    const ring = i < count / 2 ? 0 : 1;
+    const t = (i % Math.ceil(count / 2)) / Math.max(Math.ceil(count / 2) - 1, 1);
+    card.scale.set(w * (0.62 + (i % 3) * 0.12), h * (0.48 + ring * 0.12), 1);
+    card.position.set((hashNoise(i, 2) - 0.5) * w * 0.28, h * (0.42 + ring * 0.22 + t * 0.06), (hashNoise(i, 6) - 0.5) * w * 0.28);
+    card.rotation.y = (i / count) * Math.PI * 2 + 0.2;
+    card.rotation.x = (hashNoise(i, 4) - 0.5) * 0.18;
+    card.castShadow = false;
+    group.add(card);
+  }
+}
+
+function addSprayCards(
+  group: THREE.Group,
+  kit: FoliageKit,
+  cardMat: THREE.MeshStandardMaterial,
+  w: number,
+  h: number,
+  count: number,
+): void {
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
     const card = new THREE.Mesh(kit.card, cardMat);
-    card.scale.set(w * (1.45 + (i % 2) * 0.25), h * (1.02 + (i % 3) * 0.08), 1);
-    card.position.y = y;
-    card.rotation.y = (i / count) * Math.PI + 0.16;
+    card.scale.set(w * 0.38, h * 0.32, 1);
+    card.position.set(Math.cos(a) * w * 0.34, h * (0.5 + (i % 3) * 0.08), Math.sin(a) * w * 0.34);
+    card.rotation.y = a + 0.4;
     card.castShadow = false;
     group.add(card);
   }
@@ -329,13 +359,14 @@ function addPine(
     const blob = new THREE.Mesh(kit.pineBlob, mat);
     const cw = w * (0.26 + t * 0.92);
     const ch = h * (0.14 + (1 - t) * 0.08);
-    blob.scale.set(cw, ch, cw * (0.78 + fbm(i, r) * 0.28));
-    blob.position.set((fbm(i + 2, r) - 0.5) * 1.8, h * (0.92 - t * 0.58), (fbm(r, i + 4) - 0.5) * 1.8);
+    blob.scale.set(cw * 0.72, ch * 0.78, cw * (0.62 + fbm(i, r) * 0.2));
+    blob.position.set((fbm(i + 2, r) - 0.5) * 1.4, h * (0.9 - t * 0.54), (fbm(r, i + 4) - 0.5) * 1.4);
     blob.rotation.set(fbm(i, 2) * 0.35, t * 1.2, (fbm(i, 3) - 0.5) * 0.2);
     blob.castShadow = shadow && i < 3;
     group.add(blob);
   }
-  addLeafCards(group, kit, kit.pineCard, w * 1.28, h * 0.92, h * 0.54, compact ? 2 : LEAF_CARDS_PER_TREE);
+  addLeafCards(group, kit, kit.pineCard, kit.pineCardB, w * 1.22, h * 0.9, compact ? 4 : LEAF_CARDS_PER_TREE);
+  if (!compact) addSprayCards(group, kit, kit.pineCardB, w * 1.15, h * 0.88, SPRAY_CARDS_PER_TREE);
 }
 
 function addOak(
@@ -369,13 +400,14 @@ function addOak(
     const a = (i / blobs) * Math.PI * 2 + hashNoise(i, r) * 0.5;
     const lift = 0.5 + (i % 4) * 0.09;
     const rad = w * (0.2 + (i % 5) * 0.045);
-    blob.scale.set(rad * (0.72 + (i % 3) * 0.22), rad * (0.52 + (i % 2) * 0.18), rad * (0.7 + (i % 4) * 0.16));
-    blob.position.set(Math.cos(a) * w * 0.42, h * lift, Math.sin(a) * w * 0.4);
+    blob.scale.set(rad * (0.55 + (i % 3) * 0.16), rad * (0.4 + (i % 2) * 0.12), rad * (0.52 + (i % 4) * 0.12));
+    blob.position.set(Math.cos(a) * w * 0.34, h * lift, Math.sin(a) * w * 0.32);
     blob.rotation.set(hashNoise(i, 2) * 0.8, a, hashNoise(i, 4) * 0.6);
     blob.castShadow = shadow && i < 5;
     group.add(blob);
   }
-  addLeafCards(group, kit, kit.oakCard, w * 1.48, h * 0.86, h * 0.58, compact ? 2 : LEAF_CARDS_PER_TREE);
+  addLeafCards(group, kit, kit.oakCard, kit.oakCardB, w * 1.4, h * 0.84, compact ? 4 : LEAF_CARDS_PER_TREE);
+  if (!compact) addSprayCards(group, kit, kit.oakCardB, w * 1.32, h * 0.8, SPRAY_CARDS_PER_TREE);
 }
 
 export function makeBush(x: number, z: number, r: number, ground: number, kit: FoliageKit): THREE.Group {
@@ -420,6 +452,7 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const oakTrunks: THREE.Matrix4[] = [];
   const oakDark: THREE.Matrix4[] = [];
   const oakLit: THREE.Matrix4[] = [];
+  const midCards: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
   for (let i = 0; i < 260 && n < 168; i++) {
@@ -459,6 +492,14 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
         (lit ? oakLit : oakDark).push(dummy.matrix.clone());
       }
     }
+    for (let c = 0; c < MID_RANGE_CARDS_PER_TREE; c++) {
+      const a = (c / MID_RANGE_CARDS_PER_TREE) * Math.PI + 0.15;
+      dummy.position.set(x + Math.cos(a * 2) * r * 0.22, ground + h * (0.46 + (c % 3) * 0.1), z + Math.sin(a * 2) * r * 0.22);
+      dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.15, a, 0);
+      dummy.scale.set(r * 0.85, h * 0.42, 1);
+      dummy.updateMatrix();
+      midCards.push(dummy.matrix.clone());
+    }
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));
@@ -467,6 +508,7 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   parent.add(makeInstanced(kit.trunk, kit.bark, oakTrunks, false));
   parent.add(makeInstanced(kit.oakBlob, kit.oak, oakDark, false));
   parent.add(makeInstanced(kit.oakBlob, kit.oakLit, oakLit, false));
+  parent.add(makeInstanced(kit.card, kit.oakCard, midCards, false));
 }
 
 function makeInstanced(
@@ -485,6 +527,6 @@ function makeInstanced(
 }
 
 export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {
-  if (kind === "pine") return 1 + PINE_CANOPY_LAYERS + LEAF_CARDS_PER_TREE;
-  return 1 + 3 + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE;
+  if (kind === "pine") return 1 + PINE_CANOPY_LAYERS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
+  return 1 + 3 + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
 }

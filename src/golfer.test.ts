@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildAddressGolfer, countMeshes, golferHeight, golferMeshCount, poseGolferClub } from "./golfer";
+import { buildAddressGolfer, countBones, countMeshes, golferBoneCount, golferHeight, golferMeshCount, poseGolferClub } from "./golfer";
 
 describe("address golfer", () => {
   it("builds a human-scale figure with a grounded club", () => {
     const golfer = buildAddressGolfer();
-    expect(countMeshes(golfer)).toBeGreaterThanOrEqual(28);
-    expect(golferMeshCount()).toBeGreaterThanOrEqual(28);
+    expect(countMeshes(golfer)).toBeGreaterThanOrEqual(40);
+    expect(golferMeshCount()).toBeGreaterThanOrEqual(40);
+    expect(countBones(golfer)).toBeGreaterThanOrEqual(12);
+    expect(golferBoneCount()).toBeGreaterThanOrEqual(12);
     expect(golfer.getObjectByName("head")).toBeTruthy();
     expect(golfer.getObjectByName("clubhead")).toBeTruthy();
     const height = golferHeight(golfer);
