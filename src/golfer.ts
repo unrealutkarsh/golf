@@ -448,11 +448,11 @@ export function buildAddressGolfer(): THREE.Group {
 
   const club = new THREE.Group();
   club.name = "club";
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.86, 10), m.steel);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.055, 0.86, 10), m.steel);
   shaft.name = "shaft";
   limbPlace(shaft, hands.x, hands.y + 0.08, hands.z - 0.02, headPt.x, headPt.y, headPt.z, 0.86);
   shaft.userData.restScaleY = shaft.scale.y;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.018, 0.17, 10), m.grip);
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.044, 0.17, 10), m.grip);
   limbPlace(handle, hands.x, hands.y + 0.09, hands.z - 0.02, hands.x, hands.y - 0.07, hands.z + 0.02, 0.17);
   const clubhead = new THREE.Group();
   clubhead.name = "clubhead";
