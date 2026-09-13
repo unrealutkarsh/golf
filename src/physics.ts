@@ -87,7 +87,7 @@ export function createBall(pos: Vec2): Ball {
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const lieMul = LIE_POWER[shot.lie];
-  const power = clamp(shot.power, shot.club.id === "putter" ? 0.02 : 0.08, 1.05);
+  const power = clamp(shot.power, shot.club.id === "putter" ? 0.005 : 0.08, 1.05);
   const acc = clamp(shot.accuracy, -1, 1);
   const spray = (1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016;
   const aim = shot.aim + spray;

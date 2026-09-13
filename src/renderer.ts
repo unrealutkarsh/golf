@@ -1004,31 +1004,43 @@ export class Renderer {
   }
 
   private drawMeters(ctx: CanvasRenderingContext2D, session: GameSession): void {
-    const x = this.w - 42;
-    const y = this.h * 0.24;
-    const h = Math.min(280, this.h * 0.4);
+    const x = this.w - 58;
+    const y = this.h * 0.22;
+    const h = Math.min(300, this.h * 0.42);
+    const putting = session.club().id === "putter";
+    const fill = session.meterFill();
+    const sugFill = session.suggestedPower();
+    const yards = session.meterYards();
+    const yardLabel = putting ? `${yards < 10 ? yards.toFixed(1) : Math.round(yards)}y` : `${Math.round(yards)}y`;
     ctx.save();
-    ctx.fillStyle = "rgba(6, 12, 10, 0.5)";
-    this.roundRect(ctx, x - 14, y - 22, 36, h + 44, 10);
+    ctx.fillStyle = "rgba(6, 12, 10, 0.62)";
+    this.roundRect(ctx, x - 18, y - 48, 52, h + 86, 12);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "700 10px 'Segoe UI', sans-serif";
+    ctx.fillStyle = "rgba(243,239,227,0.9)";
+    ctx.font = "800 13px 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("PWR", x + 4, y - 8);
+    ctx.fillText(`${session.meterPercent()}%`, x + 6, y - 28);
+    ctx.font = "700 11px 'Segoe UI', sans-serif";
+    ctx.fillStyle = "rgba(212,175,55,0.95)";
+    ctx.fillText(yardLabel, x + 6, y - 12);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "700 9px 'Segoe UI', sans-serif";
+    ctx.fillText("PWR", x + 6, y + h + 16);
+    ctx.fillStyle = putting ? "rgba(243,239,227,0.55)" : "rgba(243,239,227,0.45)";
+    ctx.fillText(putting ? "to hole" : "sug", x + 6, y + h + 28);
     ctx.fillStyle = "rgba(0,0,0,0.5)";
-    this.roundRect(ctx, x - 2, y, 14, h, 6);
+    this.roundRect(ctx, x - 2, y, 16, h, 6);
     ctx.fill();
     const g = ctx.createLinearGradient(0, y + h, 0, y);
     g.addColorStop(0, "#2e7d32");
     g.addColorStop(0.7, "#d4af37");
     g.addColorStop(1, "#c62828");
     ctx.fillStyle = g;
-    const fill = session.swingPhase === "aim" ? session.suggestedPower() : session.swingPhase === "power" ? session.meter : session.power;
-    this.roundRect(ctx, x, y + h - h * fill, 10, h * fill, 5);
+    this.roundRect(ctx, x + 1, y + h - h * fill, 12, h * fill, 5);
     ctx.fill();
-    const sugY = y + h - h * session.suggestedPower();
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.fillRect(x - 5, sugY - 1, 20, 2);
+    const sugY = y + h - h * sugFill;
+    ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.fillRect(x - 7, sugY - 1, 26, 2);
     ctx.restore();
 
     if (session.swingPhase === "flight" || session.swingPhase === "settle") return;

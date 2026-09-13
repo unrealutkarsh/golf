@@ -74,36 +74,45 @@ function worldFromPointer(x: number, y: number) {
 }
 
 let pointerDown: { x: number; y: number; t: number } | null = null;
+let pointerDragged = false;
 
 window.addEventListener("pointerdown", (e) => {
   if (session.screen !== "play" || session.helpOpen || session.scorecardOpen) return;
   const target = e.target as HTMLElement;
   if (target.closest("button, input, a, .panel")) return;
   pointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+  pointerDragged = false;
   if (session.swingPhase !== "aim") session.tap();
 });
 
 window.addEventListener("pointermove", (e) => {
-  if (session.screen !== "play" || session.swingPhase !== "aim") return;
+  if (session.screen !== "play" || session.swingPhase !== "aim" || !pointerDown) return;
   const target = e.target as HTMLElement;
   if (target.closest("button, input, .panel")) return;
+  const moved = Math.hypot(e.clientX - pointerDown.x, e.clientY - pointerDown.y);
+  if (moved < 16) return;
+  pointerDragged = true;
   session.aimAt(worldFromPointer(e.clientX, e.clientY));
 });
 
 window.addEventListener("pointerup", (e) => {
   if (!pointerDown || session.screen !== "play" || session.helpOpen || session.scorecardOpen) {
     pointerDown = null;
+    pointerDragged = false;
     return;
   }
   const target = e.target as HTMLElement;
   if (target.closest("button, input, a, .panel")) {
     pointerDown = null;
+    pointerDragged = false;
     return;
   }
   const moved = Math.hypot(e.clientX - pointerDown.x, e.clientY - pointerDown.y);
   const quick = performance.now() - pointerDown.t < 450;
+  const dragged = pointerDragged;
   pointerDown = null;
-  if (session.swingPhase === "aim" && moved < 14 && quick) session.tap();
+  pointerDragged = false;
+  if (session.swingPhase === "aim" && !dragged && moved < 14 && quick) session.tap();
 });
 
 window.addEventListener("wheel", (e) => {

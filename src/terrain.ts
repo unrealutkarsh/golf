@@ -6,16 +6,31 @@ import type { CamMode, Hole, Lie } from "./types";
 export type ResolvedCam = "player" | "follow" | "putt";
 
 const PUTT_ROLL_YARDS = 42;
+/** Meter fill that should die at the hole. */
+export const PUTT_HOLE_FILL = 0.5;
 
 export function suggestedPuttPower(yardsToPin: number): number {
-  return Math.max(0.04, Math.min(0.64, (yardsToPin + 0.35) / PUTT_ROLL_YARDS));
+  return Math.min(0.64, scaledPuttPower(PUTT_HOLE_FILL, yardsToPin));
 }
 
 /** Mid-meter should die at the hole; a full smash only runs about 1.5× leftover. */
 export function scaledPuttPower(meter: number, yardsToPin: number): number {
-  const fill = Math.max(0.08, Math.min(1, meter));
-  const factor = 0.42 + fill * 1.16;
-  return Math.max(0.025, Math.min(0.95, (yardsToPin * factor) / PUTT_ROLL_YARDS));
+  const fill = Math.max(0.05, Math.min(1, meter));
+  const leftover = Math.max(0.2, yardsToPin);
+  const factor = 0.38 + fill * 1.24;
+  return Math.max(0.006, Math.min(0.95, (leftover * factor) / PUTT_ROLL_YARDS));
+}
+
+/** Inverse of scaledPuttPower for drawing the meter after a stroke is locked. */
+export function puttPowerToMeterFill(power: number, yardsToPin: number): number {
+  const leftover = Math.max(0.2, yardsToPin);
+  const factor = (power * PUTT_ROLL_YARDS) / leftover;
+  return Math.max(0, Math.min(1, (factor - 0.38) / 1.24));
+}
+
+/** Yards a putt should roll for this meter fill. Mid-meter ≈ leftover. */
+export function puttMeterYards(meter: number, yardsToPin: number): number {
+  return PUTT_ROLL_YARDS * scaledPuttPower(meter, yardsToPin);
 }
 
 export function isPuttingSituation(lie: Lie, pinDist: number, clubId: string, hole: Hole, pos: Vec2): boolean {

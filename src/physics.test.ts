@@ -173,6 +173,35 @@ describe("shot physics", () => {
     expect(holed).toBe(true);
   });
 
+  it("holes a 1-yard and 2-yard putt aimed at the pin", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const wind = { speed: 0, dir: 0 };
+    const club = clubById("putter");
+    for (const yards of [1, 2]) {
+      const from = { x: hole.pin.x - yards, y: hole.pin.y };
+      let ball = launchBall(from, {
+        aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x),
+        power: scaledPuttPower(0.5, yards),
+        accuracy: 0,
+        club,
+        lie: "green",
+        wind,
+      });
+      let holed = false;
+      for (let i = 0; i < 360; i++) {
+        const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+        ball = step.ball;
+        if (step.holed) {
+          holed = true;
+          break;
+        }
+        if (!step.flying) break;
+      }
+      expect(holed, `${yards}y putt`).toBe(true);
+      expect(Math.hypot(ball.pos.x - hole.pin.x, ball.pos.y - hole.pin.y)).toBeLessThan(0.3);
+    }
+  });
+
   it("lets a missed putt come to rest instead of creeping on the break", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 8.5, y: hole.pin.y + 3.2 };

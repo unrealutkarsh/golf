@@ -36,9 +36,18 @@ export function clubReach(club: Club, lie: string): number {
 
 /** Swing-meter fill that should finish near `distanceYards` with this club. */
 export function suggestedShotPower(distanceYards: number, club: Club, lie: string): number {
-  if (club.id === "putter") return Math.max(0.04, Math.min(0.95, distanceYards / Math.max(club.roll, 1)));
+  if (club.id === "putter") return 0.5;
   const reach = clubReach(club, lie);
   return Math.max(0.36, Math.min(1, distanceYards / Math.max(reach, 1)));
+}
+
+/** Estimated finish yards for a meter fill (putt: roll; else carry+roll). */
+export function meterYardage(fill: number, club: Club, lie: string, leftoverYards: number): number {
+  if (club.id === "putter") {
+    const factor = 0.38 + Math.max(0.05, Math.min(1, fill)) * 1.24;
+    return Math.max(0.2, leftoverYards) * factor;
+  }
+  return clubReach(club, lie) * Math.max(0, Math.min(1.05, fill));
 }
 
 export function recommendClub(distanceYards: number, lie: string): Club {
