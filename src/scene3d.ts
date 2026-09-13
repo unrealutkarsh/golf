@@ -856,15 +856,11 @@ export class CourseScene {
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.35 ? Math.atan2(v.y, v.x) : session.aim;
-      const landing = session.shotArc[session.shotArc.length - 1];
-      const back = fromAngle(heading + Math.PI, 18);
-      const curve = session.ball.curve || session.shape * 24;
-      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 3.4);
-      desired.set(ball.x + back.x + side.x, 7.6, ball.y + back.y + side.y);
-      const toLand = landing ? Math.hypot(landing.pos.x - ball.x, landing.pos.y - ball.y) : 40;
-      const ahead = Math.min(64, Math.max(22, toLand * 0.5));
-      look.set(ball.x + Math.cos(heading) * ahead, 0.55, ball.y + Math.sin(heading) * ahead);
-      fov = 46;
+      const back = fromAngle(heading + Math.PI, 24 + Math.min(14, session.ball.z * 0.4));
+      const side = fromAngle(heading + Math.PI / 2, session.shape * -2.2);
+      desired.set(ball.x + back.x + side.x, 9.2 + session.ball.z * 0.38, ball.y + back.y + side.y);
+      look.set(ball.x + Math.cos(heading) * 16, bh + 0.35, ball.y + Math.sin(heading) * 16);
+      fov = 50;
     } else {
       const back = fromAngle(aim + Math.PI, 4.85);
       const side = fromAngle(aim + Math.PI / 2, 1.58);
@@ -872,7 +868,7 @@ export class CourseScene {
       look.set(ball.x + Math.cos(aim) * 11, bh + 0.42, ball.y + Math.sin(aim) * 11);
       fov = 50;
     }
-    const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;
+    const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.36 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));
     if (this.camPos.distanceTo(desired) > 90 || this.viewAge < 0.02) {
       this.camPos.copy(desired);

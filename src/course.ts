@@ -125,19 +125,13 @@ const hole1 = buildHole({
     { cx: 414, cy: 128, rx: 8, ry: 5, rotation: -0.3 },
   ],
   trees: [
-    ...lineTrees({ x: 58, y: 168 }, { x: 220, y: 164 }, 10, -24, 8),
-    ...lineTrees({ x: 62, y: 168 }, { x: 230, y: 162 }, 10, 24, 7),
-    ...lineTrees({ x: 80, y: 168 }, { x: 360, y: 142 }, 14, -30, 8),
-    ...lineTrees({ x: 86, y: 168 }, { x: 350, y: 144 }, 12, 30, 7),
-    ...lineTrees({ x: 96, y: 168 }, { x: 370, y: 140 }, 8, -42, 9),
-    ...lineTrees({ x: 104, y: 168 }, { x: 352, y: 144 }, 8, 44, 8),
+    ...lineTrees({ x: 80, y: 168 }, { x: 360, y: 142 }, 14, -36, 8),
+    ...lineTrees({ x: 86, y: 168 }, { x: 350, y: 144 }, 12, 36, 7),
+    ...lineTrees({ x: 96, y: 168 }, { x: 370, y: 140 }, 10, -48, 9),
+    ...lineTrees({ x: 104, y: 168 }, { x: 352, y: 144 }, 8, 50, 8),
     { x: 428, y: 142, r: 9 },
     { x: 422, y: 158, r: 8 },
     { x: 424, y: 126, r: 8 },
-    { x: 410, y: 170, r: 7 },
-    { x: 412, y: 114, r: 7 },
-    { x: 398, y: 176, r: 8 },
-    { x: 396, y: 108, r: 8 },
     { x: 442, y: 152, r: 10 },
     { x: 440, y: 132, r: 9 },
     { x: 452, y: 142, r: 8 },
@@ -196,8 +190,6 @@ const hole3 = buildHole({
   ],
   water: [pond(250, 154, 36, 18)],
   trees: [
-    ...lineTrees({ x: 70, y: 210 }, { x: 280, y: 196 }, 8, -24, 7),
-    ...lineTrees({ x: 80, y: 210 }, { x: 300, y: 190 }, 8, 24, 7),
     ...lineTrees({ x: 70, y: 210 }, { x: 500, y: 168 }, 10, -48, 8),
     ...lineTrees({ x: 90, y: 210 }, { x: 480, y: 168 }, 7, 46, 7),
   ],
@@ -321,8 +313,6 @@ const hole7 = buildHole({
   ],
   water: [pond(360, 214, 40, 16)],
   trees: [
-    ...lineTrees({ x: 50, y: 120 }, { x: 260, y: 136 }, 8, -24, 7),
-    ...lineTrees({ x: 60, y: 120 }, { x: 280, y: 140 }, 8, 24, 7),
     ...lineTrees({ x: 60, y: 120 }, { x: 520, y: 230 }, 9, -44, 8),
     ...lineTrees({ x: 80, y: 120 }, { x: 500, y: 230 }, 7, 42, 7),
   ],
@@ -350,8 +340,6 @@ const hole8 = buildHole({
     { cx: 472, cy: 132, rx: 8, ry: 5, rotation: -0.2 },
   ],
   trees: [
-    ...lineTrees({ x: 50, y: 160 }, { x: 240, y: 154 }, 8, -24, 7),
-    ...lineTrees({ x: 58, y: 160 }, { x: 250, y: 152 }, 8, 24, 7),
     ...lineTrees({ x: 70, y: 160 }, { x: 420, y: 148 }, 8, -40, 8),
     ...lineTrees({ x: 90, y: 160 }, { x: 400, y: 148 }, 6, 44, 8),
   ],
@@ -379,8 +367,6 @@ const hole9 = buildHole({
   ],
   water: [pond(360, 188, 32, 16)],
   trees: [
-    ...lineTrees({ x: 52, y: 190 }, { x: 220, y: 180 }, 8, -24, 7),
-    ...lineTrees({ x: 60, y: 190 }, { x: 230, y: 176 }, 8, 24, 7),
     ...lineTrees({ x: 70, y: 190 }, { x: 380, y: 132 }, 8, -40, 8),
     ...lineTrees({ x: 90, y: 190 }, { x: 340, y: 132 }, 5, 38, 7),
     { x: 440, y: 168, r: 8 },
@@ -496,7 +482,7 @@ export function lieId(lie: Lie): number {
 export function treeHit(hole: Hole, p: Vec2, z: number): Tree | null {
   if (z > 14) return null;
   for (const tree of hole.trees) {
-    if (dist(p, tree) < tree.r * 0.72) return tree;
+    if (dist(p, tree) < tree.r * 0.58) return tree;
   }
   return null;
 }

@@ -1023,11 +1023,12 @@ export class Renderer {
     g.addColorStop(0.7, "#d4af37");
     g.addColorStop(1, "#c62828");
     ctx.fillStyle = g;
-    const fill = session.swingPhase === "aim" ? session.suggestedPower() * 0.15 : session.swingPhase === "power" ? session.meter : session.power;
+    const fill = session.swingPhase === "aim" ? session.suggestedPower() : session.swingPhase === "power" ? session.meter : session.power;
     this.roundRect(ctx, x, y + h - h * fill, 10, h * fill, 5);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.fillRect(x - 4, y + 10, 18, 2);
+    const sugY = y + h - h * session.suggestedPower();
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillRect(x - 5, sugY - 1, 20, 2);
     ctx.restore();
 
     if (session.swingPhase === "flight" || session.swingPhase === "settle") return;
@@ -1059,8 +1060,8 @@ export class Renderer {
     ctx.fillStyle = miss;
     this.roundRect(ctx, bx + 2, by + 2, bw - 4, bh - 4, 6);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.fillRect(bx + bw * 0.46, by + 2, bw * 0.08, bh - 4);
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fillRect(bx + bw * 0.4, by + 2, bw * 0.2, bh - 4);
     const t = active ? (session.swingPhase === "accuracy" ? session.meter * 2 - 1 : session.accuracy) : 0;
     const mx = bx + bw / 2 + t * (bw / 2 - 8);
     ctx.fillStyle = "#f4f1e8";

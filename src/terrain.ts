@@ -5,14 +5,17 @@ import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
 
+const PUTT_ROLL_YARDS = 42;
+
 export function suggestedPuttPower(yardsToPin: number): number {
-  return Math.max(0.14, Math.min(0.62, (yardsToPin + 0.6) / 22));
+  return Math.max(0.04, Math.min(0.64, (yardsToPin + 0.35) / PUTT_ROLL_YARDS));
 }
 
-/** Map the swing meter onto a distance-scaled putt so a mid-meter tap dies at the hole. */
+/** Mid-meter should die at the hole; a full smash only runs about 1.5× leftover. */
 export function scaledPuttPower(meter: number, yardsToPin: number): number {
-  const suggested = suggestedPuttPower(yardsToPin);
-  return Math.max(0.08, Math.min(0.78, suggested * (0.35 + Math.max(meter, 0.08) * 1.15)));
+  const fill = Math.max(0.08, Math.min(1, meter));
+  const factor = 0.42 + fill * 1.16;
+  return Math.max(0.025, Math.min(0.95, (yardsToPin * factor) / PUTT_ROLL_YARDS));
 }
 
 export function isPuttingSituation(lie: Lie, pinDist: number, clubId: string, hole: Hole, pos: Vec2): boolean {

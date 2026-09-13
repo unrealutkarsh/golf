@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
 import { createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { scaledPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];
@@ -49,7 +50,7 @@ describe("shot physics", () => {
     let ball = createBall(from);
     ball = launchBall(from, {
       aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x),
-      power: 0.12,
+      power: scaledPuttPower(0.5, 0.6),
       accuracy: 0,
       club,
       lie: "green",
@@ -154,7 +155,7 @@ describe("shot physics", () => {
     expect(Math.hypot(rest.x - hole.pin.x, rest.y - hole.pin.y)).toBeLessThan(3.5);
     ball = launchBall(rest, {
       aim: Math.atan2(hole.pin.y - rest.y, hole.pin.x - rest.x),
-      power: 0.15,
+      power: scaledPuttPower(0.55, Math.hypot(rest.x - hole.pin.x, rest.y - hole.pin.y)),
       accuracy: 0,
       club,
       lie: "green",

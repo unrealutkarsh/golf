@@ -1,6 +1,6 @@
 import { AudioBus } from "./audio";
 import { loadProfile, recordRound, saveProfile } from "./career";
-import { CLUBS, clubIndex, recommendClub } from "./clubs";
+import { CLUBS, clubIndex, recommendClub, suggestedShotPower } from "./clubs";
 import { HARBOR_DUNES, lieAt, onGreen } from "./course";
 import { hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
 import { isPuttingSituation, resolveCamView, scaledPuttPower, suggestedPuttPower, type ResolvedCam } from "./terrain";
@@ -105,8 +105,7 @@ export class GameSession {
   }
 
   suggestedPower(): number {
-    if (this.club().id === "putter") return suggestedPuttPower(this.toPin());
-    return 0.92;
+    return suggestedShotPower(this.toPin(), this.club(), this.lie);
   }
 
   cycleCam(): void {
@@ -262,7 +261,7 @@ export class GameSession {
     }
     if (this.swingPhase === "accuracy") {
       const raw = clamp(this.meter * 2 - 1, -1, 1);
-      this.accuracy = Math.abs(raw) < 0.12 ? 0 : Math.sign(raw) * raw * raw;
+      this.accuracy = Math.abs(raw) < 0.2 ? 0 : Math.sign(raw) * raw * raw;
       this.lockedAccuracy = true;
       this.fire();
     }

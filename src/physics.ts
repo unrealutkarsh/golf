@@ -15,8 +15,8 @@ import type { Ball, Club, Hole, Lie, Wind } from "./types";
 export const CUP_RADIUS = 0.5;
 export const GIMME_RADIUS = 0.36;
 export const STOP_SPEED = 0.5;
-export const CAPTURE_SPEED = 10.2;
-export const LIP_SPEED = 11;
+export const CAPTURE_SPEED = 7.4;
+export const LIP_SPEED = 9.6;
 export const MAX_HOLE_STROKES = 10;
 export const GRAVITY = 28;
 
@@ -87,16 +87,16 @@ export function createBall(pos: Vec2): Ball {
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const lieMul = LIE_POWER[shot.lie];
-  const power = clamp(shot.power, 0.08, 1.05);
+  const power = clamp(shot.power, shot.club.id === "putter" ? 0.02 : 0.08, 1.05);
   const acc = clamp(shot.accuracy, -1, 1);
-  const spray = (1 - shot.club.accuracy) * acc * 0.22 + acc * 0.045;
+  const spray = (1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016;
   const aim = shot.aim + spray;
   const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
   const curve = shape * (0.7 + shot.club.loft / 40) * (0.55 + power * 0.7) * 32;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
-    const speed = roll * 1.18;
+    const speed = puttSpeedForRoll(roll);
     return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0, curve: 0, lipped: false };
   }
 
@@ -108,10 +108,17 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve, lipped: false };
 }
 
+/** Launch speed that rolls about `yards` on a flat green. */
+export function puttSpeedForRoll(yards: number): number {
+  const y = Math.max(0.2, yards);
+  if (y < 3.5) return y * 2.4 + 1.1;
+  return y * 2.02 + 0.8;
+}
+
 export function windAccel(wind: Wind, z: number): Vec2 {
   if (z <= 0.2) return { x: 0, y: 0 };
   const mph = wind.speed;
-  const k = 0.085 * mph * (0.45 + Math.min(z, 18) / 18);
+  const k = 0.34 * mph * (0.38 + Math.min(z, 20) / 20);
   return fromAngle(wind.dir, k);
 }
 
@@ -192,8 +199,8 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
       next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
       const rollSpeed = len(next.vel);
       if (lie === "green") {
-        if (rollSpeed > 0.95) {
-          const breakScale = clamp((rollSpeed - 0.95) / 10, 0, 1) * 0.72;
+        if (rollSpeed > 1.15) {
+          const breakScale = clamp((rollSpeed - 1.15) / 12, 0, 1) * 0.48;
           next.vel = add(next.vel, scale(hole.greenBreak, dt * breakScale));
         }
         if (rollSpeed < 2.1) {

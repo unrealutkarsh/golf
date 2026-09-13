@@ -1,10 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { clubIndex } from "./clubs";
+import { clubById, clubIndex, recommendClub, suggestedShotPower } from "./clubs";
 import { GameSession } from "./game";
 import { createBall } from "./physics";
+import { scaledPuttPower } from "./terrain";
 import { toPar, totalStrokes } from "./scoring";
 
 describe("tour session", () => {
+  it("picks a club and swing fill that match leftover yards", () => {
+    expect(recommendClub(270, "tee").id).toBe("driver");
+    expect(recommendClub(230, "tee").id).toBe("wood3");
+    expect(recommendClub(155, "fairway").id).toBe("iron7");
+    expect(recommendClub(20, "fairway").id).toBe("putter");
+    const pw = clubById("pw");
+    const fill = suggestedShotPower(80, pw, "fairway");
+    expect(fill).toBeGreaterThan(0.55);
+    expect(fill).toBeLessThan(0.85);
+    expect(suggestedShotPower(110, pw, "fairway")).toBeGreaterThan(0.85);
+  });
+
   it("can sign a complete nine-hole card", () => {
     const game = new GameSession(1);
     game.startTournament();
@@ -116,7 +129,7 @@ describe("tour session", () => {
     game.lie = "green";
     game.clubIndex = clubIndex("putter");
     game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
-    game.power = 0.14;
+    game.power = scaledPuttPower(0.55, 0.7);
     game.accuracy = 0;
     game.swingPhase = "accuracy";
     game.meter = 0.5;
