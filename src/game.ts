@@ -64,7 +64,7 @@ export class GameSession {
   cam: Camera = { x: 200, y: 150, zoom: 3 };
   camHold = false;
   camMode: CamMode = "auto";
-  puttGrid = true;
+  puttGrid = false;
   shape = 0;
   tipVisible = true;
   helpOpen = false;
@@ -296,6 +296,7 @@ export class GameSession {
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     if (this.screen !== "play") return;
+    this.refreshLie();
 
     if (this.swingPhase === "power") {
       this.meter += this.meterDir * dt * 0.72;
@@ -326,6 +327,7 @@ export class GameSession {
     const hole = this.hole();
     const step = stepBall(this.ball, hole, this.wind, dt, this.club().bounce);
     this.ball = step.ball;
+    this.refreshLie();
 
     for (const ev of step.events) {
       if (ev.type === "splash") {
@@ -387,6 +389,12 @@ export class GameSession {
       this.power = suggestedPuttPower(this.toPin());
       this.shape = 0;
     }
+  }
+
+  /** Current surface under the ball. Airborne shots keep the launch lie. */
+  refreshLie(): void {
+    if (this.ball.z > 0.55) return;
+    this.lie = lieAt(this.hole(), this.ball.pos);
   }
 
   isHoled(): boolean {

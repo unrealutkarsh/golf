@@ -12,9 +12,11 @@ import {
 } from "./math";
 import type { Ball, Club, Hole, Lie, Wind } from "./types";
 
-export const CUP_RADIUS = 1.35;
-export const GIMME_RADIUS = 1.15;
-export const STOP_SPEED = 0.55;
+export const CUP_RADIUS = 0.5;
+export const GIMME_RADIUS = 0.36;
+export const STOP_SPEED = 0.5;
+export const CAPTURE_SPEED = 8.4;
+export const LIP_SPEED = 9.2;
 export const MAX_HOLE_STROKES = 10;
 export const GRAVITY = 28;
 
@@ -53,7 +55,7 @@ const FRICTION: Record<Lie, number> = {
   tee: 0.986,
   fairway: 0.984,
   rough: 0.955,
-  green: 0.978,
+  green: 0.968,
   bunker: 0.88,
   water: 0.4,
   ob: 0.97,
@@ -80,7 +82,7 @@ const LIE_POWER: Record<Lie, number> = {
 };
 
 export function createBall(pos: Vec2): Ball {
-  return { pos: clone(pos), vel: { x: 0, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0 };
+  return { pos: clone(pos), vel: { x: 0, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0, lipped: false };
 }
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
@@ -94,8 +96,8 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
-    const speed = roll * 1.62;
-    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0, curve: 0 };
+    const speed = roll * 1.18;
+    return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: 0, curve: 0, lipped: false };
   }
 
   const carry = shot.club.carry * power * lieMul;
@@ -103,7 +105,7 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const flightTime = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
   const horiz = carry / flightTime;
   const vz = (flightTime * GRAVITY) / 2;
-  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve };
+  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve, lipped: false };
 }
 
 export function windAccel(wind: Wind, z: number): Vec2 {
@@ -122,6 +124,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     vz: ball.vz - GRAVITY * dt,
     spinning: ball.spinning,
     curve: ball.curve,
+    lipped: ball.lipped,
   };
 
   if (next.z > 0.35 && Math.abs(ball.curve) > 0.01) {
@@ -187,10 +190,15 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     } else {
       next.vz = 0;
       next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
-      // Break only while the ball is still rolling. Applying it at rest
-      // kept putts creeping forever and blocked the next stroke.
-      if (lie === "green" && len(next.vel) > STOP_SPEED * 1.2) {
-        next.vel = add(next.vel, scale(hole.greenBreak, dt * 2.4));
+      const rollSpeed = len(next.vel);
+      if (lie === "green") {
+        if (rollSpeed > 0.95) {
+          const breakScale = clamp((rollSpeed - 0.95) / 10, 0, 1) * 0.72;
+          next.vel = add(next.vel, scale(hole.greenBreak, dt * breakScale));
+        }
+        if (rollSpeed < 2.1) {
+          next.vel = scale(next.vel, Math.pow(0.94, dt * 60));
+        }
       }
       if (lie === "bunker") {
         next.vel = scale(next.vel, Math.pow(0.82, dt * 60));
@@ -204,24 +212,33 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
   let holed = false;
 
   if (onGreen(hole, next.pos) && next.z <= 0.05) {
-    if (pinDist < CUP_RADIUS && speed < 6.2) {
+    if (pinDist < CUP_RADIUS) {
+      if (!ball.lipped && speed < CAPTURE_SPEED) {
+        holed = true;
+      } else if (speed >= LIP_SPEED && !ball.lipped) {
+        next.lipped = true;
+        const away = angleTo(hole.pin, next.pos);
+        next.pos = add(next.pos, fromAngle(away, CUP_RADIUS + 0.14));
+        next.vel = fromAngle(away, Math.min(speed * 0.2, 2.1));
+        events.push({ type: "lip", pos: clone(next.pos) });
+      } else if (!ball.lipped) {
+        const toward = angleTo(next.pos, hole.pin);
+        next.vel = add(next.vel, fromAngle(toward, dt * 2.8));
+        next.vel = scale(next.vel, Math.pow(0.93, dt * 60));
+      }
+    } else if (!ball.lipped && pinDist < GIMME_RADIUS && speed < STOP_SPEED) {
       holed = true;
+    }
+    if (holed) {
       next.vel = { x: 0, y: 0 };
+      next.vz = 0;
       next.pos = clone(hole.pin);
-      events.push({ type: "hole", pos: clone(next.pos) });
-    } else if (pinDist < CUP_RADIUS && speed >= 6.2) {
-      const away = angleTo(hole.pin, next.pos);
-      next.vel = fromAngle(away, speed * 0.45);
-      events.push({ type: "lip", pos: clone(next.pos) });
-    } else if (pinDist < GIMME_RADIUS && speed < STOP_SPEED) {
-      holed = true;
-      next.pos = clone(hole.pin);
-      next.vel = { x: 0, y: 0 };
       events.push({ type: "hole", pos: clone(next.pos) });
     }
   }
 
-  const flying = next.z > 0.05 || speed > STOP_SPEED;
+  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < 0.78 && pinDist > CUP_RADIUS;
+  const flying = !holed && !dyingOnGreen && (next.z > 0.05 || speed > STOP_SPEED);
   if (!flying && !holed) {
     next.vel = { x: 0, y: 0 };
     next.vz = 0;

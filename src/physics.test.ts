@@ -122,6 +122,56 @@ describe("shot physics", () => {
     expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 8);
   });
 
+  it("lips a fast putt once, then holes the tap-in", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 2.4, y: hole.pin.y };
+    const wind = { speed: 0, dir: 0 };
+    const club = clubById("putter");
+    let ball = launchBall(from, {
+      aim: 0,
+      power: 0.58,
+      accuracy: 0,
+      club,
+      lie: "green",
+      wind,
+    });
+    let lipped = false;
+    let holed = false;
+    for (let i = 0; i < 240; i++) {
+      const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+      ball = step.ball;
+      if (step.events.some((e) => e.type === "lip")) lipped = true;
+      if (step.holed) {
+        holed = true;
+        break;
+      }
+      if (!step.flying) break;
+    }
+    expect(lipped).toBe(true);
+    expect(holed).toBe(false);
+    expect(ball.lipped).toBe(true);
+    const rest = { ...ball.pos };
+    expect(Math.hypot(rest.x - hole.pin.x, rest.y - hole.pin.y)).toBeLessThan(3.5);
+    ball = launchBall(rest, {
+      aim: Math.atan2(hole.pin.y - rest.y, hole.pin.x - rest.x),
+      power: 0.15,
+      accuracy: 0,
+      club,
+      lie: "green",
+      wind,
+    });
+    for (let i = 0; i < 360; i++) {
+      const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+      ball = step.ball;
+      if (step.holed) {
+        holed = true;
+        break;
+      }
+      if (!step.flying) break;
+    }
+    expect(holed).toBe(true);
+  });
+
   it("lets a missed putt come to rest instead of creeping on the break", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 8.5, y: hole.pin.y + 3.2 };

@@ -12,6 +12,8 @@ import type { Course, Ellipse, Hole, Lie, Tree } from "./types";
 
 /** Extra yards beyond painted rough that still play as rough, not OB. */
 export const PLAYABLE_MARGIN = 20;
+/** Collar that still plays and paints as green so HUD/visual stay aligned. */
+export const GREEN_COLLAR = 0.9;
 
 interface HoleSpec {
   number: number;
@@ -388,7 +390,7 @@ function lieAtStrict(hole: Hole, p: Vec2): Lie {
   for (const bunker of hole.bunkers) {
     if (pointInEllipse(p, bunker.cx, bunker.cy, bunker.rx, bunker.ry, bunker.rotation)) return "bunker";
   }
-  if (pointInEllipse(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation)) {
+  if (inGreen(hole, p)) {
     return "green";
   }
   if (dist(p, hole.tee) < 9) return "tee";
@@ -435,8 +437,38 @@ export function nearOb(hole: Hole, p: Vec2): boolean {
   return d > 0 && d <= PLAYABLE_MARGIN;
 }
 
+export function inGreen(hole: Hole, p: Vec2, pad = GREEN_COLLAR): boolean {
+  return pointInEllipse(
+    p,
+    hole.green.cx,
+    hole.green.cy,
+    hole.green.rx + pad,
+    hole.green.ry + pad,
+    hole.green.rotation,
+  );
+}
+
 export function onGreen(hole: Hole, p: Vec2): boolean {
-  return pointInEllipse(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation);
+  return inGreen(hole, p);
+}
+
+export function lieId(lie: Lie): number {
+  switch (lie) {
+    case "tee":
+      return 1;
+    case "fairway":
+      return 2;
+    case "rough":
+      return 3;
+    case "green":
+      return 4;
+    case "bunker":
+      return 5;
+    case "water":
+      return 6;
+    case "ob":
+      return 7;
+  }
 }
 
 export function treeHit(hole: Hole, p: Vec2, z: number): Tree | null {

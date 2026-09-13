@@ -79,6 +79,18 @@ describe("tour session", () => {
     expect(game.canShape()).toBe(false);
   });
 
+  it("labels the lie Green as soon as the ball is on the putting surface", () => {
+    const game = new GameSession(8);
+    game.startTournament();
+    expect(game.lie).toBe("tee");
+    const hole = game.hole();
+    game.ball.pos = { x: hole.green.cx, y: hole.green.cy };
+    game.ball.z = 0;
+    game.update(1 / 60);
+    expect(game.lie).toBe("green");
+    expect(game.putting()).toBe(true);
+  });
+
   it("holes a tap-in from the putting view", () => {
     const game = new GameSession(5);
     game.startTournament();

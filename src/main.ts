@@ -205,19 +205,20 @@ if (qa === "round") {
   session.update = () => undefined;
 } else if (qa === "shape" || qa === "fade") {
   poseShapedShot(session, qa === "fade" ? -1 : 1);
-} else if (qa === "green") {
+} else if (qa === "green" || qa === "greenShort" || qa === "greenLie") {
   session.startTournament();
   session.tipVisible = false;
   const hole = session.hole();
-  session.ball.pos = { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
+  const offset = qa === "greenShort" ? { x: hole.pin.x - 1.15, y: hole.pin.y } : { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
+  session.ball.pos = offset;
   session.ball.vel = { x: 0, y: 0 };
   session.ball.z = 0;
-  session.lie = "green";
+  session.refreshLie();
   session.autoClub();
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
   session.power = session.suggestedPower();
   session.camMode = "putt";
-  session.puttGrid = true;
+  session.puttGrid = qa === "green";
 }
 
 (window as unknown as { __ptg: GameSession }).__ptg = session;
