@@ -8,6 +8,7 @@ import {
   groundHeight,
   resolveCamView,
   shapeLabel,
+  scaledPuttPower,
   suggestedPuttPower,
   surfaceColor,
   turfLush,
@@ -48,6 +49,9 @@ describe("course terrain", () => {
     expect(suggestedPuttPower(6)).toBeLessThan(suggestedPuttPower(18));
     expect(suggestedPuttPower(6)).toBeGreaterThan(0.13);
     expect(suggestedPuttPower(80)).toBeLessThanOrEqual(0.64);
+    expect(scaledPuttPower(0.5, 1.2)).toBeLessThan(0.22);
+    expect(scaledPuttPower(0.5, 1.2)).toBeGreaterThan(0.1);
+    expect(scaledPuttPower(1, 8)).toBeGreaterThan(scaledPuttPower(0.4, 8));
     expect(shapeLabel(0.8)).toBe("Draw");
     expect(shapeLabel(-0.8)).toBe("Fade");
   });

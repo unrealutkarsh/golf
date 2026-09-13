@@ -91,6 +91,23 @@ describe("tour session", () => {
     expect(game.putting()).toBe(true);
   });
 
+  it("holes a mid-meter tap-in instead of blasting through the cup", () => {
+    const game = new GameSession(9);
+    game.startTournament();
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 1.15, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+    game.swingPhase = "power";
+    game.meter = 0.55;
+    game.tap();
+    game.meter = 0.5;
+    game.tap();
+    for (let i = 0; i < 300; i++) game.update(1 / 60);
+    expect(game.screen).toBe("holeEnd");
+  });
+
   it("holes a tap-in from the putting view", () => {
     const game = new GameSession(5);
     game.startTournament();

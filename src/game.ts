@@ -3,7 +3,7 @@ import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubIndex, recommendClub } from "./clubs";
 import { HARBOR_DUNES, lieAt, onGreen } from "./course";
 import { hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
-import { isPuttingSituation, resolveCamView, suggestedPuttPower, type ResolvedCam } from "./terrain";
+import { isPuttingSituation, resolveCamView, scaledPuttPower, suggestedPuttPower, type ResolvedCam } from "./terrain";
 import {
   createBall,
   defaultAim,
@@ -142,7 +142,14 @@ export class GameSession {
   private previewShot() {
     return {
       aim: this.aim,
-      power: this.swingPhase === "aim" ? this.suggestedPower() : this.swingPhase === "power" ? Math.max(this.meter, 0.2) : this.power,
+      power:
+        this.club().id === "putter" && this.swingPhase === "power"
+          ? scaledPuttPower(this.meter, this.toPin())
+          : this.swingPhase === "aim"
+            ? this.suggestedPower()
+            : this.swingPhase === "power"
+              ? Math.max(this.meter, 0.2)
+              : this.power,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
@@ -246,7 +253,7 @@ export class GameSession {
       return;
     }
     if (this.swingPhase === "power") {
-      this.power = clamp(this.meter, 0.08, 1);
+      this.power = this.club().id === "putter" ? scaledPuttPower(this.meter, this.toPin()) : clamp(this.meter, 0.08, 1);
       this.swingPhase = "accuracy";
       this.meter = 0.5;
       this.meterDir = 1;

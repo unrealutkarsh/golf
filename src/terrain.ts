@@ -9,6 +9,12 @@ export function suggestedPuttPower(yardsToPin: number): number {
   return Math.max(0.14, Math.min(0.62, (yardsToPin + 0.6) / 22));
 }
 
+/** Map the swing meter onto a distance-scaled putt so a mid-meter tap dies at the hole. */
+export function scaledPuttPower(meter: number, yardsToPin: number): number {
+  const suggested = suggestedPuttPower(yardsToPin);
+  return Math.max(0.08, Math.min(0.78, suggested * (0.35 + Math.max(meter, 0.08) * 1.15)));
+}
+
 export function isPuttingSituation(lie: Lie, pinDist: number, clubId: string, hole: Hole, pos: Vec2): boolean {
   return lie === "green" || onGreen(hole, pos) || (pinDist < 24 && clubId === "putter");
 }
