@@ -72,9 +72,9 @@ export function buildAddressGolfer(): THREE.Group {
   torso.scale.set(1.08, 1, 0.78);
   torso.rotation.x = 0.38;
   torso.rotation.z = 0.18;
-  const poloBack = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.34, 0.04), shirtShade);
-  poloBack.position.set(0.0, 1.2, -0.05);
-  poloBack.rotation.x = 0.42;
+  const poloBack = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.03), shirtShade);
+  poloBack.position.set(0.0, 1.38, 0.02);
+  poloBack.rotation.x = 0.35;
 
   const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.42, 3, 8), shirt);
   shoulders.position.set(-0.02, 1.4, 0.12);

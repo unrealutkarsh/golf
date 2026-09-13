@@ -53,8 +53,8 @@ export function napShade(band: TurfBand, x: number, z: number, napX: number, nap
     return 0.86 + clump * 0.12;
   }
   if (band === "fairway" || band === "tee") {
-    const stripe = 0.5 + 0.5 * Math.sin(x * 0.34 + z * 0.05);
-    return 0.84 + stripe * 0.2;
+    const stripe = 0.5 + 0.5 * Math.sin(x * 0.22 + z * 0.04);
+    return 0.76 + stripe * 0.32;
   }
   return 0.92;
 }
@@ -338,8 +338,8 @@ ${shader.fragmentShader}`;
        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.06, 0.86) * (0.86 + stripe * 0.16), onCollar);
        diffuseColor.rgb *= mix(vec3(1.0), fringeTint * fringeTerm, onFringe);
        float fairway = (1.0 - onGreen) * (1.0 - onFringe) * (1.0 - onCollar);
-       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.28 + world.y * 0.04);
-       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.92 + fwStripe * 0.2, 0.96 + fwStripe * 0.14, 0.82 + fwStripe * 0.06), fairway * uCourseWide);`
+       float fwStripe = 0.5 + 0.5 * sin(world.x * 0.2 + world.y * 0.03);
+       diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82 + fwStripe * 0.32, 0.88 + fwStripe * 0.24, 0.74 + fwStripe * 0.1), fairway * uCourseWide);`
     );
   };
   mat.customProgramCacheKey = () => `turf-nap-${detailScale}-${courseWide ? "w" : "g"}`;

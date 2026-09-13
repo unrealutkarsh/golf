@@ -353,8 +353,8 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const stripe = 0.86 + 0.24 * Math.sin(x * 0.3 + z * 0.04);
-      const boost = lie === "green" ? 1.12 + stripe * 0.1 : lie === "fairway" || lie === "tee" ? 1.02 + stripe * 0.14 : 0.94;
+      const stripe = 0.72 + 0.36 * Math.sin(x * 0.22 + z * 0.035);
+      const boost = lie === "green" ? 1.1 + stripe * 0.12 : lie === "fairway" || lie === "tee" ? 0.88 + stripe * 0.28 : 0.94;
       colors[i * 3] = cr * boost;
       colors[i * 3 + 1] = cg * boost;
       colors[i * 3 + 2] = cb * boost;

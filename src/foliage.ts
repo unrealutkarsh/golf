@@ -201,11 +201,11 @@ function cutout(canvas: HTMLCanvasElement, alphaTest = 0.28): THREE.MeshStandard
 function solidFoliage(color: number): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.82,
+    roughness: 0.8,
     metalness: 0,
     flatShading: false,
-    emissive: new THREE.Color(color).multiplyScalar(0.18),
-    emissiveIntensity: 0.2,
+    emissive: new THREE.Color(color).multiplyScalar(0.14),
+    emissiveIntensity: 0.16,
   });
 }
 
@@ -224,11 +224,11 @@ function displaceBlob(detail: number, seed: number, flatten = 0.78): THREE.Buffe
 }
 
 export function createFoliageKit(): FoliageKit {
-  const pine = solidFoliage(0x4c8238);
-  const pineLit = solidFoliage(0x5e9844);
-  const oak = solidFoliage(0x5a8e40);
-  const oakLit = solidFoliage(0x6eaa50);
-  const bush = solidFoliage(0x547c38);
+  const pine = solidFoliage(0x2f5c28);
+  const pineLit = solidFoliage(0x6aaa46);
+  const oak = solidFoliage(0x4a7834);
+  const oakLit = solidFoliage(0x86b84e);
+  const bush = solidFoliage(0x3e6a2c);
   const pineCard = cutout(makeFoliageCard(true, 11), 0.18);
   const oakCard = cutout(makeFoliageCard(false, 27), 0.18);
   const impostor = cutout(makeImpostorCard(9), 0.1);
@@ -280,9 +280,9 @@ export function makeVolumeTree(
   else addOak(group, r, kit, mat, shadow, compact);
   group.position.set(x, ground, z);
   group.rotation.y = fbm(x, z) * Math.PI * 2;
-  group.scale.y = 0.88 + fbm(z, x) * 0.32;
-  group.scale.x = 0.92 + hashNoise(x, 3) * 0.2;
-  group.scale.z = 0.9 + hashNoise(z, 5) * 0.22;
+  group.scale.y = 0.7 + fbm(z, x) * 0.95;
+  group.scale.x = 0.82 + hashNoise(x, 3) * 0.45;
+  group.scale.z = 0.8 + hashNoise(z, 5) * 0.42;
   group.userData.kind = kind;
   group.userData.volume = true;
   return group;
@@ -299,7 +299,7 @@ function addLeafCards(
 ): void {
   for (let i = 0; i < count; i++) {
     const card = new THREE.Mesh(kit.card, cardMat);
-    card.scale.set(w * (1.15 + (i % 2) * 0.18), h * (0.88 + (i % 3) * 0.06), 1);
+    card.scale.set(w * (1.45 + (i % 2) * 0.25), h * (1.02 + (i % 3) * 0.08), 1);
     card.position.y = y;
     card.rotation.y = (i / count) * Math.PI + 0.16;
     card.castShadow = false;
@@ -326,10 +326,10 @@ function addPine(
   for (let i = 0; i < layers; i++) {
     const t = i / Math.max(layers - 1, 1);
     const blob = new THREE.Mesh(kit.pineBlob, mat);
-    const cw = w * (0.38 + t * 0.78);
-    const ch = h * (0.16 + (1 - t) * 0.05);
-    blob.scale.set(cw, ch, cw * (0.86 + fbm(i, r) * 0.18));
-    blob.position.set((fbm(i + 2, r) - 0.5) * 1.1, h * (0.88 - t * 0.5), (fbm(r, i + 4) - 0.5) * 1.1);
+    const cw = w * (0.26 + t * 0.92);
+    const ch = h * (0.14 + (1 - t) * 0.08);
+    blob.scale.set(cw, ch, cw * (0.78 + fbm(i, r) * 0.28));
+    blob.position.set((fbm(i + 2, r) - 0.5) * 1.8, h * (0.92 - t * 0.58), (fbm(r, i + 4) - 0.5) * 1.8);
     blob.rotation.set(fbm(i, 2) * 0.35, t * 1.2, (fbm(i, 3) - 0.5) * 0.2);
     blob.castShadow = shadow && i < 3;
     group.add(blob);
@@ -368,8 +368,8 @@ function addOak(
     const a = (i / blobs) * Math.PI * 2 + hashNoise(i, r) * 0.5;
     const lift = 0.5 + (i % 4) * 0.09;
     const rad = w * (0.2 + (i % 5) * 0.045);
-    blob.scale.set(rad * (0.8 + (i % 3) * 0.16), rad * (0.62 + (i % 2) * 0.12), rad * (0.76 + (i % 4) * 0.1));
-    blob.position.set(Math.cos(a) * w * 0.3, h * lift, Math.sin(a) * w * 0.28);
+    blob.scale.set(rad * (0.72 + (i % 3) * 0.22), rad * (0.52 + (i % 2) * 0.18), rad * (0.7 + (i % 4) * 0.16));
+    blob.position.set(Math.cos(a) * w * 0.42, h * lift, Math.sin(a) * w * 0.4);
     blob.rotation.set(hashNoise(i, 2) * 0.8, a, hashNoise(i, 4) * 0.6);
     blob.castShadow = shadow && i < 5;
     group.add(blob);
@@ -425,19 +425,17 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   let n = 0;
   for (let i = 0; i < 260 && n < 168; i++) {
     const cluster = Math.floor(i / 5);
-    const grove = hashNoise(cluster, 0.7);
-    const side = grove > 0.5 ? 1 : -1;
-    const along = hashNoise(cluster, 1.4);
-    const depth = 28 + hashNoise(cluster, 2.2) * 90;
-    const cx = b.x + along * b.w + (hashNoise(cluster, 3) - 0.5) * 70;
-    const cz = side < 0 ? b.y - depth : b.y + b.h + depth * 0.85;
-    const x = cx + (hashNoise(i, 8) - 0.5) * 32;
-    const z = cz + (hashNoise(i, 9) - 0.5) * 28;
+    const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
+    const rad = 62 + hashNoise(cluster, 2.2) * 170;
+    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 24;
+    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 24;
+    const x = cx + (hashNoise(i, 8) - 0.5) * 36;
+    const z = cz + (hashNoise(i, 9) - 0.5) * 32;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;
     const ground = groundHeight(hole, x, z);
     const kind = treeKind(x + 1, z);
-    const r = 5.4 + hashNoise(i, 11) * 7.2;
-    const h = kind === "pine" ? 9 + r * 0.75 + hashNoise(i, 12) * 7 : 7.2 + r * 0.5 + hashNoise(i, 13) * 5;
+    const r = 4.8 + hashNoise(i, 11) * 8.4;
+    const h = kind === "pine" ? 7 + r * 0.55 + hashNoise(i, 12) * 14 : 6 + r * 0.42 + hashNoise(i, 13) * 10;
     dummy.position.set(x, ground + h * (kind === "pine" ? 0.28 : 0.22), z);
     dummy.rotation.set(0, fbm(x, z) * 6, 0);
     dummy.scale.set(kind === "pine" ? 0.75 : 1.05, h * (kind === "pine" ? 0.58 : 0.46), kind === "pine" ? 0.75 : 1.05);
@@ -450,7 +448,7 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
       if (kind === "pine") {
         dummy.position.set(x + (fbm(k, x) - 0.5) * 1.2, ground + h * (0.84 - t * 0.32), z + (fbm(z, k) - 0.5) * 1.2);
         dummy.rotation.set(fbm(k, 2) * 0.4, t * 1.4, (fbm(k, 5) - 0.5) * 0.2);
-        dummy.scale.set(r * (0.48 + t * 0.78), h * (0.14 + (1 - t) * 0.06), r * (0.48 + t * 0.72));
+        dummy.scale.set(r * (0.32 + t * 0.95), h * (0.12 + (1 - t) * 0.08), r * (0.3 + t * 0.88));
         dummy.updateMatrix();
         (lit ? pineLit : pineDark).push(dummy.matrix.clone());
       } else {
