@@ -4,13 +4,15 @@ import { fbm, hashNoise } from "./look";
 import { groundHeight } from "./terrain";
 import type { Hole } from "./types";
 
-export const PINE_CANOPY_LAYERS = 6;
-export const OAK_CANOPY_BLOBS = 14;
-export const LEAF_CARDS_PER_TREE = 22;
-export const SPRAY_CARDS_PER_TREE = 16;
-export const MID_RANGE_CARDS_PER_TREE = 20;
+export const PINE_CANOPY_LAYERS = 8;
+export const PINE_CLUSTERS_PER_LAYER = 2;
+export const OAK_CANOPY_BLOBS = 20;
+export const OAK_BRANCHES = 5;
+export const LEAF_CARDS_PER_TREE = 12;
+export const SPRAY_CARDS_PER_TREE = 8;
+export const MID_RANGE_CARDS_PER_TREE = 8;
 export const TRUNK_PARTS = 2;
-export const VOLUME_TREE_PARTS = 24;
+export const VOLUME_TREE_PARTS = 28;
 
 export type TreeKind = "pine" | "oak";
 
@@ -32,43 +34,57 @@ export interface FoliageKit {
   impostor: THREE.MeshStandardMaterial;
   pineBlob: THREE.BufferGeometry;
   oakBlob: THREE.BufferGeometry;
+  midBlob: THREE.BufferGeometry;
   trunk: THREE.BufferGeometry;
   flare: THREE.BufferGeometry;
   card: THREE.BufferGeometry;
   branch: THREE.BufferGeometry;
 }
 
+/** Ragged leaf-mass card — not a circular lollipop. */
 function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
-  const w = 160;
-  const h = 160;
+  const w = 192;
+  const h = 192;
   const data = new Uint8Array(w * h * 4);
   const pine: Array<[number, number, number]> = [
-    [62, 88, 52],
-    [76, 102, 62],
-    [54, 78, 44],
-    [84, 110, 66],
+    [74, 86, 52],
+    [88, 96, 58],
+    [64, 76, 46],
+    [96, 102, 64],
+    [70, 80, 48],
   ];
   const oak: Array<[number, number, number]> = [
-    [72, 96, 56],
-    [88, 112, 66],
-    [60, 84, 48],
-    [96, 120, 72],
+    [86, 92, 56],
+    [98, 102, 62],
+    [72, 82, 50],
+    [108, 108, 68],
+    [80, 88, 54],
   ];
   const tones = needles ? pine : oak;
+  const clumps: Array<[number, number, number, number]> = [];
+  for (let k = 0; k < (needles ? 9 : 11); k++) {
+    const a = (k / 10) * Math.PI * 2 + seed * 0.2;
+    const rad = 0.12 + hashNoise(k + seed, 3) * 0.28;
+    clumps.push([
+      Math.cos(a) * rad * 0.55,
+      Math.sin(a) * rad * 0.5 + (hashNoise(k, 8) - 0.5) * 0.12,
+      0.1 + hashNoise(k, 5) * 0.16,
+      0.7 + hashNoise(k, 9) * 0.55,
+    ]);
+  }
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const u = (x + 0.5) / w - 0.5;
       const v = (y + 0.5) / h - 0.5;
-      const ang = Math.atan2(v, u);
-      const rad = Math.hypot(u, v);
-      const n = hashNoise(x * 0.31 + seed, y * 0.29 + seed);
-      const lobe = needles
-        ? 0.2 + 0.26 * (0.55 + 0.45 * Math.cos(ang * 5 + seed)) + n * 0.08
-        : 0.28 + 0.2 * hashNoise(Math.cos(ang * 3 + seed), Math.sin(ang * 4)) + 0.1 * Math.sin(ang * 7 + seed);
-      const inside = rad < lobe ? Math.min(1, (1 - rad / Math.max(lobe, 0.05)) * 2.1) : 0;
-      const speckle = hashNoise(x * 1.7 + seed, y * 1.4) > (needles ? 0.22 : 0.18) ? 1 : 0.15;
-      const a = inside * speckle * (0.7 + n * 0.3);
-      const tone = tones[(x + y + Math.floor(n * 8)) % tones.length];
+      const n = hashNoise(x * 0.37 + seed, y * 0.33 + seed);
+      let cover = 0;
+      for (const [cx, cy, cr, wgt] of clumps) {
+        const e = Math.hypot((u - cx) / cr, (v - cy) / (cr * (needles ? 1.35 : 0.92)));
+        if (e < 1) cover += (1 - e) * wgt;
+      }
+      const holes = hashNoise(x * 2.1 + seed, y * 1.8) > (needles ? 0.16 : 0.2) ? 1 : 0.08;
+      const a = Math.min(1, cover * 0.85) * holes * (0.72 + n * 0.28);
+      const tone = tones[(x + y * 3 + Math.floor(n * 8)) % tones.length];
       const i = (y * w + x) * 4;
       data[i] = tone[0];
       data[i + 1] = tone[1];
@@ -96,11 +112,11 @@ function makeBarkMaps(): { color: THREE.DataTexture; normal: THREE.DataTexture; 
     for (let x = 0; x < w; x++) {
       const n = hashNoise(x * 0.8, y * 0.35);
       const ht = height(x, y);
-      const v = 48 + ht * 42 + n * 16;
+      const v = 52 + ht * 38 + n * 14;
       const i = (y * w + x) * 4;
       color[i] = v;
-      color[i + 1] = v * 0.7;
-      color[i + 2] = v * 0.46;
+      color[i + 1] = v * 0.72;
+      color[i + 2] = v * 0.5;
       color[i + 3] = 255;
       const nx = (height(x - 1, y) - height(x + 1, y)) * 2.4;
       const ny = (height(x, y - 1) - height(x, y + 1)) * 2.4;
@@ -130,56 +146,76 @@ function makeBarkMaps(): { color: THREE.DataTexture; normal: THREE.DataTexture; 
 function leafMat(map: THREE.DataTexture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x5a7848,
+    color: 0x6a7048,
     transparent: true,
-    alphaTest: 0.2,
+    alphaTest: 0.22,
     side: THREE.DoubleSide,
-    roughness: 0.9,
+    roughness: 0.92,
     metalness: 0,
     depthWrite: true,
-    emissive: new THREE.Color(0x0c140c),
-    emissiveIntensity: 0.02,
+    emissive: new THREE.Color(0x0e1008),
+    emissiveIntensity: 0.015,
   });
 }
 
 function solidFoliage(color: number): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.9,
+    roughness: 0.88,
     metalness: 0,
     flatShading: false,
-    emissive: new THREE.Color(color).multiplyScalar(0.04),
-    emissiveIntensity: 0.03,
+    vertexColors: true,
+    emissive: new THREE.Color(color).multiplyScalar(0.03),
+    emissiveIntensity: 0.02,
   });
 }
 
-function displaceBlob(detail: number, seed: number, flatten = 0.78): THREE.BufferGeometry {
+function paintBlobColors(geo: THREE.BufferGeometry, seed: number, lit: boolean): void {
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const n = hashNoise(pos.getX(i) * 4.2 + seed, pos.getZ(i) * 3.8 + seed);
+    const lift = lit ? 1.06 : 0.94;
+    colors[i * 3] = (0.78 + n * 0.22) * lift;
+    colors[i * 3 + 1] = (0.86 + n * 0.14) * lift;
+    colors[i * 3 + 2] = (0.62 + n * 0.12) * lift;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
+function displaceBlob(detail: number, seed: number, flatten = 0.7): THREE.BufferGeometry {
   const geo = new THREE.IcosahedronGeometry(1, detail);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    const n = 0.78 + hashNoise(x * 3.6 + seed, z * 3.8 + seed) * 0.32 + hashNoise(y * 5.1 + seed, x * 2.2) * 0.12;
-    pos.setXYZ(i, x * n, y * n * flatten, z * n);
+    const n1 = hashNoise(x * 2.8 + seed, z * 3.1 + seed);
+    const n2 = hashNoise(y * 4.4 + seed, x * 2.6);
+    const n3 = hashNoise(z * 5.2 + seed, y * 3.7);
+    let n = 0.58 + n1 * 0.38 + n2 * 0.16 + n3 * 0.1;
+    if (n3 > 0.82) n *= 0.62;
+    if (n1 < 0.18) n *= 0.74;
+    pos.setXYZ(i, x * n, y * n * flatten, z * n * (0.88 + n2 * 0.2));
   }
   geo.computeVertexNormals();
+  paintBlobColors(geo, seed, true);
   return geo;
 }
 
 function makeTrunkGeo(): THREE.BufferGeometry {
   return new THREE.LatheGeometry(
-    [new THREE.Vector2(0.34, 0), new THREE.Vector2(0.24, 0.08), new THREE.Vector2(0.18, 0.45), new THREE.Vector2(0.15, 1)],
-    14,
+    [new THREE.Vector2(0.38, 0), new THREE.Vector2(0.26, 0.1), new THREE.Vector2(0.19, 0.48), new THREE.Vector2(0.14, 1)],
+    16,
   );
 }
 
 export function createFoliageKit(): FoliageKit {
-  const pine = solidFoliage(0x38582c);
-  const pineLit = solidFoliage(0x4e703e);
-  const oak = solidFoliage(0x416032);
-  const oakLit = solidFoliage(0x567844);
-  const bush = solidFoliage(0x38562a);
+  const pine = solidFoliage(0x4a5836);
+  const pineLit = solidFoliage(0x5a6840);
+  const oak = solidFoliage(0x556238);
+  const oakLit = solidFoliage(0x667446);
+  const bush = solidFoliage(0x4a542e);
   const pineCard = leafMat(makeLeafCardTex(true, 11));
   const pineCardB = leafMat(makeLeafCardTex(true, 41));
   const oakCard = leafMat(makeLeafCardTex(false, 27));
@@ -206,12 +242,13 @@ export function createFoliageKit(): FoliageKit {
     bush,
     bark,
     impostor,
-    pineBlob: displaceBlob(2, 2.2, 0.58),
-    oakBlob: displaceBlob(2, 7.4, 0.72),
+    pineBlob: displaceBlob(3, 2.2, 0.48),
+    oakBlob: displaceBlob(3, 7.4, 0.68),
+    midBlob: displaceBlob(2, 4.1, 0.62),
     trunk: makeTrunkGeo(),
-    flare: new THREE.CylinderGeometry(0.38, 0.62, 0.18, 10),
+    flare: new THREE.CylinderGeometry(0.4, 0.68, 0.2, 12),
     card: new THREE.PlaneGeometry(1, 1),
-    branch: new THREE.CylinderGeometry(0.045, 0.1, 1, 8),
+    branch: new THREE.CylinderGeometry(0.04, 0.095, 1, 8),
   };
 }
 
@@ -238,15 +275,15 @@ export function makeVolumeTree(
   else addOak(group, r, kit, mat, shadow, compact);
   group.position.set(x, ground, z);
   group.rotation.y = fbm(x, z) * Math.PI * 2;
-  group.scale.y = 0.7 + fbm(z, x) * 0.95;
-  group.scale.x = 0.82 + hashNoise(x, 3) * 0.45;
-  group.scale.z = 0.8 + hashNoise(z, 5) * 0.42;
+  group.scale.y = 0.78 + fbm(z, x) * 0.85;
+  group.scale.x = 0.86 + hashNoise(x, 3) * 0.38;
+  group.scale.z = 0.84 + hashNoise(z, 5) * 0.36;
   group.userData.kind = kind;
   group.userData.volume = true;
   return group;
 }
 
-function addLeafCards(
+function addEdgeCards(
   group: THREE.Group,
   kit: FoliageKit,
   cardMat: THREE.MeshStandardMaterial,
@@ -257,32 +294,13 @@ function addLeafCards(
 ): void {
   for (let i = 0; i < count; i++) {
     const card = new THREE.Mesh(kit.card, i % 2 === 0 ? cardMat : alt);
-    const ring = i < count / 2 ? 0 : 1;
-    const t = (i % Math.ceil(count / 2)) / Math.max(Math.ceil(count / 2) - 1, 1);
-    card.scale.set(w * (0.55 + (i % 5) * 0.1), h * (0.42 + ring * 0.16 + (i % 4) * 0.04), 1);
-    card.position.set((hashNoise(i, 2) - 0.5) * w * 0.42, h * (0.34 + ring * 0.22 + t * 0.06), (hashNoise(i, 6) - 0.5) * w * 0.4);
-    card.rotation.y = (i / count) * Math.PI * 2 + hashNoise(i, 8) * 0.7;
-    card.rotation.x = (hashNoise(i, 4) - 0.5) * 0.28;
-    card.castShadow = false;
-    group.add(card);
-  }
-}
-
-function addSprayCards(
-  group: THREE.Group,
-  kit: FoliageKit,
-  cardMat: THREE.MeshStandardMaterial,
-  w: number,
-  h: number,
-  count: number,
-): void {
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2;
-    const card = new THREE.Mesh(kit.card, cardMat);
-    const jitter = 0.72 + hashNoise(i, 9) * 0.45;
-    card.scale.set(w * 0.38 * jitter, h * 0.34 * jitter, 1);
-    card.position.set(Math.cos(a) * w * 0.44, h * (0.4 + (i % 4) * 0.08), Math.sin(a) * w * 0.42);
-    card.rotation.y = a + 0.4;
+    const a = (i / count) * Math.PI * 2 + hashNoise(i, 3) * 0.4;
+    const lift = 0.42 + (i % 5) * 0.09 + hashNoise(i, 7) * 0.05;
+    const rad = w * (0.28 + (i % 4) * 0.06);
+    card.scale.set(w * (0.22 + (i % 5) * 0.04), h * (0.16 + (i % 3) * 0.03), 1);
+    card.position.set(Math.cos(a) * rad, h * lift, Math.sin(a) * rad * 0.92);
+    card.rotation.y = a + 0.55;
+    card.rotation.x = (hashNoise(i, 4) - 0.5) * 0.35;
     card.castShadow = false;
     group.add(card);
   }
@@ -296,33 +314,41 @@ function addPine(
   shadow: boolean,
   compact: boolean,
 ): void {
-  const h = 12.2 + (r - 7) * 0.95;
-  const w = r * 1.08;
+  const h = 13.4 + (r - 7) * 0.95;
+  const w = r * 1.02;
   const trunk = new THREE.Mesh(kit.trunk, kit.bark);
-  const lean = (hashNoise(r, 2) - 0.5) * 0.1;
-  trunk.scale.set(0.85 + hashNoise(r, 3) * 0.4, h * 0.7, 0.85 + hashNoise(r, 5) * 0.32);
+  const lean = (hashNoise(r, 2) - 0.5) * 0.08;
+  trunk.scale.set(0.72 + hashNoise(r, 3) * 0.28, h * 0.78, 0.7 + hashNoise(r, 5) * 0.24);
   trunk.position.y = h * 0.02;
   trunk.rotation.z = lean;
   trunk.castShadow = shadow;
   const flare = new THREE.Mesh(kit.flare, kit.bark);
   flare.position.y = 0.08;
-  flare.scale.set(0.9 + hashNoise(r, 6) * 0.3, 1, 0.9);
+  flare.scale.set(0.72 + hashNoise(r, 6) * 0.22, 1, 0.7);
   flare.castShadow = shadow;
   group.add(trunk, flare);
-  const layers = compact ? 4 : PINE_CANOPY_LAYERS;
+  const layers = compact ? 5 : PINE_CANOPY_LAYERS;
+  const per = compact ? 1 : PINE_CLUSTERS_PER_LAYER;
   for (let i = 0; i < layers; i++) {
     const t = i / Math.max(layers - 1, 1);
-    const blob = new THREE.Mesh(kit.pineBlob, mat);
-    const cw = w * (0.2 + t * 0.7);
-    const ch = h * (0.1 + (1 - t) * 0.06);
-    blob.scale.set(cw * 0.22, ch * 0.28, cw * (0.18 + fbm(i, r) * 0.1));
-    blob.position.set((fbm(i + 2, r) - 0.5) * w * 0.22, h * (0.88 - t * 0.52), (fbm(r, i + 4) - 0.5) * w * 0.22);
-    blob.rotation.set(fbm(i, 2) * 0.28, t * 1.2, (fbm(i, 3) - 0.5) * 0.16);
-    blob.castShadow = shadow && i < 2;
-    group.add(blob);
+    for (let c = 0; c < per; c++) {
+      const blob = new THREE.Mesh(kit.pineBlob, mat);
+      const cw = w * (0.16 + t * 0.58) * (0.72 + (c % 2) * 0.22);
+      const ch = h * (0.055 + (1 - t) * 0.04);
+      const a = (c / per) * Math.PI + t * 1.7 + hashNoise(i + c, r) * 0.8;
+      blob.scale.set(cw * 0.38, ch * 0.55, cw * (0.3 + fbm(i, r) * 0.12));
+      blob.position.set(
+        Math.cos(a) * w * (0.08 + t * 0.16),
+        h * (0.92 - t * 0.58) + (c % 2) * h * 0.02,
+        Math.sin(a) * w * (0.08 + t * 0.15),
+      );
+      blob.rotation.set(fbm(i, 2) * 0.22, a, (fbm(i + c, 3) - 0.5) * 0.2);
+      blob.castShadow = shadow && i < 3 && c === 0;
+      group.add(blob);
+    }
   }
-  addLeafCards(group, kit, kit.pineCard, kit.pineCardB, w * 1.22, h * 0.9, compact ? 4 : LEAF_CARDS_PER_TREE);
-  if (!compact) addSprayCards(group, kit, kit.pineCardB, w * 1.15, h * 0.88, SPRAY_CARDS_PER_TREE);
+  addEdgeCards(group, kit, kit.pineCard, kit.pineCardB, w * 0.95, h * 0.92, compact ? 4 : LEAF_CARDS_PER_TREE);
+  if (!compact) addEdgeCards(group, kit, kit.pineCardB, kit.pineCard, w * 0.82, h * 0.86, SPRAY_CARDS_PER_TREE);
 }
 
 function addOak(
@@ -333,51 +359,53 @@ function addOak(
   shadow: boolean,
   compact: boolean,
 ): void {
-  const h = 9.4 + (r - 7) * 0.62;
-  const w = r * 1.42;
+  const h = 10.2 + (r - 7) * 0.58;
+  const w = r * 1.55;
   const trunk = new THREE.Mesh(kit.trunk, kit.bark);
-  trunk.scale.set(1.2 + hashNoise(r, 8) * 0.4, h * 0.56, 1.15 + hashNoise(r, 9) * 0.32);
+  trunk.scale.set(1.28 + hashNoise(r, 8) * 0.36, h * 0.62, 1.2 + hashNoise(r, 9) * 0.28);
   trunk.position.y = h * 0.02;
-  trunk.rotation.z = (hashNoise(r, 4) - 0.5) * 0.12;
+  trunk.rotation.z = (hashNoise(r, 4) - 0.5) * 0.1;
   trunk.castShadow = shadow;
   const flare = new THREE.Mesh(kit.flare, kit.bark);
-  flare.position.y = 0.09;
-  flare.scale.set(1.15, 1, 1.05);
+  flare.position.y = 0.1;
+  flare.scale.set(1.2, 1, 1.1);
   flare.castShadow = shadow;
   group.add(trunk, flare);
-  const branches = compact ? 2 : 3;
+  const branches = compact ? 3 : OAK_BRANCHES;
   for (let i = 0; i < branches; i++) {
     const br = new THREE.Mesh(kit.branch, kit.bark);
-    const a = (i / branches) * Math.PI * 2 + 0.4;
-    br.scale.set(1, h * 0.32, 1);
-    br.position.set(Math.cos(a) * 0.35, h * 0.42, Math.sin(a) * 0.35);
-    br.rotation.z = Math.cos(a) * 0.7;
-    br.rotation.x = -Math.sin(a) * 0.7;
+    const a = (i / branches) * Math.PI * 2 + 0.35 + hashNoise(i, r) * 0.4;
+    const lift = 0.34 + (i % 3) * 0.08;
+    br.scale.set(1, h * (0.22 + (i % 3) * 0.06), 1);
+    br.position.set(Math.cos(a) * 0.42, h * lift, Math.sin(a) * 0.4);
+    br.rotation.z = Math.cos(a) * 0.85;
+    br.rotation.x = -Math.sin(a) * 0.8;
     group.add(br);
   }
-  const blobs = compact ? 6 : OAK_CANOPY_BLOBS;
+  const blobs = compact ? 8 : OAK_CANOPY_BLOBS;
   for (let i = 0; i < blobs; i++) {
     const blob = new THREE.Mesh(kit.oakBlob, mat);
-    const a = i * 2.399 + hashNoise(i, r) * 1.1;
-    const lift = 0.38 + (i % 6) * 0.07 + hashNoise(i, 8) * 0.06;
-    const rad = w * (0.14 + hashNoise(i, 3) * 0.16);
-    blob.scale.set(rad * (0.28 + (i % 3) * 0.06), rad * (0.2 + (i % 2) * 0.05), rad * (0.24 + (i % 4) * 0.05));
-    blob.position.set(Math.cos(a) * w * (0.22 + (i % 5) * 0.04), h * lift, Math.sin(a) * w * (0.2 + (i % 4) * 0.04));
-    blob.rotation.set(hashNoise(i, 2) * 0.8, a, hashNoise(i, 4) * 0.6);
-    blob.castShadow = shadow && i < 5;
+    const a = i * 2.399 + hashNoise(i, r) * 1.4;
+    const lift = 0.4 + (i % 7) * 0.055 + hashNoise(i, 8) * 0.05;
+    const rad = w * (0.1 + hashNoise(i, 3) * 0.12);
+    const spread = 0.16 + (i % 6) * 0.035 + hashNoise(i, 11) * 0.04;
+    blob.scale.set(rad * (0.34 + (i % 4) * 0.05), rad * (0.22 + (i % 3) * 0.04), rad * (0.3 + (i % 5) * 0.04));
+    blob.position.set(Math.cos(a) * w * spread, h * lift, Math.sin(a) * w * spread * 0.92);
+    blob.rotation.set(hashNoise(i, 2) * 0.9, a, hashNoise(i, 4) * 0.7);
+    blob.castShadow = shadow && i < 6;
     group.add(blob);
   }
-  addLeafCards(group, kit, kit.oakCard, kit.oakCardB, w * 1.4, h * 0.84, compact ? 4 : LEAF_CARDS_PER_TREE);
-  if (!compact) addSprayCards(group, kit, kit.oakCardB, w * 1.32, h * 0.8, SPRAY_CARDS_PER_TREE);
+  addEdgeCards(group, kit, kit.oakCard, kit.oakCardB, w * 1.05, h * 0.86, compact ? 4 : LEAF_CARDS_PER_TREE);
+  if (!compact) addEdgeCards(group, kit, kit.oakCardB, kit.oakCard, w * 0.92, h * 0.8, SPRAY_CARDS_PER_TREE);
 }
 
 export function makeBush(x: number, z: number, r: number, ground: number, kit: FoliageKit): THREE.Group {
   const group = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     const blob = new THREE.Mesh(kit.oakBlob, kit.bush);
-    const a = (i / 4) * Math.PI * 2;
-    blob.scale.set(r * (0.48 + (i % 2) * 0.12), r * 0.36, r * 0.46);
-    blob.position.set(Math.cos(a) * r * 0.3, r * 0.3, Math.sin(a) * r * 0.3);
+    const a = (i / 5) * Math.PI * 2;
+    blob.scale.set(r * (0.38 + (i % 2) * 0.1), r * 0.28, r * 0.36);
+    blob.position.set(Math.cos(a) * r * 0.28, r * 0.26, Math.sin(a) * r * 0.28);
     group.add(blob);
   }
   group.position.set(x, ground, z);
@@ -386,16 +414,16 @@ export function makeBush(x: number, z: number, r: number, ground: number, kit: F
 
 export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
   for (const tree of hole.trees) {
-    parent.add(makeVolumeTree(tree.x, tree.y, tree.r * 1.32, groundHeight(hole, tree.x, tree.y), kit));
-    if (fbm(tree.x, tree.y) > 0.36) {
-      const jx = tree.x + (fbm(tree.x + 2, tree.y) - 0.5) * 11;
-      const jz = tree.y + (fbm(tree.x, tree.y + 3) - 0.5) * 11;
+    parent.add(makeVolumeTree(tree.x, tree.y, tree.r * 1.28, groundHeight(hole, tree.x, tree.y), kit));
+    if (fbm(tree.x, tree.y) > 0.42) {
+      const jx = tree.x + (fbm(tree.x + 2, tree.y) - 0.5) * 14;
+      const jz = tree.y + (fbm(tree.x, tree.y + 3) - 0.5) * 14;
       if (lieAt(hole, { x: jx, y: jz }) !== "fairway" && lieAt(hole, { x: jx, y: jz }) !== "green") {
-        parent.add(makeVolumeTree(jx, jz, tree.r * 0.9, groundHeight(hole, jx, jz), kit, { compact: true }));
+        parent.add(makeVolumeTree(jx, jz, tree.r * 0.82, groundHeight(hole, jx, jz), kit, { compact: true }));
       }
     }
-    if (fbm(tree.x * 0.3, tree.y) > 0.48) {
-      parent.add(makeBush(tree.x + 3.2, tree.y - 2.4, 2.3, groundHeight(hole, tree.x + 3.2, tree.y - 2.4), kit));
+    if (fbm(tree.x * 0.3, tree.y) > 0.52) {
+      parent.add(makeBush(tree.x + 3.2, tree.y - 2.4, 2.1, groundHeight(hole, tree.x + 3.2, tree.y - 2.4), kit));
     }
   }
   addInstancedWoods(parent, kit, hole);
@@ -409,43 +437,45 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const b = hole.bounds;
   const pineTrunks: THREE.Matrix4[] = [];
   const oakTrunks: THREE.Matrix4[] = [];
-  const oakCards: THREE.Matrix4[] = [];
-  const pineCards: THREE.Matrix4[] = [];
+  const pineCanopy: THREE.Matrix4[] = [];
+  const oakCanopy: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
-  for (let i = 0; i < 320 && n < 200; i++) {
-    const cluster = Math.floor(i / 5);
+  for (let i = 0; i < 420 && n < 168; i++) {
+    const cluster = Math.floor(i / 4);
     const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
-    const rad = 58 + hashNoise(cluster, 2.2) * 118;
-    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 24;
-    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 24;
-    const x = cx + (hashNoise(i, 8) - 0.5) * 36;
-    const z = cz + (hashNoise(i, 9) - 0.5) * 32;
+    const rad = 64 + hashNoise(cluster, 2.2) * 132;
+    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 36;
+    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 36;
+    const x = cx + (hashNoise(i, 8) - 0.5) * 42;
+    const z = cz + (hashNoise(i, 9) - 0.5) * 38;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;
+    if (hashNoise(i, 1.4) < 0.18) continue;
     const ground = groundHeight(hole, x, z);
     const kind = treeKind(x + 1, z);
-    const r = 4.8 + hashNoise(i, 11) * 8.4;
-    const h = kind === "pine" ? 6 + r * 0.7 + hashNoise(i, 12) * 18 : 5 + r * 0.5 + hashNoise(i, 13) * 14;
+    const r = 4.2 + hashNoise(i, 11) * 7.2;
+    const h = kind === "pine" ? 5 + r * 0.55 + hashNoise(i, 12) * 16 : 4.2 + r * 0.42 + hashNoise(i, 13) * 12;
     dummy.position.set(x, ground + 0.04, z);
-    dummy.rotation.set(0, fbm(x, z) * 6, (hashNoise(i, 14) - 0.5) * 0.12);
-    dummy.scale.set(kind === "pine" ? 0.7 : 1.0, h * (kind === "pine" ? 0.62 : 0.5), kind === "pine" ? 0.7 : 1.0);
+    dummy.rotation.set(0, fbm(x, z) * 6, (hashNoise(i, 14) - 0.5) * 0.1);
+    dummy.scale.set(kind === "pine" ? 0.62 : 0.95, h * (kind === "pine" ? 0.68 : 0.54), kind === "pine" ? 0.62 : 0.95);
     dummy.updateMatrix();
     (kind === "pine" ? pineTrunks : oakTrunks).push(dummy.matrix.clone());
     for (let c = 0; c < MID_RANGE_CARDS_PER_TREE; c++) {
       const a = (c / MID_RANGE_CARDS_PER_TREE) * Math.PI * 2 + hashNoise(i + c, 3);
-      const lift = 0.32 + (c % 7) * 0.08 + hashNoise(c, 6) * 0.05;
-      dummy.position.set(x + Math.cos(a) * r * (0.18 + (c % 4) * 0.08), ground + h * lift, z + Math.sin(a) * r * (0.16 + (c % 3) * 0.07));
-      dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.35, a + hashNoise(c, 7), (hashNoise(c, 9) - 0.5) * 0.2);
-      dummy.scale.set(r * (0.7 + (c % 5) * 0.16), h * (0.22 + (c % 4) * 0.08), 1);
+      const lift = 0.38 + (c % 5) * 0.09 + hashNoise(c, 6) * 0.06;
+      const spread = r * (0.12 + (c % 4) * 0.07);
+      dummy.position.set(x + Math.cos(a) * spread, ground + h * lift, z + Math.sin(a) * spread * 0.9);
+      dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.5, a + hashNoise(c, 7), (hashNoise(c, 9) - 0.5) * 0.35);
+      dummy.scale.set(r * (0.28 + (c % 5) * 0.08), h * (0.1 + (c % 4) * 0.035), r * (0.24 + (c % 3) * 0.06));
       dummy.updateMatrix();
-      (kind === "pine" ? pineCards : oakCards).push(dummy.matrix.clone());
+      (kind === "pine" ? pineCanopy : oakCanopy).push(dummy.matrix.clone());
     }
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));
   parent.add(makeInstanced(kit.trunk, kit.bark, oakTrunks, false));
-  parent.add(makeInstanced(kit.card, kit.oakCard, oakCards, false));
-  parent.add(makeInstanced(kit.card, kit.pineCard, pineCards, false));
+  parent.add(makeInstanced(kit.midBlob, kit.oak, oakCanopy, false));
+  parent.add(makeInstanced(kit.midBlob, kit.pine, pineCanopy, false));
 }
 
 function makeInstanced(
@@ -464,6 +494,8 @@ function makeInstanced(
 }
 
 export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {
-  if (kind === "pine") return TRUNK_PARTS + PINE_CANOPY_LAYERS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
-  return TRUNK_PARTS + 3 + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
+  if (kind === "pine") {
+    return TRUNK_PARTS + PINE_CANOPY_LAYERS * PINE_CLUSTERS_PER_LAYER + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
+  }
+  return TRUNK_PARTS + OAK_BRANCHES + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
 }

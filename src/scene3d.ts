@@ -44,15 +44,15 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.18, 0.42, 0.74);
-    vec3 mid = vec3(0.4, 0.64, 0.86);
-    vec3 horizon = vec3(0.82, 0.78, 0.68);
-    vec3 ground = vec3(0.62, 0.68, 0.58);
-    vec3 col = mix(ground, horizon, smoothstep(-0.14, 0.06, h));
-    col = mix(col, mid, smoothstep(0.04, 0.32, h));
-    col = mix(col, zenith, smoothstep(0.22, 0.88, h));
-    float haze = pow(1.0 - clamp(h * 0.88 + 0.1, 0.0, 1.0), 1.45);
-    col = mix(col, vec3(0.74, 0.78, 0.7), haze * 0.48);
+    vec3 zenith = vec3(0.30, 0.48, 0.68);
+    vec3 mid = vec3(0.54, 0.64, 0.76);
+    vec3 horizon = vec3(0.76, 0.74, 0.66);
+    vec3 ground = vec3(0.70, 0.68, 0.56);
+    vec3 col = mix(ground, horizon, smoothstep(-0.10, 0.12, h));
+    col = mix(col, mid, smoothstep(0.06, 0.38, h));
+    col = mix(col, zenith, smoothstep(0.28, 0.92, h));
+    float haze = pow(1.0 - clamp(h * 0.82 + 0.14, 0.0, 1.0), 1.25);
+    col = mix(col, vec3(0.78, 0.76, 0.68), haze * 0.55);
     vec3 sunD = normalize(vec3(0.38, 0.66, 0.24));
     float glow = pow(max(dot(dir, sunD), 0.0), 6.5);
     float wash = pow(max(dot(dir, sunD), 0.0), 1.9);
@@ -117,29 +117,29 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x6e8caa, 1);
+    this.renderer.setClearColor(0x8a9288, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.02;
+    this.renderer.toneMappingExposure = 0.96;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xb4c2a8, 520, 3600);
+    this.scene.fog = new THREE.Fog(0xc4c2b4, 140, 2600);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc6d0c2, 0.74));
-    const hemi = new THREE.HemisphereLight(0xd4e4f0, 0x6e7c48, 1.28);
+    this.scene.add(new THREE.AmbientLight(0xc8c4b8, 0.78));
+    const hemi = new THREE.HemisphereLight(0xd8e0e8, 0x8a8468, 1.18);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xdce6e0, 0.72);
+    const fill = new THREE.DirectionalLight(0xd8dce0, 0.62);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xb8c87a, 0.38);
+    const bounce = new THREE.DirectionalLight(0xc4b890, 0.28);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xffefd0, 0.86);
+    this.sun = new THREE.DirectionalLight(0xfff0d8, 0.8);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -439,7 +439,7 @@ export class CourseScene {
       metalness: 0,
       envMapIntensity: 0.12,
     });
-    const lip = new THREE.MeshStandardMaterial({ color: 0x6a7c40, roughness: 0.96 });
+    const lip = new THREE.MeshStandardMaterial({ color: 0x7a7c50, roughness: 0.96 });
     const profile = [
       new THREE.Vector2(0, -0.34),
       new THREE.Vector2(0.22, -0.3),
@@ -505,10 +505,10 @@ export class CourseScene {
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
     const grass = new THREE.MeshStandardMaterial({
-      color: 0x8a9a6a,
+      color: 0xa8a478,
       roughness: 0.96,
-      emissive: new THREE.Color(0x3a4830),
-      emissiveIntensity: 0.06,
+      emissive: new THREE.Color(0x4a4830),
+      emissiveIntensity: 0.03,
     });
     const far = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600, 96, 96), grass);
     far.rotation.x = -Math.PI / 2;
