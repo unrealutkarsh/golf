@@ -11,7 +11,7 @@ export const VOLUME_TREE_PARTS = 12;
 export type TreeKind = "pine" | "oak";
 
 export function treeKind(x: number, z: number): TreeKind {
-  return fbm(x * 0.17, z * 0.17) > 0.34 ? "pine" : "oak";
+  return fbm(x * 0.17, z * 0.17) > 0.58 ? "pine" : "oak";
 }
 
 export interface FoliageKit {

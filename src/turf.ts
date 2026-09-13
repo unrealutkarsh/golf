@@ -42,7 +42,7 @@ export function napShade(band: TurfBand, x: number, z: number, napX: number, nap
   if (band === "green") {
     const stripe = 0.5 + 0.5 * Math.sin(across * 3.6);
     const fine = 0.5 + 0.5 * Math.sin(across * 17 + x * 0.4);
-    return 0.9 + stripe * 0.14 + fine * 0.05;
+    return 0.68 + stripe * 0.4 + fine * 0.08;
   }
   if (band === "collar") {
     const stripe = 0.5 + 0.5 * Math.sin(across * 2.4);
@@ -66,9 +66,9 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.2 + micro * 0.03 + n * 0.015) * nap,
-      (0.52 + micro * 0.02 + n * 0.03) * nap,
-      (0.3 + micro * 0.015) * nap,
+      (0.16 + micro * 0.04 + n * 0.02) * nap,
+      (0.5 + micro * 0.03 + n * 0.04) * nap,
+      (0.28 + micro * 0.02) * nap,
     ];
   }
   if (band === "collar") {

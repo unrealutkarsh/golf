@@ -27,6 +27,6 @@ describe("turf bands and nap", () => {
     const contrast = napContrast(hole, hole.green.cx, hole.green.cy);
     expect(contrast).toBeGreaterThan(0.04);
     expect(napShade("green", 0, 0, 1, 0)).not.toBe(napShade("green", 1.2, 0.1, 1, 0));
-    expect(napShade("green", 0, 0, 1, 0)).toBeGreaterThan(0.85);
+    expect(napShade("green", 0, 0, 1, 0)).toBeGreaterThan(0.65);
   });
 });
