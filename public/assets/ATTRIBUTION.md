@@ -16,7 +16,7 @@ None of these assets are from GS Pro, PGA Tour 2K, or other copyrighted golf tit
 
 ## Models
 
-- Tree meshes from **Kenney Nature Kit** — [kenney.nl](https://kenney.nl/assets/nature-kit), CC0
-- Address figure fallback is original. Optional Kenney Animated Characters 3 humanoid (CC0) is evaluated at runtime and only used if it loads cleanly.
+- Tree meshes from **Quaternius Ultimate Nature Pack** — [quaternius.com](https://quaternius.com/packs/ultimatenature.html) / [OpenGameArt](https://opengameart.org/content/low-poly-nature-pack-1), CC0
+- Address figure is an original posed figure (blocky humanoid packs clashed with the course).
 
 Poly Haven and ambientCG require no attribution; Kenney appreciates a credit.

@@ -448,7 +448,7 @@ export function buildAddressGolfer(): THREE.Group {
 
   const club = new THREE.Group();
   club.name = "club";
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.022, 0.86, 10), m.steel);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.86, 10), m.steel);
   shaft.name = "shaft";
   limbPlace(shaft, hands.x, hands.y + 0.08, hands.z - 0.02, headPt.x, headPt.y, headPt.z, 0.86);
   shaft.userData.restScaleY = shaft.scale.y;
@@ -457,13 +457,16 @@ export function buildAddressGolfer(): THREE.Group {
   const clubhead = new THREE.Group();
   clubhead.name = "clubhead";
   clubhead.position.set(headPt.x, headPt.y, headPt.z);
-  const putterHead = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.032, 0.05), m.putterFace);
+  const putterHead = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.034, 0.052), m.putterFace);
   putterHead.name = "putter-head";
-  const woodHead = new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 8), m.woodCrown);
+  putterHead.position.set(0, 0.012, -0.11);
+  const woodHead = new THREE.Mesh(new THREE.SphereGeometry(0.078, 12, 8), m.woodCrown);
   woodHead.name = "wood-head";
-  woodHead.scale.set(1.55, 0.58, 1.05);
+  woodHead.scale.set(1.6, 0.6, 1.08);
+  woodHead.position.set(0, 0.02, -0.13);
   woodHead.visible = false;
-  const ironHead = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.034, 0.028), m.steel);
+  const ironHead = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.036, 0.03), m.steel);
+  ironHead.position.set(0, 0.012, -0.09);
   ironHead.name = "iron-head";
   ironHead.visible = false;
   clubhead.add(putterHead, woodHead, ironHead);

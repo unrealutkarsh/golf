@@ -25,13 +25,14 @@ export const TEX = {
 export const HDRI = "assets/hdr/sky.hdr";
 
 export const TREE_GLBS = [
-  "assets/models/trees/tree_oak.glb",
-  "assets/models/trees/tree_oak_dark.glb",
-  "assets/models/trees/tree_detailed.glb",
-  "assets/models/trees/tree_detailed_dark.glb",
-  "assets/models/trees/tree_pineDefaultA.glb",
-  "assets/models/trees/tree_pineTallA.glb",
-  "assets/models/trees/tree_pineRoundA.glb",
+  "assets/models/trees/q_CommonTree_1.glb",
+  "assets/models/trees/q_CommonTree_2.glb",
+  "assets/models/trees/q_CommonTree_3.glb",
+  "assets/models/trees/q_CommonTree_5.glb",
+  "assets/models/trees/q_BirchTree_1.glb",
+  "assets/models/trees/q_PineTree_1.glb",
+  "assets/models/trees/q_PineTree_2.glb",
+  "assets/models/trees/q_PineTree_3.glb",
 ] as const;
 
 export const TREE_ASSET_COUNT = TREE_GLBS.length;
@@ -102,8 +103,9 @@ export async function loadArtKit(renderer: THREE.WebGLRenderer, lite: boolean): 
         mesh.receiveShadow = true;
         const mat = mesh.material as THREE.MeshStandardMaterial;
         if (mat && mat.isMeshStandardMaterial) {
-          mat.envMapIntensity = 0.55;
-          mat.roughness = 0.72;
+          mat.envMapIntensity = 0.48;
+          mat.roughness = 0.74;
+          mat.metalness = 0;
         }
       });
       trees.push(root);

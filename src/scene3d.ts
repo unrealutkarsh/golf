@@ -116,6 +116,7 @@ export class CourseScene {
   private fringeMat: THREE.MeshStandardMaterial;
   private greenBlades: THREE.InstancedMesh | null = null;
   private fringeBlades: THREE.InstancedMesh | null = null;
+  private pendingArtRebuild = false;
   private waterTime = { value: 0 };
   private ribbon: THREE.Mesh;
   private ribbonGeo: THREE.BufferGeometry;
@@ -336,7 +337,7 @@ export class CourseScene {
         this.sky.visible = false;
         this.scene.fog = new THREE.Fog(0x8eb6d4, 2400, 6400);
       }
-      this.builtHole = -1;
+      this.pendingArtRebuild = true;
     } catch (err) {
       console.warn("[ptg] art kit skip", err);
     }
@@ -385,6 +386,11 @@ export class CourseScene {
   sync(session: GameSession, dt: number): void {
     this.time += dt;
     const hole = session.hole();
+    const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
+    if (this.pendingArtRebuild && !flying) {
+      this.pendingArtRebuild = false;
+      this.builtHole = -1;
+    }
     if (this.builtHole !== session.holeIndex) this.rebuildHole(hole, session.holeIndex);
 
     const putting = isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);

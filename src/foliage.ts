@@ -90,8 +90,8 @@ export function bindFoliageArt(kit: FoliageKit, art: ArtKit): void {
 
 function pickTemplate(kit: FoliageKit, kind: TreeKind, x: number, z: number): THREE.Group | null {
   if (!kit.trees.length) return null;
-  const pines = kit.trees.filter((_, i) => i >= 4);
-  const oaks = kit.trees.filter((_, i) => i < 4);
+  const pines = kit.trees.filter((_, i) => i >= 5);
+  const oaks = kit.trees.filter((_, i) => i < 5);
   const pool = kind === "pine" ? (pines.length ? pines : kit.trees) : oaks.length ? oaks : kit.trees;
   return pool[Math.floor(hashNoise(x, z) * pool.length) % pool.length];
 }
@@ -137,7 +137,7 @@ export function makeVolumeTree(
     trunk.castShadow = true;
     group.add(trunk);
   }
-  if (!compact) addLeafSpray(group, kit, r, kind === "pine" ? 12 : 16);
+  if (!src && !compact) addLeafSpray(group, kit, r, kind === "pine" ? 12 : 16);
   const pad = new THREE.Mesh(kit.card, kit.contact);
   pad.rotation.x = -Math.PI / 2;
   pad.position.y = 0.02;
