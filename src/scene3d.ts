@@ -142,12 +142,12 @@ export class CourseScene {
     this.scene.add(this.holeGroup);
     this.scene.add(makeSky());
 
-    const hemi = new THREE.HemisphereLight(0xd4e6f4, 0x5d6a40, 0.72);
+    const hemi = new THREE.HemisphereLight(0xc5d8e8, 0x4a5534, 0.48);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xb9cfe2, 0.55);
+    const fill = new THREE.DirectionalLight(0xa8c0d4, 0.38);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    this.sun = new THREE.DirectionalLight(0xfff0cc, 2.35);
+    this.sun = new THREE.DirectionalLight(0xffe8b8, 2.8);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0008;
@@ -634,10 +634,12 @@ export class CourseScene {
     this.grassAt = { ...focus };
     if (this.blades) this.scene.remove(this.blades);
     const focusLie = lieAt(hole, focus);
-    const close = view === "putt" || view === "player";
-    const budget = close ? grassBudget(focusLie, BLADE_COUNT) : Math.floor(BLADE_COUNT * 0.18);
+    const budget = view === "putt" ? Math.floor(grassBudget(focusLie, BLADE_COUNT) * 0.35) : 0;
     if (budget <= 40 || focusLie === "green") {
-      this.blades = null;
+      if (this.blades) {
+        this.scene.remove(this.blades);
+        this.blades = null;
+      }
       return;
     }
     const mesh = new THREE.InstancedMesh(this.bladeGeo, this.bladeMat, budget);
@@ -706,18 +708,18 @@ export class CourseScene {
       const back = fromAngle(heading + Math.PI, 18);
       const curve = session.ball.curve || session.shape * 24;
       const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 5);
-      desired.set(ball.x + back.x + side.x, 7.2 + Math.min(6, session.ball.z * 0.16), ball.y + back.y + side.y);
-      const ahead = 22 + session.ball.z * 0.4;
-      const lx = landing ? ball.x * 0.35 + landing.pos.x * 0.65 : ball.x + Math.cos(heading) * ahead;
-      const lz = landing ? ball.y * 0.35 + landing.pos.y * 0.65 : ball.y + Math.sin(heading) * ahead;
-      look.set(lx, 1.4 + session.ball.z * 0.18, lz);
-      fov = 48;
+      desired.set(ball.x + back.x + side.x, 6.4 + Math.min(4.2, session.ball.z * 0.12), ball.y + back.y + side.y);
+      const ahead = 28;
+      const lx = landing ? ball.x * 0.28 + landing.pos.x * 0.72 : ball.x + Math.cos(heading) * ahead;
+      const lz = landing ? ball.y * 0.28 + landing.pos.y * 0.72 : ball.y + Math.sin(heading) * ahead;
+      look.set(lx, 0.9 + session.ball.z * 0.1, lz);
+      fov = 46;
     } else {
-      const lookDist = 48;
-      const back = fromAngle(aim + Math.PI, 13.5);
-      desired.set(ball.x + back.x, 5.6, ball.y + back.y);
-      look.set(ball.x + Math.cos(aim) * lookDist, 1.15, ball.y + Math.sin(aim) * lookDist);
-      fov = 50;
+      const lookDist = 28;
+      const back = fromAngle(aim + Math.PI, 12);
+      desired.set(ball.x + back.x, 6.8, ball.y + back.y);
+      look.set(ball.x + Math.cos(aim) * lookDist, 0.35, ball.y + Math.sin(aim) * lookDist);
+      fov = 46;
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.22 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));
@@ -847,27 +849,27 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
       let b = 0.26;
       let rk = 0.92;
       if (lie === "green") {
-        const nap = 0.94 + stripe * 0.08;
-        r = 0.12 * nap;
-        g = (0.42 + n * 0.04) * nap;
-        b = 0.28 * nap;
-        rk = 0.38;
+        const nap = 0.9 + stripe * 0.14;
+        r = 0.1 * nap;
+        g = (0.4 + n * 0.03) * nap;
+        b = 0.3 * nap;
+        rk = 0.72;
       } else if (lie === "fairway") {
-        const sheen = 0.92 + stripe * 0.06 + n * 0.06;
-        r = 0.28 * sheen;
-        g = 0.5 * sheen;
-        b = 0.16 * sheen;
-        rk = 0.68;
+        const sheen = 0.84 + stripe * 0.2 + n * 0.08;
+        r = 0.3 * sheen;
+        g = 0.52 * sheen;
+        b = 0.14 * sheen;
+        rk = 0.78;
       } else if (lie === "tee") {
-        r = 0.24 + n * 0.03;
-        g = 0.46 + n * 0.03;
-        b = 0.18;
-        rk = 0.58;
+        r = 0.22 + n * 0.03;
+        g = 0.44 + n * 0.03;
+        b = 0.16;
+        rk = 0.7;
       } else if (lie === "rough") {
-        r = 0.2 + n * 0.07;
-        g = 0.3 + n * 0.05;
-        b = 0.1 + n * 0.02;
-        rk = 0.94;
+        r = 0.16 + n * 0.06;
+        g = 0.24 + n * 0.04;
+        b = 0.08 + n * 0.02;
+        rk = 0.96;
       } else if (lie === "bunker") {
         r = 0.8 + n * 0.08;
         g = 0.68 + n * 0.05;
@@ -911,7 +913,7 @@ function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th: number
 
 function makeTree(x: number, z: number, r: number, ground: number): THREE.Group {
   const group = new THREE.Group();
-  const pine = fbm(x * 0.17, z * 0.17) > 0.38;
+  const pine = fbm(x * 0.17, z * 0.17) > 0.18;
   const bark = new THREE.MeshStandardMaterial({ color: pine ? 0x3d3126 : 0x5a4332, roughness: 0.94 });
   const h = pine ? 10.5 + (r - 7) * 0.7 : 8.2 + (r - 7) * 0.45;
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(pine ? 0.16 : 0.22, pine ? 0.34 : 0.4, h * (pine ? 0.7 : 0.52), 8), bark);
@@ -923,7 +925,7 @@ function makeTree(x: number, z: number, r: number, ground: number): THREE.Group 
     for (let i = 0; i < 7; i++) {
       const t = i / 6;
       const mat = new THREE.MeshStandardMaterial({ color: greens[i % greens.length], roughness: 0.78 });
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * (0.95 - t * 0.55), h * 0.26, 9), mat);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * (0.72 - t * 0.42), h * 0.28, 9), mat);
       cone.position.set((fbm(x + i, z) - 0.5) * 0.45, h * (0.34 + t * 0.12), (fbm(z + i, x) - 0.5) * 0.4);
       cone.rotation.z = (fbm(x, i) - 0.5) * 0.12;
       cone.castShadow = true;

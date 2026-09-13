@@ -15,8 +15,8 @@ import type { Ball, Club, Hole, Lie, Wind } from "./types";
 export const CUP_RADIUS = 0.5;
 export const GIMME_RADIUS = 0.36;
 export const STOP_SPEED = 0.5;
-export const CAPTURE_SPEED = 8.4;
-export const LIP_SPEED = 9.2;
+export const CAPTURE_SPEED = 10.2;
+export const LIP_SPEED = 11;
 export const MAX_HOLE_STROKES = 10;
 export const GRAVITY = 28;
 
