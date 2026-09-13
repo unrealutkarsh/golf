@@ -102,7 +102,7 @@ function leafMat(map: THREE.DataTexture): THREE.MeshStandardMaterial {
     map,
     color: 0x4a6e38,
     transparent: true,
-    alphaTest: 0.28,
+    alphaTest: 0.16,
     side: THREE.DoubleSide,
     roughness: 0.88,
     metalness: 0,

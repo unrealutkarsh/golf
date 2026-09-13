@@ -124,22 +124,22 @@ export class CourseScene {
     this.renderer.toneMappingExposure = 0.98;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8aa8bc, 240, 3600);
+    this.scene.fog = new THREE.Fog(0x94aebc, 640, 3800);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc4d2de, 0.78));
-    const hemi = new THREE.HemisphereLight(0xd4e0ea, 0x6a7848, 1.18);
+    this.scene.add(new THREE.AmbientLight(0xc8d4c4, 0.82));
+    const hemi = new THREE.HemisphereLight(0xd6e2ea, 0x748454, 1.22);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xd0dce8, 0.86);
+    const fill = new THREE.DirectionalLight(0xd8e2dc, 0.88);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xa8b870, 0.36);
+    const bounce = new THREE.DirectionalLight(0xb4c478, 0.4);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff1d8, 0.74);
+    this.sun = new THREE.DirectionalLight(0xfff2d6, 0.8);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;

@@ -512,24 +512,27 @@ td.empty {
 .tip,
 .toast {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(8, 16, 12, 0.86);
-  border: 1px solid var(--gold);
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 14px;
-  max-width: min(560px, 92vw);
-  text-align: center;
+  left: 12px;
+  background: rgba(16, 28, 22, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  max-width: min(360px, 46vw);
+  text-align: left;
+  color: var(--ink);
+  pointer-events: none;
 }
 
 .tip {
-  top: 62px;
+  top: 52px;
 }
 
 .toast {
-  top: 150px;
-  border-color: var(--line);
+  top: 52px;
+  left: auto;
+  right: 12px;
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
 @media (max-width: 800px) {

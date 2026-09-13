@@ -35,9 +35,9 @@ function makeBladeCard(): THREE.DataTexture {
       const vein = 1 - Math.min(1, Math.abs(u) * 3.2);
       const n = hashNoise(x * 0.7, y * 0.55);
       const a = edge > 0.08 ? Math.min(1, edge * 1.15) * (0.78 + n * 0.22) : 0;
-      const g = 58 + vein * 36 + n * 22;
-      const r = 32 + n * 16;
-      const b = 20 + n * 8;
+      const g = 88 + vein * 40 + n * 24;
+      const r = 48 + n * 18;
+      const b = 24 + n * 10;
       const i = (y * w + x) * 4;
       data[i] = r;
       data[i + 1] = g;
@@ -55,7 +55,7 @@ export function createBladeMaterial(): THREE.MeshStandardMaterial {
   const map = makeBladeCard();
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x5a7844,
+    color: 0x6e8c50,
     transparent: true,
     alphaTest: 0.28,
     side: THREE.DoubleSide,
@@ -84,8 +84,8 @@ export function buildGreenBladeField(hole: Hole, mat: THREE.MeshStandardMaterial
     const band = turfBand(hole, x, z);
     if (band !== "green" && band !== "collar") continue;
     const y = groundHeight(hole, x, z) + 0.01;
-    const hgt = 0.07 + hashNoise(i, 7) * 0.07;
-    const w = 0.014 + hashNoise(i, 9) * 0.012;
+    const hgt = 0.05 + hashNoise(i, 7) * 0.045;
+    const w = 0.028 + hashNoise(i, 9) * 0.02;
     const yaw = hashNoise(i, 3) * Math.PI * 2;
     const lean = (hashNoise(i, 5) - 0.5) * 0.22;
     dummy.position.set(x, y + hgt * 0.5, z);
