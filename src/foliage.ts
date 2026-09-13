@@ -14,10 +14,13 @@ export const MID_RANGE_CARDS_PER_TREE = 8;
 export const TRUNK_PARTS = 2;
 export const VOLUME_TREE_PARTS = 28;
 
-export type TreeKind = "pine" | "oak";
+export type TreeKind = "pine" | "oak" | "maple";
 
 export function treeKind(x: number, z: number): TreeKind {
-  return fbm(x * 0.17, z * 0.17) > 0.62 ? "pine" : "oak";
+  const n = fbm(x * 0.17, z * 0.17);
+  if (n > 0.68) return "pine";
+  if (n < 0.28) return "maple";
+  return "oak";
 }
 
 export interface FoliageKit {
@@ -25,11 +28,16 @@ export interface FoliageKit {
   pineLit: THREE.MeshStandardMaterial;
   oak: THREE.MeshStandardMaterial;
   oakLit: THREE.MeshStandardMaterial;
+  maple: THREE.MeshStandardMaterial;
+  mapleLit: THREE.MeshStandardMaterial;
   pineCard: THREE.MeshStandardMaterial;
   pineCardB: THREE.MeshStandardMaterial;
   oakCard: THREE.MeshStandardMaterial;
   oakCardB: THREE.MeshStandardMaterial;
+  mapleCard: THREE.MeshStandardMaterial;
   bush: THREE.MeshStandardMaterial;
+  fern: THREE.MeshStandardMaterial;
+  contact: THREE.MeshBasicMaterial;
   bark: THREE.MeshStandardMaterial;
   impostor: THREE.MeshStandardMaterial;
   pineBlob: THREE.BufferGeometry;
@@ -215,12 +223,26 @@ export function createFoliageKit(): FoliageKit {
   const pineLit = solidFoliage(0x5a6840);
   const oak = solidFoliage(0x556238);
   const oakLit = solidFoliage(0x667446);
+  const maple = solidFoliage(0x6a6438);
+  const mapleLit = solidFoliage(0x7a7444);
   const bush = solidFoliage(0x4a542e);
+  const fern = solidFoliage(0x3e4a28);
   const pineCard = leafMat(makeLeafCardTex(true, 11));
   const pineCardB = leafMat(makeLeafCardTex(true, 41));
   const oakCard = leafMat(makeLeafCardTex(false, 27));
   const oakCardB = leafMat(makeLeafCardTex(false, 63));
+  const mapleCard = leafMat(makeLeafCardTex(false, 81));
+  mapleCard.color.set(0x7a7048);
   const impostor = leafMat(makeLeafCardTex(false, 9));
+  const contactMap = makeContactShadow();
+  const contact = new THREE.MeshBasicMaterial({
+    map: contactMap,
+    color: 0x1a2014,
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+    toneMapped: false,
+  });
   const barkMaps = makeBarkMaps();
   const bark = new THREE.MeshStandardMaterial({
     map: barkMaps.color,
@@ -235,11 +257,16 @@ export function createFoliageKit(): FoliageKit {
     pineLit,
     oak,
     oakLit,
+    maple,
+    mapleLit,
     pineCard,
     pineCardB,
     oakCard,
     oakCardB,
+    mapleCard,
     bush,
+    fern,
+    contact,
     bark,
     impostor,
     pineBlob: displaceBlob(2, 2.2, 0.48),
@@ -252,9 +279,30 @@ export function createFoliageKit(): FoliageKit {
   };
 }
 
+function makeContactShadow(): THREE.DataTexture {
+  const w = 64;
+  const h = 64;
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const u = (x + 0.5) / w - 0.5;
+      const v = (y + 0.5) / h - 0.5;
+      const r = Math.hypot(u, v);
+      const a = Math.max(0, 1 - r * 2.05);
+      const i = (y * w + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = 20;
+      data[i + 3] = Math.round(a * a * 255);
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, h);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function canopyMat(kind: TreeKind, x: number, z: number, kit: FoliageKit): THREE.MeshStandardMaterial {
   const lit = hashNoise(x, z) > 0.45;
   if (kind === "pine") return lit ? kit.pineLit : kit.pine;
+  if (kind === "maple") return lit ? kit.mapleLit : kit.maple;
   return lit ? kit.oakLit : kit.oak;
 }
 
@@ -272,7 +320,13 @@ export function makeVolumeTree(
   const compact = opts?.compact ?? false;
   const mat = canopyMat(kind, x, z, kit);
   if (kind === "pine") addPine(group, r, kit, mat, shadow, compact);
+  else if (kind === "maple") addMaple(group, r, kit, mat, shadow, compact);
   else addOak(group, r, kit, mat, shadow, compact);
+  const pad = new THREE.Mesh(kit.card, kit.contact);
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.y = 0.02;
+  pad.scale.set(r * 0.55, r * 0.42, 1);
+  group.add(pad);
   group.position.set(x, ground, z);
   group.rotation.y = fbm(x, z) * Math.PI * 2;
   group.scale.y = 0.78 + fbm(z, x) * 0.85;
@@ -399,6 +453,52 @@ function addOak(
   if (!compact) addEdgeCards(group, kit, kit.oakCardB, kit.oakCard, w * 0.92, h * 0.8, SPRAY_CARDS_PER_TREE);
 }
 
+function addMaple(
+  group: THREE.Group,
+  r: number,
+  kit: FoliageKit,
+  mat: THREE.MeshStandardMaterial,
+  shadow: boolean,
+  compact: boolean,
+): void {
+  const h = 8.2 + (r - 7) * 0.48;
+  const w = r * 1.72;
+  const trunk = new THREE.Mesh(kit.trunk, kit.bark);
+  trunk.scale.set(1.05 + hashNoise(r, 8) * 0.28, h * 0.52, 1.0 + hashNoise(r, 9) * 0.22);
+  trunk.position.y = h * 0.02;
+  trunk.rotation.z = (hashNoise(r, 4) - 0.5) * 0.14;
+  trunk.castShadow = shadow;
+  const flare = new THREE.Mesh(kit.flare, kit.bark);
+  flare.position.y = 0.08;
+  flare.scale.set(1.05, 1, 1.0);
+  flare.castShadow = shadow;
+  group.add(trunk, flare);
+  const branches = compact ? 3 : 4;
+  for (let i = 0; i < branches; i++) {
+    const br = new THREE.Mesh(kit.branch, kit.bark);
+    const a = (i / branches) * Math.PI * 2 + 0.2;
+    br.scale.set(0.9, h * 0.26, 0.9);
+    br.position.set(Math.cos(a) * 0.38, h * 0.36, Math.sin(a) * 0.36);
+    br.rotation.z = Math.cos(a) * 0.95;
+    br.rotation.x = -Math.sin(a) * 0.9;
+    group.add(br);
+  }
+  const blobs = compact ? 7 : 16;
+  for (let i = 0; i < blobs; i++) {
+    const blob = new THREE.Mesh(kit.oakBlob, mat);
+    const a = i * 2.2 + hashNoise(i, r);
+    const lift = 0.36 + (i % 5) * 0.07;
+    const rad = w * (0.09 + hashNoise(i, 3) * 0.1);
+    blob.scale.set(rad * 0.4, rad * 0.18, rad * 0.36);
+    blob.position.set(Math.cos(a) * w * 0.2, h * lift, Math.sin(a) * w * 0.18);
+    blob.rotation.set(0.2, a, hashNoise(i, 4) * 0.5);
+    blob.castShadow = shadow && i < 4;
+    group.add(blob);
+  }
+  addEdgeCards(group, kit, kit.mapleCard, kit.oakCardB, w * 1.1, h * 0.78, compact ? 4 : LEAF_CARDS_PER_TREE);
+  if (!compact) addEdgeCards(group, kit, kit.mapleCard, kit.oakCard, w * 0.95, h * 0.72, SPRAY_CARDS_PER_TREE);
+}
+
 export function makeBush(x: number, z: number, r: number, ground: number, kit: FoliageKit): THREE.Group {
   const group = new THREE.Group();
   for (let i = 0; i < 5; i++) {
@@ -422,8 +522,11 @@ export function addCourseFoliage(parent: THREE.Group, kit: FoliageKit, hole: Hol
         parent.add(makeVolumeTree(jx, jz, tree.r * 0.82, groundHeight(hole, jx, jz), kit, { compact: true }));
       }
     }
-    if (fbm(tree.x * 0.3, tree.y) > 0.52) {
+    if (fbm(tree.x * 0.3, tree.y) > 0.4) {
       parent.add(makeBush(tree.x + 3.2, tree.y - 2.4, 2.1, groundHeight(hole, tree.x + 3.2, tree.y - 2.4), kit));
+    }
+    if (fbm(tree.x, tree.y * 0.4) > 0.55) {
+      parent.add(makeBush(tree.x - 2.6, tree.y + 3.4, 1.4, groundHeight(hole, tree.x - 2.6, tree.y + 3.4), kit));
     }
   }
   addInstancedWoods(parent, kit, hole);
@@ -437,45 +540,70 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
   const b = hole.bounds;
   const pineTrunks: THREE.Matrix4[] = [];
   const oakTrunks: THREE.Matrix4[] = [];
+  const mapleTrunks: THREE.Matrix4[] = [];
   const pineCanopy: THREE.Matrix4[] = [];
   const oakCanopy: THREE.Matrix4[] = [];
+  const mapleCanopy: THREE.Matrix4[] = [];
+  const shadows: THREE.Matrix4[] = [];
+  const under: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
-  for (let i = 0; i < 360 && n < 140; i++) {
+  for (let i = 0; i < 380 && n < 148; i++) {
     const cluster = Math.floor(i / 4);
     const ang = hashNoise(cluster, 0.7) * Math.PI * 2;
     const rad = 64 + hashNoise(cluster, 2.2) * 132;
-    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 36;
-    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 36;
-    const x = cx + (hashNoise(i, 8) - 0.5) * 42;
-    const z = cz + (hashNoise(i, 9) - 0.5) * 38;
+    const cx = b.x + b.w * 0.5 + Math.cos(ang) * rad + (hashNoise(cluster, 3) - 0.5) * 42;
+    const cz = b.y + b.h * 0.5 + Math.sin(ang) * rad + (hashNoise(cluster, 4) - 0.5) * 42;
+    const x = cx + (hashNoise(i, 8) - 0.5) * 48;
+    const z = cz + (hashNoise(i, 9) - 0.5) * 44;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;
-    if (hashNoise(i, 1.4) < 0.18) continue;
+    if (hashNoise(i, 1.4) < 0.26) continue;
     const ground = groundHeight(hole, x, z);
     const kind = treeKind(x + 1, z);
-    const r = 4.2 + hashNoise(i, 11) * 7.2;
-    const h = kind === "pine" ? 5 + r * 0.55 + hashNoise(i, 12) * 16 : 4.2 + r * 0.42 + hashNoise(i, 13) * 12;
+    const r = 3.6 + hashNoise(i, 11) * 8.4;
+    const h =
+      kind === "pine"
+        ? 4.2 + r * 0.5 + hashNoise(i, 12) * 18
+        : kind === "maple"
+          ? 3.8 + r * 0.38 + hashNoise(i, 13) * 10
+          : 4.2 + r * 0.42 + hashNoise(i, 13) * 13;
     dummy.position.set(x, ground + 0.04, z);
     dummy.rotation.set(0, fbm(x, z) * 6, (hashNoise(i, 14) - 0.5) * 0.1);
-    dummy.scale.set(kind === "pine" ? 0.62 : 0.95, h * (kind === "pine" ? 0.68 : 0.54), kind === "pine" ? 0.62 : 0.95);
+    dummy.scale.set(kind === "pine" ? 0.58 : 0.92, h * (kind === "pine" ? 0.7 : 0.52), kind === "pine" ? 0.58 : 0.92);
     dummy.updateMatrix();
-    (kind === "pine" ? pineTrunks : oakTrunks).push(dummy.matrix.clone());
+    (kind === "pine" ? pineTrunks : kind === "maple" ? mapleTrunks : oakTrunks).push(dummy.matrix.clone());
+    dummy.position.set(x, ground + 0.03, z);
+    dummy.rotation.set(-Math.PI / 2, 0, 0);
+    dummy.scale.set(r * 0.7, r * 0.5, 1);
+    dummy.updateMatrix();
+    shadows.push(dummy.matrix.clone());
+    if (hashNoise(i, 2.2) > 0.55) {
+      dummy.position.set(x + (hashNoise(i, 3) - 0.5) * 3.2, ground + 0.35, z + (hashNoise(i, 4) - 0.5) * 3.2);
+      dummy.rotation.set(0, hashNoise(i, 5) * 6, 0);
+      dummy.scale.set(1.4 + hashNoise(i, 6), 0.7, 1.3);
+      dummy.updateMatrix();
+      under.push(dummy.matrix.clone());
+    }
     for (let c = 0; c < MID_RANGE_CARDS_PER_TREE; c++) {
       const a = (c / MID_RANGE_CARDS_PER_TREE) * Math.PI * 2 + hashNoise(i + c, 3);
-      const lift = 0.38 + (c % 5) * 0.09 + hashNoise(c, 6) * 0.06;
-      const spread = r * (0.12 + (c % 4) * 0.07);
+      const lift = 0.36 + (c % 5) * 0.1 + hashNoise(c, 6) * 0.06;
+      const spread = r * (0.12 + (c % 4) * 0.08);
       dummy.position.set(x + Math.cos(a) * spread, ground + h * lift, z + Math.sin(a) * spread * 0.9);
       dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.5, a + hashNoise(c, 7), (hashNoise(c, 9) - 0.5) * 0.35);
-      dummy.scale.set(r * (0.28 + (c % 5) * 0.08), h * (0.1 + (c % 4) * 0.035), r * (0.24 + (c % 3) * 0.06));
+      dummy.scale.set(r * (0.26 + (c % 5) * 0.08), h * (0.09 + (c % 4) * 0.03), r * (0.22 + (c % 3) * 0.06));
       dummy.updateMatrix();
-      (kind === "pine" ? pineCanopy : oakCanopy).push(dummy.matrix.clone());
+      (kind === "pine" ? pineCanopy : kind === "maple" ? mapleCanopy : oakCanopy).push(dummy.matrix.clone());
     }
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));
   parent.add(makeInstanced(kit.trunk, kit.bark, oakTrunks, false));
+  parent.add(makeInstanced(kit.trunk, kit.bark, mapleTrunks, false));
   parent.add(makeInstanced(kit.midBlob, kit.oak, oakCanopy, false));
   parent.add(makeInstanced(kit.midBlob, kit.pine, pineCanopy, false));
+  parent.add(makeInstanced(kit.midBlob, kit.maple, mapleCanopy, false));
+  parent.add(makeInstanced(kit.card, kit.contact, shadows, false));
+  parent.add(makeInstanced(kit.oakBlob, kit.fern, under, false));
 }
 
 function makeInstanced(
@@ -494,8 +622,12 @@ function makeInstanced(
 }
 
 export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {
+  const pad = 1;
   if (kind === "pine") {
-    return TRUNK_PARTS + PINE_CANOPY_LAYERS * PINE_CLUSTERS_PER_LAYER + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
+    return TRUNK_PARTS + PINE_CANOPY_LAYERS * PINE_CLUSTERS_PER_LAYER + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
   }
-  return TRUNK_PARTS + OAK_BRANCHES + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE;
+  if (kind === "maple") {
+    return TRUNK_PARTS + 4 + 16 + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
+  }
+  return TRUNK_PARTS + OAK_BRANCHES + OAK_CANOPY_BLOBS + LEAF_CARDS_PER_TREE + SPRAY_CARDS_PER_TREE + pad;
 }

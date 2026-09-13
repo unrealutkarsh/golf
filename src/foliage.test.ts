@@ -25,5 +25,6 @@ describe("volume foliage", () => {
     for (let i = 0; i < 40; i++) kinds.add(treeKind(i * 7.3, i * 4.1));
     expect(kinds.has("pine")).toBe(true);
     expect(kinds.has("oak")).toBe(true);
+    expect(kinds.has("maple")).toBe(true);
   });
 });

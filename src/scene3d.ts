@@ -7,7 +7,11 @@ import { buildAddressGolfer, golferMeshCount as countGolferMeshes, poseGolferClu
 import { hashNoise } from "./look";
 import { dist, fromAngle, type Vec2 } from "./math";
 import type { FlightSample } from "./physics";
-import { applyNapUniforms, bakeTurfMaps, buildGreenOverlay, createGreenMaterial, createTurfMaterial, makeGrassDetailTex } from "./turf";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { applyNapUniforms, bakeTurfMaps, buildGreenOverlay, createGreenMaterial, createTurfMaterial, makeGrassDetailNormal, makeGrassDetailTex } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
@@ -44,26 +48,27 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.30, 0.48, 0.68);
-    vec3 mid = vec3(0.54, 0.64, 0.76);
-    vec3 horizon = vec3(0.76, 0.74, 0.66);
-    vec3 ground = vec3(0.70, 0.68, 0.56);
-    vec3 col = mix(ground, horizon, smoothstep(-0.10, 0.12, h));
-    col = mix(col, mid, smoothstep(0.06, 0.38, h));
-    col = mix(col, zenith, smoothstep(0.28, 0.92, h));
-    float haze = pow(1.0 - clamp(h * 0.82 + 0.14, 0.0, 1.0), 1.25);
-    col = mix(col, vec3(0.78, 0.76, 0.68), haze * 0.55);
-    vec3 sunD = normalize(vec3(0.38, 0.66, 0.24));
-    float glow = pow(max(dot(dir, sunD), 0.0), 6.5);
-    float wash = pow(max(dot(dir, sunD), 0.0), 1.9);
-    col += vec3(1.0, 0.9, 0.72) * glow * 0.2;
-    col += vec3(0.96, 0.88, 0.7) * wash * 0.08;
-    vec2 cuv = dir.xz / max(abs(h) + 0.3, 0.18);
-    float cloud = fbm(cuv * 0.72 + vec2(0.35, 0.08));
-    float wisps = fbm(cuv * 1.9 + 5.4);
-    float mask = smoothstep(0.1, 0.34, h) * smoothstep(0.8, 0.24, h);
-    float banks = smoothstep(0.5, 0.76, cloud + wisps * 0.18) * mask;
-    col = mix(col, vec3(0.93, 0.92, 0.88), banks * 0.38);
+    vec3 zenith = vec3(0.14, 0.36, 0.72);
+    vec3 mid = vec3(0.38, 0.60, 0.88);
+    vec3 horizon = vec3(0.70, 0.78, 0.86);
+    vec3 ground = vec3(0.52, 0.58, 0.54);
+    vec3 col = mix(ground, horizon, smoothstep(-0.12, 0.08, h));
+    col = mix(col, mid, smoothstep(0.05, 0.36, h));
+    col = mix(col, zenith, smoothstep(0.26, 0.94, h));
+    float haze = pow(1.0 - clamp(h * 0.9 + 0.08, 0.0, 1.0), 1.35);
+    col = mix(col, vec3(0.72, 0.78, 0.84), haze * 0.42);
+    vec3 sunD = normalize(vec3(0.42, 0.62, 0.22));
+    float glow = pow(max(dot(dir, sunD), 0.0), 8.0);
+    float wash = pow(max(dot(dir, sunD), 0.0), 2.2);
+    col += vec3(1.0, 0.92, 0.74) * glow * 0.28;
+    col += vec3(0.96, 0.9, 0.76) * wash * 0.1;
+    vec2 cuv = dir.xz / max(abs(h) + 0.28, 0.16);
+    float cloud = fbm(cuv * 0.62 + vec2(0.28, 0.1));
+    float wisps = fbm(cuv * 1.7 + 4.8);
+    float mask = smoothstep(0.08, 0.32, h) * smoothstep(0.84, 0.22, h);
+    float banks = smoothstep(0.48, 0.78, cloud + wisps * 0.22) * mask;
+    float lit = 0.78 + 0.22 * max(dot(dir, sunD), 0.0);
+    col = mix(col, vec3(0.94, 0.95, 0.96) * lit, banks * 0.52);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -113,33 +118,35 @@ export class CourseScene {
   private time = 0;
   private w = 1;
   private h = 1;
+  private composer: EffectComposer | null = null;
+  private bloom: UnrealBloomPass | null = null;
 
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x8a9288, 1);
+    this.renderer.setClearColor(0x6a88b0, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 0.96;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xc4c2b4, 140, 2600);
+    this.scene.fog = new THREE.Fog(0xb4c2cc, 220, 3200);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(0xc8c4b8, 0.78));
-    const hemi = new THREE.HemisphereLight(0xd8e0e8, 0x8a8468, 1.18);
+    this.scene.add(new THREE.AmbientLight(0xc4c8d0, 0.7));
+    const hemi = new THREE.HemisphereLight(0xd4e4f4, 0x7a7458, 1.22);
     this.scene.add(hemi);
-    const fill = new THREE.DirectionalLight(0xd8dce0, 0.62);
+    const fill = new THREE.DirectionalLight(0xd0d8e4, 0.58);
     fill.position.set(-90, 48, 70);
     this.scene.add(fill);
-    const bounce = new THREE.DirectionalLight(0xc4b890, 0.28);
+    const bounce = new THREE.DirectionalLight(0xc0b488, 0.24);
     bounce.position.set(40, 12, -30);
     this.scene.add(bounce);
-    this.sun = new THREE.DirectionalLight(0xfff0d8, 0.8);
+    this.sun = new THREE.DirectionalLight(0xfff2d6, 0.92);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.00022;
@@ -164,8 +171,9 @@ export class CourseScene {
     }
 
     const detail = makeGrassDetailTex();
-    this.turfMat = createTurfMaterial(detail);
-    this.greenMat = createGreenMaterial(detail);
+    const detailN = makeGrassDetailNormal();
+    this.turfMat = createTurfMaterial(detail, detailN);
+    this.greenMat = createGreenMaterial(detail, detailN);
     this.bladeMat = createBladeMaterial();
     this.foliageKit = createFoliageKit();
 
@@ -177,18 +185,27 @@ export class CourseScene {
     this.ball = new THREE.Mesh(
       makeGolfBallGeometry(BALL_RADIUS),
       new THREE.MeshPhysicalMaterial({
-        color: 0xfffef8,
-        roughness: 0.15,
-        metalness: 0.02,
-        clearcoat: 0.62,
-        clearcoatRoughness: 0.1,
-        sheen: 0.18,
-        sheenRoughness: 0.4,
+        color: 0xffffff,
+        roughness: 0.12,
+        metalness: 0.04,
+        clearcoat: 0.82,
+        clearcoatRoughness: 0.08,
+        sheen: 0.22,
+        sheenRoughness: 0.32,
         sheenColor: new THREE.Color(0xffffff),
-        envMapIntensity: 0.85,
+        envMapIntensity: 1.15,
         vertexColors: true,
       }),
     );
+    const ballMat = this.ball.material as THREE.MeshPhysicalMaterial;
+    ballMat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+         roughnessFactor = clamp(mix(0.07, 0.46, 1.0 - diffuseColor.r), 0.05, 0.7);`,
+      );
+    };
+    ballMat.customProgramCacheKey = () => "ptg-ball-dimple-v1";
     this.ball.castShadow = true;
     this.halo = new THREE.Mesh(
       new THREE.SphereGeometry(BALL_RADIUS * 1.55, 16, 12),
@@ -198,7 +215,7 @@ export class CourseScene {
     const marker = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: new THREE.CanvasTexture(makeDiscSprite()),
-        color: 0xfff6d8,
+        color: 0xffffff,
         transparent: true,
         opacity: 0,
         depthWrite: false,
@@ -280,7 +297,23 @@ export class CourseScene {
     this.scene.add(this.pin, this.golfer, this.grid);
     this.buildGolfer();
     this.resize();
+    this.initComposer();
     window.addEventListener("resize", () => this.resize());
+  }
+
+  private initComposer(): void {
+    try {
+      const composer = new EffectComposer(this.renderer);
+      composer.addPass(new RenderPass(this.scene, this.camera));
+      const bloom = new UnrealBloomPass(new THREE.Vector2(this.w, this.h), 0.14, 0.28, 0.84);
+      composer.addPass(bloom);
+      composer.addPass(new OutputPass());
+      this.composer = composer;
+      this.bloom = bloom;
+    } catch (err) {
+      console.warn("[ptg] post FX skip", err);
+      this.composer = null;
+    }
   }
 
   resize(): void {
@@ -291,6 +324,8 @@ export class CourseScene {
     this.renderer.setSize(this.w, this.h, false);
     this.renderer.domElement.style.width = `${this.w}px`;
     this.renderer.domElement.style.height = `${this.h}px`;
+    this.composer?.setSize(this.w, this.h);
+    this.bloom?.setSize(this.w, this.h);
   }
 
   worldFromScreen(sx: number, sy: number): Vec2 {
@@ -327,7 +362,13 @@ export class CourseScene {
 
   render(): void {
     this.sky.position.copy(this.camera.position);
-    this.renderer.render(this.scene, this.camera);
+    try {
+      if (this.composer) this.composer.render();
+      else this.renderer.render(this.scene, this.camera);
+    } catch {
+      this.composer = null;
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   private rebuildHole(hole: Hole, index: number): void {
@@ -382,7 +423,7 @@ export class CourseScene {
     this.turfMat.map = maps.albedo;
     this.turfMat.roughnessMap = maps.rough;
     this.turfMat.normalMap = maps.normal;
-    this.turfMat.normalScale.set(1.9, 1.9);
+    this.turfMat.normalScale.set(2.25, 2.25);
     this.turfMat.vertexColors = true;
     this.turfMat.needsUpdate = true;
     applyNapUniforms(this.turfMat, hole);
@@ -638,12 +679,12 @@ export class CourseScene {
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.02 : 0.07;
     (this.softShadow.material as THREE.MeshBasicMaterial).opacity = air > 12 ? 0.01 : 0.045;
     const halo = this.halo.material as THREE.MeshBasicMaterial;
-    halo.opacity = air > 1.4 ? Math.min(0.42, 0.1 + air * 0.016) : 0.03;
+    halo.opacity = air > 1.2 ? Math.min(0.58, 0.16 + air * 0.022) : 0.04;
     const marker = this.ball.getObjectByName("air-marker") as THREE.Sprite | undefined;
     if (marker) {
       const mat = marker.material as THREE.SpriteMaterial;
-      mat.opacity = air > 2 ? Math.min(0.62, 0.18 + air * 0.016) : 0;
-      const s = 0.24 + Math.min(0.4, air * 0.014);
+      mat.opacity = air > 1.6 ? Math.min(0.78, 0.28 + air * 0.022) : 0;
+      const s = 0.3 + Math.min(0.55, air * 0.018);
       marker.scale.set(s, s, 1);
     }
   }
@@ -892,7 +933,7 @@ export function makeGolfBallGeometry(radius = BALL_RADIUS): THREE.BufferGeometry
     const dent = dimpleIndent(n.x, n.y, n.z, dimples);
     const r = radius - dent * depth;
     pos.setXYZ(i, n.x * r, n.y * r, n.z * r);
-    const shade = 1 - dent * 0.2;
+    const shade = 1 - dent * 0.34;
     colors[i * 3] = 0.995 * shade;
     colors[i * 3 + 1] = 0.99 * shade;
     colors[i * 3 + 2] = 0.97 * shade;
@@ -927,9 +968,9 @@ function makeSandCard(): HTMLCanvasElement {
   c.height = 256;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  ctx.fillStyle = "#e6c88a";
+  ctx.fillStyle = "#e2c284";
   ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 110; i++) {
+  for (let i = 0; i < 160; i++) {
     const y = (i / 110) * 256;
     ctx.strokeStyle = `rgba(${176 + (i % 5) * 8},${136 + (i % 4) * 6},78,${0.07 + (i % 3) * 0.04})`;
     ctx.lineWidth = 1.2;
@@ -938,9 +979,9 @@ function makeSandCard(): HTMLCanvasElement {
     ctx.quadraticCurveTo(128, y + Math.sin(i * 0.7) * 8, 256, y + Math.cos(i * 0.5) * 6);
     ctx.stroke();
   }
-  for (let i = 0; i < 2200; i++) {
-    ctx.fillStyle = i % 3 === 0 ? "#d4b06e" : i % 3 === 1 ? "#f0d8a0" : "#c49a58";
-    ctx.fillRect(hashNoise(i, 2) * 256, hashNoise(i, 7) * 256, 1.4, 1.3);
+  for (let i = 0; i < 3600; i++) {
+    ctx.fillStyle = i % 4 === 0 ? "#c9a45c" : i % 4 === 1 ? "#f2d8a2" : i % 4 === 2 ? "#d8b46e" : "#b89050";
+    ctx.fillRect(hashNoise(i, 2) * 256, hashNoise(i, 7) * 256, 1.6 + (i % 3) * 0.4, 1.2 + (i % 2));
   }
   return c;
 }

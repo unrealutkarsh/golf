@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { lieAt, onGreen } from "./course";
-import { fbm, grassTile, hashNoise, heightToNormal, packNormalRgb } from "./look";
+import { fbm, grassNormalTile, grassTile, hashNoise, heightToNormal, packNormalRgb } from "./look";
 import { ellipseRadial } from "./math";
 import { groundHeight } from "./terrain";
 import type { Hole } from "./types";
@@ -162,12 +162,13 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
     const band = turfBand(hole, x, z);
     const n = fbm(x * 0.22, z * 0.22);
     const micro = hashNoise(x * 6.4, z * 6.4);
-    if (band === "green") return n * 0.07 + micro * 0.04;
-    if (band === "collar") return n * 0.12 + micro * 0.07;
-    if (band === "fringe") return n * 0.18 + micro * 0.1;
-    if (band === "fairway" || band === "tee") return n * 0.22 + micro * 0.16;
-    if (band === "rough") return n * 0.42 + micro * 0.28;
-    if (band === "bunker") return n * 0.28 + micro * 0.12;
+    const blade = hashNoise(x * 18.4, z * 17.1);
+    if (band === "green") return n * 0.08 + micro * 0.055 + blade * 0.03;
+    if (band === "collar") return n * 0.14 + micro * 0.09 + blade * 0.04;
+    if (band === "fringe") return n * 0.22 + micro * 0.14 + blade * 0.06;
+    if (band === "fairway" || band === "tee") return n * 0.26 + micro * 0.2 + blade * 0.08;
+    if (band === "rough") return n * 0.5 + micro * 0.34 + blade * 0.12;
+    if (band === "bunker") return n * 0.34 + micro * 0.18 + hashNoise(x * 22, z * 19) * 0.1;
     return n * 0.28;
   };
   for (let j = 0; j < h; j++) {
@@ -175,17 +176,17 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       const x = ox + (i / (w - 1)) * tw;
       const z = oz + (j / (h - 1)) * th;
       const band = turfBand(hole, x, z);
-      const wet = Math.max(0, 0.55 - fbm(x * 0.09 + 3, z * 0.09));
+      const wet = Math.max(0, 0.62 - fbm(x * 0.07 + 3, z * 0.07)) * (0.55 + hashNoise(x * 1.3, z * 1.1) * 0.45);
       const micro = hashNoise(x * 7.2, z * 7.2);
       const [r, g, b] = turfAlbedoRgb(band, x, z, napX, napZ);
       let rk = 0.92;
-      if (band === "green") rk = 0.38 + wet * 0.22 + micro * 0.08;
-      else if (band === "collar") rk = 0.52 + wet * 0.16 + micro * 0.06;
-      else if (band === "fringe") rk = 0.7 + wet * 0.12 + micro * 0.08;
-      else if (band === "fairway" || band === "tee") rk = 0.58 + wet * 0.16 + micro * 0.1;
-      else if (band === "rough") rk = 0.88 + micro * 0.08;
-      else if (band === "bunker") rk = 0.9 + micro * 0.06;
-      else if (band === "water") rk = 0.1;
+      if (band === "green") rk = 0.32 + wet * 0.28 + micro * 0.1;
+      else if (band === "collar") rk = 0.48 + wet * 0.2 + micro * 0.08;
+      else if (band === "fringe") rk = 0.64 + wet * 0.16 + micro * 0.1;
+      else if (band === "fairway" || band === "tee") rk = 0.5 + wet * 0.22 + micro * 0.12;
+      else if (band === "rough") rk = 0.82 + wet * 0.08 + micro * 0.1;
+      else if (band === "bunker") rk = 0.78 + micro * 0.14 + wet * 0.06;
+      else if (band === "water") rk = 0.08;
       const idx = (j * w + i) * 4;
       cimg.data[idx] = Math.round(Math.min(1, r) * 255);
       cimg.data[idx + 1] = Math.round(Math.min(1, g) * 255);
@@ -197,7 +198,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       rimg.data[idx + 2] = rv;
       rimg.data[idx + 3] = 255;
       const eps = tw / w;
-      const scale = band === "green" ? 3.2 : band === "fringe" ? 2.2 : 1.5;
+      const scale = band === "green" ? 4.2 : band === "fringe" ? 3.0 : band === "rough" ? 2.4 : 2.1;
       const [nx, ny, nz] = heightToNormal(heightAt(x - eps, z), heightAt(x + eps, z), heightAt(x, z - eps), heightAt(x, z + eps), scale);
       const packed = packNormalRgb(nx, ny, nz);
       nimg.data[idx] = Math.round(packed[0] * 255);
@@ -234,31 +235,39 @@ export function makeGrassDetailTex(): THREE.CanvasTexture {
   return tex;
 }
 
-export function createTurfMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
+export function makeGrassDetailNormal(): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(grassNormalTile("ptg-grass-n", 256));
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function createTurfMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.9,
+    roughness: 0.88,
     metalness: 0,
-    envMapIntensity: 0.16,
+    envMapIntensity: 0.22,
     vertexColors: true,
     emissive: new THREE.Color(0x12140e),
-    emissiveIntensity: 0.012,
+    emissiveIntensity: 0.01,
   });
-  attachTurfShader(mat, detail, 72, true);
+  attachTurfShader(mat, detail, detailN, 72, true);
   return mat;
 }
 
-export function createGreenMaterial(detail: THREE.CanvasTexture): THREE.MeshStandardMaterial {
+export function createGreenMaterial(detail: THREE.CanvasTexture, detailN: THREE.CanvasTexture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    roughness: 0.48,
+    roughness: 0.44,
     metalness: 0,
-    envMapIntensity: 0.14,
+    envMapIntensity: 0.2,
     emissive: new THREE.Color(0x10120e),
-    emissiveIntensity: 0.012,
+    emissiveIntensity: 0.01,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-  attachTurfShader(mat, detail, 28, false);
+  attachTurfShader(mat, detail, detailN, 28, false);
   return mat;
 }
 
@@ -280,6 +289,7 @@ export function createNapUniforms(hole: Hole): NapUniforms {
 function attachTurfShader(
   mat: THREE.MeshStandardMaterial,
   detail: THREE.Texture,
+  detailN: THREE.Texture,
   detailScale: number,
   courseWide: boolean,
 ): void {
@@ -291,6 +301,7 @@ function attachTurfShader(
   mat.userData.greenRadii = greenRadii;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uDetail = { value: detail };
+    shader.uniforms.uDetailN = { value: detailN };
     shader.uniforms.uDetailScale = { value: detailScale };
     shader.uniforms.uNapDir = napDir;
     shader.uniforms.uGreenCenter = greenCenter;
@@ -304,6 +315,7 @@ function attachTurfShader(
     );
     shader.fragmentShader = `varying vec3 vWorldPos;
 uniform sampler2D uDetail;
+uniform sampler2D uDetailN;
 uniform float uDetailScale;
 uniform vec2 uNapDir;
 uniform vec3 uGreenCenter;
@@ -346,10 +358,17 @@ ${shader.fragmentShader}`;
       "#include <roughnessmap_fragment>",
       `#include <roughnessmap_fragment>
        float rGrain = fract(sin(dot(vWorldPos.xz, vec2(19.1, 47.3))) * 43758.5);
-       roughnessFactor = clamp(roughnessFactor * (0.86 + rGrain * 0.2), 0.22, 1.0);`,
+       roughnessFactor = clamp(roughnessFactor * (0.82 + rGrain * 0.22), 0.16, 1.0);`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <normal_fragment_maps>",
+      `#include <normal_fragment_maps>
+       vec3 dn = texture2D(uDetailN, vMapUv * uDetailScale * 1.8).xyz * 2.0 - 1.0;
+       float nAmt = uCourseWide > 0.5 ? 0.38 : 0.55;
+       normal = normalize(normal + dn * nAmt);`,
     );
   };
-  mat.customProgramCacheKey = () => `turf-nap-v7-${detailScale}-${courseWide ? "w" : "g"}`;
+  mat.customProgramCacheKey = () => `turf-nap-v8-${detailScale}-${courseWide ? "w" : "g"}`;
 }
 
 export function applyNapUniforms(mat: THREE.MeshStandardMaterial, hole: Hole): void {
@@ -388,7 +407,7 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
   mat.map = maps.albedo;
   mat.roughnessMap = maps.rough;
   mat.normalMap = maps.normal;
-  mat.normalScale.set(2.15, 2.15);
+  mat.normalScale.set(2.45, 2.45);
   mat.needsUpdate = true;
   applyNapUniforms(mat, hole);
   const mesh = new THREE.Mesh(geo, mat);

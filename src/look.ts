@@ -63,3 +63,49 @@ export function patternFrom(ctx: CanvasRenderingContext2D, tile: HTMLCanvasEleme
   if (!pattern) throw new Error("Pattern unavailable");
   return pattern;
 }
+
+/** Tiled grass-blade normal from a height-speckle field. */
+export function grassNormalTile(seed: string, size = 256): HTMLCanvasElement {
+  const tile = document.createElement("canvas");
+  tile.width = size;
+  tile.height = size;
+  const ctx = tile.getContext("2d");
+  if (!ctx) throw new Error("Grass normal unavailable");
+  const rng = mulberry32(hashString(seed));
+  const height = new Float32Array(size * size);
+  for (let i = 0; i < size * size; i++) height[i] = 0.42;
+  for (let i = 0; i < 5200; i++) {
+    const px = Math.floor(rng() * size);
+    const py = Math.floor(rng() * size);
+    const h = 0.35 + rng() * 0.65;
+    const w = 1 + Math.floor(rng() * 2);
+    const len = 3 + Math.floor(rng() * 7);
+    const tilt = Math.floor((rng() - 0.5) * 3);
+    for (let k = 0; k < len; k++) {
+      const x = (px + tilt * (k / len) + size) % size;
+      const y = (py - k + size) % size;
+      for (let t = 0; t < w; t++) {
+        const xx = (x + t) % size;
+        height[y * size + xx] = Math.max(height[y * size + xx], h * (1 - k / len));
+      }
+    }
+  }
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const hL = height[y * size + ((x + size - 1) % size)];
+      const hR = height[y * size + ((x + 1) % size)];
+      const hD = height[((y + size - 1) % size) * size + x];
+      const hU = height[((y + 1) % size) * size + x];
+      const [nx, ny, nz] = heightToNormal(hL, hR, hD, hU, 2.4);
+      const packed = packNormalRgb(nx, ny, nz);
+      const i = (y * size + x) * 4;
+      img.data[i] = Math.round(packed[0] * 255);
+      img.data[i + 1] = Math.round(packed[1] * 255);
+      img.data[i + 2] = Math.round(packed[2] * 255);
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return tile;
+}

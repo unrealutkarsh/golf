@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const GOLFER_MESH_COUNT = 42;
+export const GOLFER_MESH_COUNT = 54;
 export const GOLFER_BONE_COUNT = 14;
 
 function clothPique(): THREE.DataTexture {
@@ -22,6 +22,60 @@ function clothPique(): THREE.DataTexture {
   const tex = new THREE.DataTexture(data, w, h);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(6, 8);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function fabricNormal(kind: "pique" | "twill"): THREE.DataTexture {
+  const w = 64;
+  const h = 64;
+  const data = new Uint8Array(w * h * 4);
+  const height = (x: number, y: number) => {
+    if (kind === "pique") {
+      const cell = ((x >> 2) + (y >> 2)) & 1;
+      return (cell ? 0.62 : 0.38) + (((x * 13 + y * 7) & 7) / 7) * 0.12;
+    }
+    const diag = ((x + y) >> 2) & 1;
+    return (diag ? 0.58 : 0.4) + (((x * 5 + y * 11) & 7) / 7) * 0.1;
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const nx = (height(x - 1, y) - height(x + 1, y)) * 2.2;
+      const ny = (height(x, y - 1) - height(x, y + 1)) * 2.2;
+      const len = Math.hypot(nx, 1, ny) || 1;
+      const i = (y * w + x) * 4;
+      data[i] = Math.round((nx / len) * 127 + 128);
+      data[i + 1] = Math.round((1 / len) * 127 + 128);
+      data[i + 2] = Math.round((ny / len) * 127 + 128);
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, h);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(kind === "pique" ? 6 : 5, kind === "pique" ? 8 : 10);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function leatherGrain(): THREE.DataTexture {
+  const w = 64;
+  const h = 64;
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const n = ((x * 17 + y * 11) & 15) / 15;
+      const v = 168 + n * 28;
+      const i = (y * w + x) * 4;
+      data[i] = v;
+      data[i + 1] = v - 18;
+      data[i + 2] = v - 36;
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, h);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
@@ -90,21 +144,67 @@ export function buildAddressGolfer(): THREE.Group {
 
   const pique = clothPique();
   const twill = clothTwill();
-  const slacks = new THREE.MeshStandardMaterial({ map: twill, color: 0x6e828c, roughness: 0.82 });
-  const shirt = new THREE.MeshStandardMaterial({ map: pique, color: 0xeee8dc, roughness: 0.64 });
-  const shirtShade = new THREE.MeshStandardMaterial({ map: pique, color: 0xcfc8ba, roughness: 0.68 });
-  const glove = new THREE.MeshStandardMaterial({ color: 0xd8d2c6, roughness: 0.6 });
-  const skin = new THREE.MeshPhysicalMaterial({
-    color: 0xb8926c,
-    roughness: 0.52,
-    metalness: 0,
-    sheen: 0.28,
-    sheenColor: new THREE.Color(0xdcba96),
-    sheenRoughness: 0.66,
+  const piqueN = fabricNormal("pique");
+  const twillN = fabricNormal("twill");
+  const leather = leatherGrain();
+  const slacks = new THREE.MeshPhysicalMaterial({
+    map: twill,
+    normalMap: twillN,
+    normalScale: new THREE.Vector2(0.45, 0.45),
+    color: 0x6a7c88,
+    roughness: 0.78,
+    sheen: 0.22,
+    sheenColor: new THREE.Color(0x8a9aa4),
+    sheenRoughness: 0.7,
   });
-  const shoe = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.5 });
-  const sole = new THREE.MeshStandardMaterial({ color: 0x242422, roughness: 0.74 });
-  const cap = new THREE.MeshStandardMaterial({ color: 0x24343a, roughness: 0.5 });
+  const shirt = new THREE.MeshPhysicalMaterial({
+    map: pique,
+    normalMap: piqueN,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    color: 0xf0ebe2,
+    roughness: 0.58,
+    sheen: 0.42,
+    sheenColor: new THREE.Color(0xffffff),
+    sheenRoughness: 0.55,
+  });
+  const shirtShade = new THREE.MeshPhysicalMaterial({
+    map: pique,
+    normalMap: piqueN,
+    color: 0xc8c2b4,
+    roughness: 0.64,
+    sheen: 0.28,
+    sheenColor: new THREE.Color(0xeee8dc),
+    sheenRoughness: 0.62,
+  });
+  const glove = new THREE.MeshPhysicalMaterial({
+    map: leather,
+    color: 0xc8b89a,
+    roughness: 0.52,
+    sheen: 0.18,
+    sheenColor: new THREE.Color(0xe8d8b8),
+    sheenRoughness: 0.6,
+  });
+  const skin = new THREE.MeshPhysicalMaterial({
+    color: 0xc49a78,
+    roughness: 0.44,
+    metalness: 0,
+    sheen: 0.38,
+    sheenColor: new THREE.Color(0xe8c4a4),
+    sheenRoughness: 0.55,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.62,
+  });
+  const shoe = new THREE.MeshPhysicalMaterial({
+    map: leather,
+    color: 0xf2eee4,
+    roughness: 0.42,
+    sheen: 0.16,
+    sheenColor: new THREE.Color(0xffffff),
+    sheenRoughness: 0.5,
+  });
+  const saddle = new THREE.MeshPhysicalMaterial({ map: leather, color: 0x5a4030, roughness: 0.55 });
+  const sole = new THREE.MeshStandardMaterial({ color: 0x1e1e1c, roughness: 0.78 });
+  const cap = new THREE.MeshPhysicalMaterial({ color: 0x1c2e36, roughness: 0.42, sheen: 0.2, sheenColor: new THREE.Color(0x4a6070) });
   const hair = new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.72 });
   const belt = new THREE.MeshStandardMaterial({ color: 0x3a2c20, roughness: 0.55 });
   const grip = new THREE.MeshStandardMaterial({ color: 0x1a1a18, roughness: 0.74 });
@@ -158,6 +258,20 @@ export function buildAddressGolfer(): THREE.Group {
   rSole.position.set(0.2, 0.018, -0.04);
   rSole.rotation.z = Math.PI / 2;
   rSole.scale.set(1.05, 0.2, 0.82);
+  const lSaddle = add(body, new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.08, 6, 10), saddle));
+  lSaddle.position.set(-0.2, 0.055, 0.14);
+  lSaddle.rotation.z = Math.PI / 2;
+  lSaddle.scale.set(0.85, 0.42, 0.7);
+  const rSaddle = add(body, new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.08, 6, 10), saddle));
+  rSaddle.position.set(0.2, 0.055, -0.06);
+  rSaddle.rotation.z = Math.PI / 2;
+  rSaddle.scale.set(0.85, 0.42, 0.7);
+  const lToe = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 8), shoe));
+  lToe.position.set(-0.2, 0.042, 0.24);
+  lToe.scale.set(1.05, 0.52, 0.85);
+  const rToe = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 8), shoe));
+  rToe.position.set(0.2, 0.042, 0.04);
+  rToe.scale.set(1.05, 0.52, 0.85);
 
   const lShin = add(body, new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.32, 8, 14), slacks));
   span(lShin, -0.16, 0.48, 0.1, -0.2, 0.1, 0.15, 0.32);
@@ -257,6 +371,18 @@ export function buildAddressGolfer(): THREE.Group {
   const rCuff = add(body, new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 8, 12), shirt));
   rCuff.position.set(rElbow.x, rElbow.y, rElbow.z);
   rCuff.rotation.x = 0.88;
+  const lElbowCap = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), shirt));
+  lElbowCap.position.set(lElbow.x, lElbow.y, lElbow.z);
+  const rElbowCap = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), shirt));
+  rElbowCap.position.set(rElbow.x, rElbow.y, rElbow.z);
+  const lKnee = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), slacks));
+  lKnee.position.set(-0.16, 0.48, 0.1);
+  const rKnee = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), slacks));
+  rKnee.position.set(0.16, 0.48, -0.02);
+  const lShoulderCap = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), shirt));
+  lShoulderCap.position.set(lShoulder.x, lShoulder.y, lShoulder.z);
+  const rShoulderCap = add(body, new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), shirt));
+  rShoulderCap.position.set(rShoulder.x, rShoulder.y, rShoulder.z);
   const collar = add(body, new THREE.Mesh(new THREE.TorusGeometry(0.072, 0.014, 8, 14, Math.PI), shirt));
   collar.position.set(-0.01, 1.48, 0.18);
   collar.rotation.x = 1.12;
