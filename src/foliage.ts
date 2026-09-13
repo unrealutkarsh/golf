@@ -8,7 +8,7 @@ export const PINE_CANOPY_LAYERS = 6;
 export const OAK_CANOPY_BLOBS = 14;
 export const LEAF_CARDS_PER_TREE = 22;
 export const SPRAY_CARDS_PER_TREE = 16;
-export const MID_RANGE_CARDS_PER_TREE = 16;
+export const MID_RANGE_CARDS_PER_TREE = 20;
 export const TRUNK_PARTS = 2;
 export const VOLUME_TREE_PARTS = 24;
 
@@ -43,16 +43,16 @@ function makeLeafCardTex(needles: boolean, seed: number): THREE.DataTexture {
   const h = 160;
   const data = new Uint8Array(w * h * 4);
   const pine: Array<[number, number, number]> = [
-    [44, 74, 36],
-    [58, 90, 46],
-    [36, 64, 30],
-    [66, 100, 50],
+    [62, 88, 52],
+    [76, 102, 62],
+    [54, 78, 44],
+    [84, 110, 66],
   ];
   const oak: Array<[number, number, number]> = [
-    [52, 82, 40],
-    [68, 102, 50],
-    [42, 70, 34],
-    [78, 112, 56],
+    [72, 96, 56],
+    [88, 112, 66],
+    [60, 84, 48],
+    [96, 120, 72],
   ];
   const tones = needles ? pine : oak;
   for (let y = 0; y < h; y++) {
@@ -130,7 +130,7 @@ function makeBarkMaps(): { color: THREE.DataTexture; normal: THREE.DataTexture; 
 function leafMat(map: THREE.DataTexture): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x4a6a36,
+    color: 0x5a7848,
     transparent: true,
     alphaTest: 0.2,
     side: THREE.DoubleSide,
@@ -315,7 +315,7 @@ function addPine(
     const blob = new THREE.Mesh(kit.pineBlob, mat);
     const cw = w * (0.2 + t * 0.7);
     const ch = h * (0.1 + (1 - t) * 0.06);
-    blob.scale.set(cw * 0.48, ch * 0.62, cw * (0.4 + fbm(i, r) * 0.2));
+    blob.scale.set(cw * 0.22, ch * 0.28, cw * (0.18 + fbm(i, r) * 0.1));
     blob.position.set((fbm(i + 2, r) - 0.5) * w * 0.22, h * (0.88 - t * 0.52), (fbm(r, i + 4) - 0.5) * w * 0.22);
     blob.rotation.set(fbm(i, 2) * 0.28, t * 1.2, (fbm(i, 3) - 0.5) * 0.16);
     blob.castShadow = shadow && i < 2;
@@ -361,7 +361,7 @@ function addOak(
     const a = i * 2.399 + hashNoise(i, r) * 1.1;
     const lift = 0.38 + (i % 6) * 0.07 + hashNoise(i, 8) * 0.06;
     const rad = w * (0.14 + hashNoise(i, 3) * 0.16);
-    blob.scale.set(rad * (0.7 + (i % 3) * 0.12), rad * (0.48 + (i % 2) * 0.1), rad * (0.62 + (i % 4) * 0.1));
+    blob.scale.set(rad * (0.28 + (i % 3) * 0.06), rad * (0.2 + (i % 2) * 0.05), rad * (0.24 + (i % 4) * 0.05));
     blob.position.set(Math.cos(a) * w * (0.22 + (i % 5) * 0.04), h * lift, Math.sin(a) * w * (0.2 + (i % 4) * 0.04));
     blob.rotation.set(hashNoise(i, 2) * 0.8, a, hashNoise(i, 4) * 0.6);
     blob.castShadow = shadow && i < 5;
@@ -408,12 +408,9 @@ function playableLie(lie: ReturnType<typeof lieAt>): boolean {
 function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): void {
   const b = hole.bounds;
   const pineTrunks: THREE.Matrix4[] = [];
-  const pineDark: THREE.Matrix4[] = [];
-  const pineLit: THREE.Matrix4[] = [];
   const oakTrunks: THREE.Matrix4[] = [];
-  const oakDark: THREE.Matrix4[] = [];
-  const oakLit: THREE.Matrix4[] = [];
-  const midCards: THREE.Matrix4[] = [];
+  const oakCards: THREE.Matrix4[] = [];
+  const pineCards: THREE.Matrix4[] = [];
   const dummy = new THREE.Object3D();
   let n = 0;
   for (let i = 0; i < 320 && n < 200; i++) {
@@ -428,49 +425,27 @@ function addInstancedWoods(parent: THREE.Group, kit: FoliageKit, hole: Hole): vo
     const ground = groundHeight(hole, x, z);
     const kind = treeKind(x + 1, z);
     const r = 4.8 + hashNoise(i, 11) * 8.4;
-    const h = kind === "pine" ? 7 + r * 0.55 + hashNoise(i, 12) * 14 : 6 + r * 0.42 + hashNoise(i, 13) * 10;
-    dummy.position.set(x, ground + h * (kind === "pine" ? 0.28 : 0.22), z);
-    dummy.rotation.set(0, fbm(x, z) * 6, 0);
-    dummy.scale.set(kind === "pine" ? 0.75 : 1.05, h * (kind === "pine" ? 0.58 : 0.46), kind === "pine" ? 0.75 : 1.05);
+    const h = kind === "pine" ? 6 + r * 0.7 + hashNoise(i, 12) * 18 : 5 + r * 0.5 + hashNoise(i, 13) * 14;
+    dummy.position.set(x, ground + 0.04, z);
+    dummy.rotation.set(0, fbm(x, z) * 6, (hashNoise(i, 14) - 0.5) * 0.12);
+    dummy.scale.set(kind === "pine" ? 0.7 : 1.0, h * (kind === "pine" ? 0.62 : 0.5), kind === "pine" ? 0.7 : 1.0);
     dummy.updateMatrix();
     (kind === "pine" ? pineTrunks : oakTrunks).push(dummy.matrix.clone());
-    const lit = hashNoise(i, 17) > 0.48;
-    const layers = kind === "pine" ? 4 : 5;
-    for (let k = 0; k < layers; k++) {
-      const t = k / Math.max(layers - 1, 1);
-      if (kind === "pine") {
-        dummy.position.set(x + (fbm(k, x) - 0.5) * 1.2, ground + h * (0.84 - t * 0.32), z + (fbm(z, k) - 0.5) * 1.2);
-        dummy.rotation.set(fbm(k, 2) * 0.4, t * 1.4, (fbm(k, 5) - 0.5) * 0.2);
-        dummy.scale.set(r * (0.18 + t * 0.55), h * (0.08 + (1 - t) * 0.05), r * (0.16 + t * 0.5));
-        dummy.updateMatrix();
-        (lit ? pineLit : pineDark).push(dummy.matrix.clone());
-      } else {
-        const a = (k / layers) * Math.PI * 2 + hashNoise(i + k, 3);
-        dummy.position.set(x + Math.cos(a) * r * 0.38, ground + h * (0.48 + (k % 3) * 0.1), z + Math.sin(a) * r * 0.34);
-        dummy.rotation.set(hashNoise(k, 2) * 0.9, a, hashNoise(k, 6) * 0.5);
-        dummy.scale.set(r * (0.22 + (k % 3) * 0.08), r * (0.18 + (k % 2) * 0.06), r * 0.22);
-        dummy.updateMatrix();
-        (lit ? oakLit : oakDark).push(dummy.matrix.clone());
-      }
-    }
     for (let c = 0; c < MID_RANGE_CARDS_PER_TREE; c++) {
-      const a = (c / MID_RANGE_CARDS_PER_TREE) * Math.PI + 0.15;
-      dummy.position.set(x + Math.cos(a * 2) * r * 0.28, ground + h * (0.36 + (c % 5) * 0.07), z + Math.sin(a * 2) * r * 0.26);
-      dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.22, a + hashNoise(c, 7), 0);
-      dummy.scale.set(r * (0.55 + (c % 3) * 0.12), h * (0.28 + (c % 4) * 0.06), 1);
+      const a = (c / MID_RANGE_CARDS_PER_TREE) * Math.PI * 2 + hashNoise(i + c, 3);
+      const lift = 0.32 + (c % 7) * 0.08 + hashNoise(c, 6) * 0.05;
+      dummy.position.set(x + Math.cos(a) * r * (0.18 + (c % 4) * 0.08), ground + h * lift, z + Math.sin(a) * r * (0.16 + (c % 3) * 0.07));
+      dummy.rotation.set((hashNoise(c, 2) - 0.5) * 0.35, a + hashNoise(c, 7), (hashNoise(c, 9) - 0.5) * 0.2);
+      dummy.scale.set(r * (0.7 + (c % 5) * 0.16), h * (0.22 + (c % 4) * 0.08), 1);
       dummy.updateMatrix();
-      midCards.push(dummy.matrix.clone());
+      (kind === "pine" ? pineCards : oakCards).push(dummy.matrix.clone());
     }
     n += 1;
   }
   parent.add(makeInstanced(kit.trunk, kit.bark, pineTrunks, false));
-  parent.add(makeInstanced(kit.pineBlob, kit.pine, pineDark, false));
-  parent.add(makeInstanced(kit.pineBlob, kit.pineLit, pineLit, false));
   parent.add(makeInstanced(kit.trunk, kit.bark, oakTrunks, false));
-  parent.add(makeInstanced(kit.oakBlob, kit.oak, oakDark, false));
-  parent.add(makeInstanced(kit.oakBlob, kit.oakLit, oakLit, false));
-  parent.add(makeInstanced(kit.card, kit.oakCard, midCards, false));
-  parent.add(makeInstanced(kit.card, kit.pineCard, midCards.filter((_, i) => i % 2 === 0), false));
+  parent.add(makeInstanced(kit.card, kit.oakCard, oakCards, false));
+  parent.add(makeInstanced(kit.card, kit.pineCard, pineCards, false));
 }
 
 function makeInstanced(

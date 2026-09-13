@@ -124,7 +124,7 @@ export class CourseScene {
     this.renderer.toneMappingExposure = 1.02;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xa8b8a4, 720, 4000);
+    this.scene.fog = new THREE.Fog(0xb4c2a8, 520, 3600);
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.12, 6200);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
@@ -505,10 +505,10 @@ export class CourseScene {
 
   private addRollingCountry(hole: Hole, cx: number, cz: number): void {
     const grass = new THREE.MeshStandardMaterial({
-      color: 0x5e7440,
+      color: 0x8a9a6a,
       roughness: 0.96,
-      emissive: new THREE.Color(0x1a2810),
-      emissiveIntensity: 0.03,
+      emissive: new THREE.Color(0x3a4830),
+      emissiveIntensity: 0.06,
     });
     const far = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600, 96, 96), grass);
     far.rotation.x = -Math.PI / 2;

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const GOLFER_MESH_COUNT = 60;
+export const GOLFER_MESH_COUNT = 53;
 export const GOLFER_BONE_COUNT = 14;
 
 function clothPique(): THREE.DataTexture {
@@ -179,13 +179,8 @@ export function buildAddressGolfer(): THREE.Group {
   torso.scale.set(1.08, 1, 0.78);
   torso.rotation.x = 0.38;
   torso.rotation.z = 0.18;
-  const poloBack = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), shirtShade);
-  poloBack.position.set(0.0, 1.38, 0.02);
-  poloBack.scale.set(1.05, 0.55, 0.42);
-  poloBack.rotation.x = 0.35;
-
-  const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.42, 8, 16), shirt);
-  shoulders.position.set(-0.02, 1.4, 0.12);
+  const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.38, 8, 16), shirt);
+  shoulders.position.set(-0.02, 1.38, 0.1);
   shoulders.rotation.z = Math.PI / 2;
   shoulders.rotation.y = 0.1;
   shoulders.rotation.x = 0.18;
@@ -218,45 +213,45 @@ export function buildAddressGolfer(): THREE.Group {
   const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.018, 20), cap);
   brim.position.set(-0.02, 1.652, 0.3);
 
-  const lUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.28, 8, 14), shirt);
-  lUpper.position.set(-0.2, 1.22, 0.26);
-  lUpper.rotation.x = 1.0;
-  lUpper.rotation.z = 0.38;
-  const rUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.27, 8, 14), shirt);
-  rUpper.position.set(0.18, 1.2, 0.28);
-  rUpper.rotation.x = 0.92;
-  rUpper.rotation.z = -0.32;
-  const lCuff = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.01, 8, 14), shirt);
-  lCuff.position.set(-0.12, 1.04, 0.4);
-  lCuff.rotation.x = 1.1;
-  const rCuff = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.01, 8, 14), shirt);
-  rCuff.position.set(0.1, 1.02, 0.42);
-  rCuff.rotation.x = 1.05;
+  const lUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.26, 8, 14), shirt);
+  lUpper.position.set(-0.14, 1.16, 0.22);
+  lUpper.rotation.x = 0.72;
+  lUpper.rotation.z = 0.22;
+  const rUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.25, 8, 14), shirt);
+  rUpper.position.set(0.12, 1.14, 0.24);
+  rUpper.rotation.x = 0.7;
+  rUpper.rotation.z = -0.2;
+  const lCuff = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.009, 8, 14), shirt);
+  lCuff.position.set(-0.06, 0.98, 0.36);
+  lCuff.rotation.x = 0.9;
+  const rCuff = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.009, 8, 14), shirt);
+  rCuff.position.set(0.05, 0.96, 0.38);
+  rCuff.rotation.x = 0.88;
 
-  const lFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.22, 8, 14), skin);
-  lFore.position.set(-0.1, 1.0, 0.42);
-  lFore.rotation.x = 0.72;
-  lFore.rotation.z = 0.15;
-  const rFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.22, 8, 14), skin);
-  rFore.position.set(0.08, 0.98, 0.44);
-  rFore.rotation.x = 0.7;
-  rFore.rotation.z = -0.1;
+  const lFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.2, 8, 14), skin);
+  lFore.position.set(-0.05, 0.92, 0.4);
+  lFore.rotation.x = 0.48;
+  lFore.rotation.z = 0.08;
+  const rFore = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.2, 8, 14), skin);
+  rFore.position.set(0.04, 0.9, 0.42);
+  rFore.rotation.x = 0.46;
+  rFore.rotation.z = -0.06;
 
-  const lHand = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.07, 6, 10), glove);
-  lHand.position.set(-0.04, 0.9, 0.5);
-  lHand.rotation.x = 1.15;
-  const rHand = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.07, 6, 10), skin);
-  rHand.position.set(0.02, 0.88, 0.52);
-  rHand.rotation.x = 1.15;
-  const gloveCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.032, 0.03, 10), glove);
-  gloveCuff.position.set(-0.04, 0.94, 0.46);
-  gloveCuff.rotation.x = 0.9;
-  const lThumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.01, 0.04, 4, 8), glove);
-  lThumb.position.set(-0.07, 0.88, 0.52);
-  lThumb.rotation.z = 0.7;
-  const rThumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.01, 0.04, 4, 8), skin);
-  rThumb.position.set(0.06, 0.86, 0.54);
-  rThumb.rotation.z = -0.7;
+  const lHand = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.055, 6, 10), glove);
+  lHand.position.set(-0.015, 0.8, 0.46);
+  lHand.rotation.x = 0.95;
+  const rHand = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.055, 6, 10), skin);
+  rHand.position.set(0.018, 0.785, 0.47);
+  rHand.rotation.x = 0.95;
+  const gloveCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.028, 0.024, 10), glove);
+  gloveCuff.position.set(-0.015, 0.84, 0.44);
+  gloveCuff.rotation.x = 0.85;
+  const lThumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.032, 4, 8), glove);
+  lThumb.position.set(-0.035, 0.79, 0.48);
+  lThumb.rotation.z = 0.55;
+  const rThumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.032, 4, 8), skin);
+  rThumb.position.set(0.038, 0.775, 0.49);
+  rThumb.rotation.z = -0.55;
 
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.016, 8, 16, Math.PI), shirt);
   collar.position.set(-0.01, 1.46, 0.2);
@@ -291,25 +286,6 @@ export function buildAddressGolfer(): THREE.Group {
   rToe.position.set(0.2, 0.042, 0.05);
   rToe.scale.set(1.1, 0.55, 0.9);
 
-  const lF1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.032, 4, 8), glove);
-  lF1.position.set(-0.02, 0.86, 0.54);
-  lF1.rotation.x = 0.9;
-  const lF2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.03, 4, 8), glove);
-  lF2.position.set(-0.04, 0.855, 0.545);
-  lF2.rotation.x = 0.95;
-  const lF3 = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.026, 4, 8), glove);
-  lF3.position.set(-0.055, 0.85, 0.53);
-  lF3.rotation.x = 1.0;
-  const rF1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.032, 4, 8), skin);
-  rF1.position.set(0.04, 0.84, 0.56);
-  rF1.rotation.x = 0.9;
-  const rF2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.03, 4, 8), skin);
-  rF2.position.set(0.02, 0.835, 0.565);
-  rF2.rotation.x = 0.95;
-  const rF3 = new THREE.Mesh(new THREE.CapsuleGeometry(0.006, 0.026, 4, 8), skin);
-  rF3.position.set(0.005, 0.83, 0.55);
-  rF3.rotation.x = 1.0;
-
   body.add(
     lFoot,
     lSole,
@@ -327,7 +303,6 @@ export function buildAddressGolfer(): THREE.Group {
     rCrease,
     beltMesh,
     torso,
-    poloBack,
     shoulders,
     neck,
     head,
@@ -360,28 +335,22 @@ export function buildAddressGolfer(): THREE.Group {
     mouth,
     lToe,
     rToe,
-    lF1,
-    lF2,
-    lF3,
-    rF1,
-    rF2,
-    rF3,
   );
 
   const club = new THREE.Group();
   club.name = "club";
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 1.05, 8), steel);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.82, 8), steel);
   shaft.name = "shaft";
-  shaft.position.set(-0.01, 0.52, 0.58);
-  shaft.rotation.x = 0.22;
-  shaft.rotation.z = 0.18;
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 8), grip);
-  handle.position.set(-0.02, 0.92, 0.52);
-  handle.rotation.x = 0.22;
-  handle.rotation.z = 0.18;
+  shaft.position.set(0.0, 0.42, 0.5);
+  shaft.rotation.x = 0.28;
+  shaft.rotation.z = 0.04;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.18, 8), grip);
+  handle.position.set(0.0, 0.8, 0.46);
+  handle.rotation.x = 0.28;
+  handle.rotation.z = 0.04;
   const clubhead = new THREE.Group();
   clubhead.name = "clubhead";
-  clubhead.position.set(0.02, 0.03, 0.68);
+  clubhead.position.set(0.02, 0.03, 0.58);
   const putterHead = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.028, 0.042), putterFace);
   putterHead.name = "putter-head";
   const woodHead = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), steel);
