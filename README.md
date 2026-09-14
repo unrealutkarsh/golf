@@ -78,16 +78,27 @@ Lies change the shot: fairway and tee are full strength, rough and bunkers sap d
 
 ```
 src/
-  main.ts          boot + input
-  game.ts          round / swing state
-  physics.ts       flight, bounce, hazards, hole-out
-  course.ts        Harbor Dunes hole data
-  clubs.ts         bag
-  renderer.ts      HUD meters + 2D fallback
-  scene3d.ts       WebGL course, grass, cameras (no player mesh)
-  terrain.ts       height, turf color, camera helpers
-  ui.ts            tour tent, HUD, scorecard
-  scoring.ts       names and totals
+  main.ts            boot + input
+  game.ts            round / swing state
+  physics.ts         flight, bounce, hazards, hole-out
+  course.ts          Harbor Dunes hole data
+  clubs.ts           bag
+  renderer.ts        2D fallback orchestration + HUD
+  canvas-hud.ts      power / accuracy meters + minimap
+  canvas-course.ts   2D hole painting
+  canvas-overlays.ts 2D aim, ball, trail
+  canvas-draw.ts     shared 2D path helpers
+  renderer-lift.ts   2.5D airborne ball offset
+  scene3d.ts         WebGL CourseScene + createCourseScene
+  scene-ball.ts      dimpled ball + roll
+  scene-course.ts    terrain, bunkers, water, pin, grid
+  scene-camera.ts    address / follow / putt cams
+  scene-lights.ts    sun, lights, software GL
+  scene-sky.ts       procedural sky box
+  scene-water.ts     water material
+  terrain.ts         height, turf color, camera helpers
+  ui.ts              tour tent, HUD, scorecard
+  scoring.ts         names and totals
 ```
 
 Hole geometry is data-driven. Add another course by appending a `Course` in `src/course.ts` and a tournament in `src/tour.ts`.

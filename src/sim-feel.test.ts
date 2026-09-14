@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -47,15 +47,32 @@ function settlePutt(from: { x: number; y: number }, power: number) {
 
 describe("dummy golfer stays gone", () => {
   it("does not define buildGolfer, placeGolfer, or a scene golfer group", () => {
-    const scene = readSrc("scene3d.ts");
-    expect(scene).not.toMatch(/\bbuildGolfer\b/);
-    expect(scene).not.toMatch(/\bplaceGolfer\b/);
-    expect(scene).not.toMatch(/private golfer\s*=/);
-    expect(scene).not.toMatch(/this\.scene\.add\([^)]*this\.golfer/);
-    expect(scene).not.toMatch(/new THREE\.CylinderGeometry\(0\.13,\s*0\.15,\s*0\.82/);
-    expect(scene).not.toMatch(/new THREE\.SphereGeometry\(0\.13,\s*10,\s*8\)/);
-    expect(scene).not.toMatch(/buildAddressGolfer|snapGolferToBall|poseGolferClub/);
-    expect(scene).not.toMatch(/root\.name\s*=\s*"golfer"/);
+    const sceneFiles = [
+      "scene3d.ts",
+      "scene-ball.ts",
+      "scene-camera.ts",
+      "scene-course.ts",
+      "scene-lights.ts",
+      "scene-sky.ts",
+      "scene-water.ts",
+      "main.ts",
+      "ui.ts",
+      "renderer.ts",
+    ];
+    for (const name of sceneFiles) {
+      const scene = readSrc(name);
+      expect(scene).not.toMatch(/\bbuildGolfer\b/);
+      expect(scene).not.toMatch(/\bplaceGolfer\b/);
+      expect(scene).not.toMatch(/private golfer\s*=/);
+      expect(scene).not.toMatch(/this\.scene\.add\([^)]*this\.golfer/);
+      expect(scene).not.toMatch(/new THREE\.CylinderGeometry\(0\.13,\s*0\.15,\s*0\.82/);
+      expect(scene).not.toMatch(/new THREE\.SphereGeometry\(0\.13,\s*10,\s*8\)/);
+      expect(scene).not.toMatch(/buildAddressGolfer|snapGolferToBall|poseGolferClub/);
+      expect(scene).not.toMatch(/root\.name\s*=\s*"golfer"/);
+      expect(scene).not.toMatch(/golferMeshCount/);
+    }
+    expect(existsSync(resolve(srcDir, "golfer.ts"))).toBe(false);
+    expect(existsSync(resolve(srcDir, "golfer.test.ts"))).toBe(false);
   });
 
   it("does not mention a dummy player mesh in HUD or boot", () => {
@@ -208,10 +225,10 @@ describe("flight still carries", () => {
 
 describe("soft preview line", () => {
   it("keeps the 2D aim stroke faded instead of a gold road", () => {
-    const renderer = readSrc("renderer.ts");
-    expect(renderer).toMatch(/rgba\(212, 175, 55, 0\.38\)/);
-    expect(renderer).not.toMatch(/rgba\(212, 175, 55, 0\.85\)/);
-    expect(renderer).toMatch(/rgba\(230, 212, 160, 0\.55\)/);
+    const overlays = readSrc("canvas-overlays.ts");
+    expect(overlays).toMatch(/rgba\(212, 175, 55, 0\.38\)/);
+    expect(overlays).not.toMatch(/rgba\(212, 175, 55, 0\.85\)/);
+    expect(overlays).toMatch(/rgba\(230, 212, 160, 0\.55\)/);
   });
 
   it("keeps the 3D aim ribbon cream and the pin line faded", () => {

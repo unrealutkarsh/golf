@@ -1,9 +1,8 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
-import { buildFringeBladeField, buildGreenBladeField, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
-import { addCourseFoliage, bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
+import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
+import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
-import { golferMeshCount as countGolferMeshes } from "./golfer";
 import { dressStandard, loadArtKit } from "./kit";
 import { hashNoise, SCENE_TONE } from "./look";
 import { dist, fromAngle, lerp, type Vec2 } from "./math";
@@ -24,6 +23,8 @@ import {
   type ResolvedCam,
 } from "./terrain";
 import type { Hole } from "./types";
+
+export { ballRollAxis, ballRollRadians, dimpleIndent, makeGolfBallGeometry } from "./scene-ball";
 
 const MAX_PATH = 140;
 const TRAIL_LEN = 80;
@@ -108,9 +109,13 @@ export class CourseScene {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  lastView: ResolvedCam | "" = "";
+  viewAge = 1;
+  time = 0;
+  camPos = new THREE.Vector3(80, 24, 80);
+  camLook = new THREE.Vector3(200, 1, 140);
   private holeGroup = new THREE.Group();
   private ball: THREE.Mesh;
-  private halo: THREE.Mesh;
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
@@ -131,12 +136,8 @@ export class CourseScene {
   private waterMat: THREE.MeshPhysicalMaterial;
   private raycaster = new THREE.Raycaster();
   private terrain: THREE.Mesh | null = null;
-  private camPos = new THREE.Vector3(80, 24, 80);
-  private camLook = new THREE.Vector3(200, 1, 140);
   private builtHole = -1;
   private pathKey = "";
-  private lastView: ResolvedCam | "" = "";
-  private viewAge = 1;
   private sun: THREE.DirectionalLight;
   private sky: THREE.Mesh;
   private foliageKit: FoliageKit;
@@ -296,32 +297,9 @@ export class CourseScene {
     outline.scale.set(0.48, 0.48, 1);
     this.ball.add(outline);
     this.scene.add(this.ball);
-
-    const softMap = new THREE.CanvasTexture(makeSoftShadowCard());
-    this.shadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({
-        map: softMap,
-        color: 0x2c341c,
-        transparent: true,
-        opacity: 0.16,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    );
-    this.shadow.rotation.x = -Math.PI / 2;
-    this.softShadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({
-        map: softMap,
-        color: 0x3a4424,
-        transparent: true,
-        opacity: 0.08,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    );
-    this.softShadow.rotation.x = -Math.PI / 2;
+    const shadows = createBallContactShadows();
+    this.shadow = shadows.shadow;
+    this.softShadow = shadows.softShadow;
     this.scene.add(this.shadow, this.softShadow);
 
     this.landing = new THREE.Mesh(
@@ -494,7 +472,7 @@ export class CourseScene {
     this.updateTrail(session);
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
-    this.updateCamera(session, hole, view, putting, dt);
+    updateSceneCamera(this, session, hole, view, putting, dt);
     this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
     const play = session.screen === "play";
@@ -703,68 +681,10 @@ export class CourseScene {
       new THREE.CylinderGeometry(0.014, 0.018, 1.85, 10),
       new THREE.MeshStandardMaterial({ color: 0xf7f3ec, roughness: 0.28, metalness: 0.08 }),
     );
-    pole.position.y = 0.96;
-    pole.castShadow = true;
-    const ferrule = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.02, 0.04, 8),
-      new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.35, metalness: 0.4 }),
-    );
-    ferrule.position.y = 1.86;
-    const flag = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.62, 0.34),
-      new THREE.MeshStandardMaterial({ color: 0xc62828, side: THREE.DoubleSide, roughness: 0.46 }),
-    );
-    flag.position.set(0.33, 1.68, 0);
-    const well = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.19, 0.17, 0.16, 20),
-      new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.9 }),
-    );
-    well.position.y = -0.02;
-    const liner = new THREE.Mesh(
-      new THREE.RingGeometry(0.19, 0.27, 26),
-      new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.45, side: THREE.DoubleSide }),
-    );
-    liner.rotation.x = -Math.PI / 2;
-    liner.position.y = 0.018;
-    this.pin.add(pole, ferrule, flag, well, liner);
-  }
-
-  private buildGrid(hole: Hole): void {
-    this.grid.clear();
-    const g = hole.green;
-    const rot = g.rotation;
-    const cos = Math.cos(rot);
-    const sin = Math.sin(rot);
-    const pts: number[] = [];
-    const toWorld = (lx: number, ly: number) => {
-      const x = g.cx + lx * cos - ly * sin;
-      const z = g.cy + lx * sin + ly * cos;
-      return { x, z, y: groundHeight(hole, x, z) + 0.03 };
-    };
-    for (let i = -3; i <= 3; i++) {
-      const u = (i / 3) * g.rx * 0.84;
-      const a = toWorld(u, -g.ry * 0.84);
-      const b = toWorld(u, g.ry * 0.84);
-      pts.push(a.x, a.y, a.z, b.x, b.y, b.z);
-    }
-    for (let i = -3; i <= 3; i++) {
-      const v = (i / 3) * g.ry * 0.84;
-      const a = toWorld(-g.rx * 0.84, v);
-      const b = toWorld(g.rx * 0.84, v);
-      pts.push(a.x, a.y, a.z, b.x, b.y, b.z);
-    }
-    const br = hole.greenBreak;
-    const bl = Math.hypot(br.x, br.y) || 1;
-    for (let i = -2; i <= 2; i++) {
-      for (let j = -2; j <= 2; j++) {
-        const o = toWorld((i / 2) * g.rx * 0.55, (j / 2) * g.ry * 0.55);
-        const tip = toWorld((i / 2) * g.rx * 0.55 + (br.x / bl) * 1.4, (j / 2) * g.ry * 0.55 + (br.y / bl) * 1.4);
-        pts.push(o.x, o.y + 0.01, o.z, tip.x, tip.y + 0.01, tip.z);
-      }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    this.grid.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xdce8d0, transparent: true, opacity: 0.2 })));
+    this.terrain = built.terrain;
+    this.greenBlades = built.greenBlades;
+    this.fringeBlades = built.fringeBlades;
+    aimSunAt(this.sun, built.focus.cx, built.focus.cz);
   }
 
   private placeBall(session: GameSession, dt: number): void {
