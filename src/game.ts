@@ -336,12 +336,7 @@ export class GameSession {
     }
     this.lastShotPos = { ...this.ball.pos };
     this.strokes += 1;
-    if (club.id === "putter") {
-      this.audio.putt();
-      if (this.lie === "green") this.putts += 1;
-    } else {
-      this.audio.swing(this.power);
-    }
+    if (club.id === "putter" && this.lie === "green") this.putts += 1;
     const shot = {
       aim: this.aim,
       power: this.power,
@@ -351,9 +346,20 @@ export class GameSession {
       wind: this.wind,
       shape: this.shape,
     };
-    this.shotArc = sampleFlightPath(this.ball.pos, shot, this.hole());
+    // Launch first so a preview or audio failure cannot swallow the stroke.
     this.ball = launchBall(this.ball.pos, shot);
     this.swingPhase = "flight";
+    try {
+      this.shotArc = sampleFlightPath(this.lastShotPos, shot, this.hole());
+    } catch {
+      this.shotArc = [{ pos: { ...this.ball.pos }, z: this.ball.z }];
+    }
+    try {
+      if (club.id === "putter") this.audio.putt();
+      else this.audio.swing(this.power);
+    } catch {
+      /* audio must never block the shot */
+    }
   }
 
   update(dt: number): void {
