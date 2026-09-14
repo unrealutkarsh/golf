@@ -639,9 +639,9 @@ export class CourseScene {
       const back = fromAngle(aim + Math.PI, frame.back);
       const side = fromAngle(aim + Math.PI / 2, frame.side);
       desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
-      const lookDist = Math.max(16, Math.min(72, dist(ball, pin) * frame.lookAhead + 14));
+      const lookDist = Math.max(12, Math.min(38, dist(ball, pin) * frame.lookAhead + 10));
       const ahead = fromAngle(aim, lookDist);
-      look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.55, ball.y + ahead.y);
+      look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.42, ball.y + ahead.y);
     }
     const follow = view === "follow" ? 0.00022 : view === "putt" ? 0.0012 : 0.0005;
     const k = 1 - Math.pow(follow, Math.max(dt, 0.001));
