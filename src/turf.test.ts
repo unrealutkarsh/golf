@@ -19,8 +19,10 @@ describe("turf bands and nap", () => {
     const [wr] = turfAlbedoRgb("fairway", hole.tee.x + 40, hole.tee.y, 1, 0);
     expect(gg).toBeGreaterThan(gr);
     expect(gg).toBeGreaterThan(gb);
-    expect(gg / gr).toBeGreaterThan(2.0);
+    expect(gg / gr).toBeGreaterThan(1.7);
+    expect(gg / gr).toBeLessThan(2.6);
     expect(gg / gr).toBeGreaterThan(fg / fr);
+    expect(gg).toBeLessThan(0.4);
     expect(wr).toBeGreaterThan(gr);
   });
 

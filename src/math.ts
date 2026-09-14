@@ -51,6 +51,18 @@ export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/** Close half the remaining gap every `halfLife` seconds. */
+export function expApproach(current: number, target: number, halfLife: number, dt: number): number {
+  if (halfLife <= 1e-8) return target;
+  const t = 1 - Math.pow(0.5, Math.max(dt, 0) / halfLife);
+  return current + (target - current) * t;
+}
+
+/** Same ease as expApproach, wrapping through the shorter arc. */
+export function angleApproach(current: number, target: number, halfLife: number, dt: number): number {
+  return wrapAngle(current + expApproach(0, wrapAngle(target - current), halfLife, dt));
+}
+
 export function lerpVec(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
 }

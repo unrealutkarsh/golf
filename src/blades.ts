@@ -38,9 +38,9 @@ function makeNapCard(): THREE.DataTexture {
       const edge = Math.max(0, 1 - ellipse);
       const a = edge > 0.08 ? Math.min(1, edge * 1.15) * (0.35 + n * 0.22) : 0;
       const i = (y * w + x) * 4;
-      data[i] = 58 + n * 16;
-      data[i + 1] = 108 + n * 18;
-      data[i + 2] = 52 + n * 12;
+      data[i] = 62 + n * 14;
+      data[i + 1] = 88 + n * 14;
+      data[i + 2] = 48 + n * 10;
       data[i + 3] = Math.round(a * 255);
     }
   }
@@ -54,7 +54,7 @@ export function createBladeMaterial(): THREE.MeshStandardMaterial {
   const map = makeNapCard();
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x3e7240,
+    color: 0x4a5e38,
     transparent: true,
     opacity: 0.7,
     alphaTest: 0.1,
@@ -71,7 +71,7 @@ export function createFringeBladeMaterial(): THREE.MeshStandardMaterial {
   const map = makeNapCard();
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0x4a6e32,
+    color: 0x556838,
     transparent: true,
     opacity: 0.58,
     alphaTest: 0.12,

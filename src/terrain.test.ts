@@ -36,7 +36,8 @@ describe("course terrain", () => {
     const fringe = surfaceColor(hole, hole.green.cx + hole.green.rx * 1.14, hole.green.cy);
     expect(fringe[0] / fringe[1]).toBeGreaterThan(r / g);
     const fairway = surfaceColor(hole, hole.tee.x + 48, hole.tee.y);
-    expect(fairway[1]).toBeGreaterThan(0.35);
+    expect(fairway[1]).toBeGreaterThan(0.28);
+    expect(fairway[1]).toBeLessThan(0.45);
   });
 
   it("picks player, follow, and putting cameras", () => {

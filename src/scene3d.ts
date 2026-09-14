@@ -5,9 +5,9 @@ import { addCourseFoliage, bindFoliageArt, createFoliageKit, type FoliageKit } f
 import type { GameSession } from "./game";
 import { golferMeshCount as countGolferMeshes } from "./golfer";
 import { dressStandard, loadArtKit } from "./kit";
-import { hashNoise } from "./look";
-import { dist, fromAngle, type Vec2 } from "./math";
-import type { FlightSample } from "./physics";
+import { hashNoise, SCENE_TONE } from "./look";
+import { dist, fromAngle, lerp, type Vec2 } from "./math";
+import { samplePathPoint, type FlightSample } from "./physics";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -20,6 +20,7 @@ const MAX_PATH = 140;
 const TRAIL_LEN = 80;
 const BALL_RADIUS = 0.11;
 const BALL_ROLL_RADIUS = 0.16;
+export const AIM_RIBBON_SEGS = 48;
 
 /** World-space roll axis for a ground-travel velocity. Null when the ball is not moving. */
 export function ballRollAxis(vx: number, vy: number): { x: number; y: number; z: number } | null {
@@ -41,6 +42,14 @@ const SKY_VERT = /* glsl */ `
 `;
 
 const SKY_FRAG = /* glsl */ `
+  uniform vec3 uZenith;
+  uniform vec3 uMid;
+  uniform vec3 uHorizon;
+  uniform vec3 uGround;
+  uniform vec3 uHaze;
+  uniform float uGlow;
+  uniform float uWash;
+  uniform float uCloud;
   varying vec3 vDir;
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -61,27 +70,27 @@ const SKY_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vDir);
     float h = dir.y;
-    vec3 zenith = vec3(0.10, 0.38, 0.86);
-    vec3 mid = vec3(0.36, 0.64, 0.96);
-    vec3 horizon = vec3(0.70, 0.84, 0.96);
-    vec3 ground = vec3(0.16, 0.28, 0.22);
+    vec3 zenith = uZenith;
+    vec3 mid = uMid;
+    vec3 horizon = uHorizon;
+    vec3 ground = uGround;
     vec3 col = mix(ground, horizon, smoothstep(-0.18, 0.04, h));
     col = mix(col, mid, smoothstep(0.02, 0.38, h));
     col = mix(col, zenith, smoothstep(0.28, 0.94, h));
     float haze = pow(1.0 - clamp(h * 1.12 + 0.02, 0.0, 1.0), 1.65);
-    col = mix(col, vec3(0.74, 0.86, 0.96), haze * 0.22);
+    col = mix(col, uHaze, haze * 0.22);
     vec3 sunD = normalize(vec3(0.48, 0.72, 0.18));
     float glow = pow(max(dot(dir, sunD), 0.0), 18.0);
     float wash = pow(max(dot(dir, sunD), 0.0), 3.4);
-    col += vec3(1.0, 0.94, 0.78) * glow * 0.55;
-    col += vec3(1.0, 0.93, 0.80) * wash * 0.12;
+    col += vec3(1.0, 0.94, 0.78) * glow * uGlow;
+    col += vec3(1.0, 0.93, 0.80) * wash * uWash;
     vec2 cuv = dir.xz / max(abs(h) + 0.32, 0.18);
     float cloud = fbm(cuv * 0.48 + vec2(0.22, 0.08));
     float wisps = fbm(cuv * 1.35 + 5.2);
     float mask = smoothstep(0.10, 0.36, h) * smoothstep(0.88, 0.28, h);
     float banks = smoothstep(0.56, 0.82, cloud + wisps * 0.18) * mask;
     float lit = 0.82 + 0.18 * max(dot(dir, sunD), 0.0);
-    col = mix(col, vec3(0.96, 0.97, 0.98) * lit, banks * 0.42);
+    col = mix(col, vec3(0.90, 0.91, 0.92) * lit, banks * uCloud);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -131,6 +140,14 @@ export class CourseScene {
   private waterTime = { value: 0 };
   private ribbon: THREE.Mesh;
   private ribbonGeo: THREE.BufferGeometry;
+  private aimRibbon: THREE.Mesh;
+  private aimRibbonGeo: THREE.BufferGeometry;
+  private aimCenter = new Float32Array(AIM_RIBBON_SEGS * 3);
+  private aimRibbonReady = false;
+  private landColor = new THREE.Color(SCENE_TONE.landCream);
+  private landTarget = new THREE.Color(SCENE_TONE.landCream);
+  private landPos = new THREE.Vector3();
+  private landPosTarget = new THREE.Vector3();
   private time = 0;
   private w = 1;
   private h = 1;
@@ -140,29 +157,38 @@ export class CourseScene {
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x6aa0d4, 1);
+    this.renderer.setClearColor(SCENE_TONE.clearColor, 1);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const software = isSoftwareGL(this.renderer);
     this.renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = software ? 1.22 : 1.02;
+    this.renderer.toneMappingExposure = software ? SCENE_TONE.exposureSoftware : SCENE_TONE.exposureHardware;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8eb6d4, 2200, 6400);
+    this.scene.fog = new THREE.Fog(SCENE_TONE.fogColor, SCENE_TONE.fogNear, SCENE_TONE.fogFar);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.12, 6800);
     this.scene.add(this.holeGroup);
     this.sky = makeSky();
     this.scene.add(this.sky);
 
-    this.scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xa8bdd0, software ? 0.7 : 0.12));
-    const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd6ebff, software ? 0x3a6a28 : 0x243018, software ? 1.05 : 0.38);
+    this.scene.add(
+      new THREE.AmbientLight(
+        software ? SCENE_TONE.ambientSoftware : SCENE_TONE.ambientHardware,
+        software ? SCENE_TONE.ambientSoftwareInt : SCENE_TONE.ambientHardwareInt,
+      ),
+    );
+    const hemi = new THREE.HemisphereLight(
+      software ? SCENE_TONE.hemiSkySoftware : SCENE_TONE.hemiSkyHardware,
+      software ? SCENE_TONE.hemiGroundSoftware : SCENE_TONE.hemiGroundHardware,
+      software ? SCENE_TONE.hemiSoftware : SCENE_TONE.hemiHardware,
+    );
     this.scene.add(hemi);
     if (software) {
-      const fill = new THREE.DirectionalLight(0xc4d8b8, 0.28);
+      const fill = new THREE.DirectionalLight(SCENE_TONE.fillSoftware, SCENE_TONE.fillSoftwareInt);
       fill.position.set(-90, 48, 70);
       this.scene.add(fill);
     }
-    this.sun = new THREE.DirectionalLight(0xffefc8, software ? 1.45 : 2.15);
+    this.sun = new THREE.DirectionalLight(SCENE_TONE.sunColor, software ? SCENE_TONE.sunSoftware : SCENE_TONE.sunHardware);
     this.sun.castShadow = true;
     const map = software ? 1024 : 4096;
     this.sun.shadow.mapSize.set(map, map);
@@ -213,7 +239,9 @@ export class CourseScene {
         sheen: 0.22,
         sheenRoughness: 0.32,
         sheenColor: new THREE.Color(0xffffff),
-        envMapIntensity: 1.45,
+        emissive: new THREE.Color(0xf2efe6),
+        emissiveIntensity: 0.12,
+        envMapIntensity: 1.55,
         vertexColors: true,
       }),
     );
@@ -229,7 +257,7 @@ export class CourseScene {
     this.ball.castShadow = true;
     this.halo = new THREE.Mesh(
       new THREE.SphereGeometry(BALL_RADIUS * 1.55, 16, 12),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, depthWrite: false, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false }),
     );
     this.ball.add(this.halo);
     const marker = new THREE.Sprite(
@@ -289,12 +317,12 @@ export class CourseScene {
 
     this.landing = new THREE.Mesh(
       new THREE.RingGeometry(0.7, 1.05, 28),
-      new THREE.MeshBasicMaterial({ color: 0xe6d4a0, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: SCENE_TONE.landCream, side: THREE.DoubleSide, transparent: true, opacity: 0.38, depthWrite: false }),
     );
     this.landing.rotation.x = -Math.PI / 2;
     this.scene.add(this.landing);
 
-    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xe6d4a0, transparent: true, opacity: 0.4, depthWrite: false });
+    this.flightMat = new THREE.MeshBasicMaterial({ color: SCENE_TONE.aimRibbon, transparent: true, opacity: 0.28, depthWrite: false });
     this.groundPos = new Float32Array(MAX_PATH * 3);
     this.groundLine = makeLine(this.groundPos, 0x1a1a14);
     (this.groundLine.material as THREE.LineBasicMaterial).opacity = 0.22;
@@ -316,16 +344,37 @@ export class CourseScene {
     this.ribbon = new THREE.Mesh(
       this.ribbonGeo,
       new THREE.MeshBasicMaterial({
-        color: 0xfff8e0,
+        color: SCENE_TONE.aimRibbon,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.78,
+        opacity: 0.72,
         depthWrite: false,
         toneMapped: false,
       }),
     );
     this.ribbon.visible = false;
     this.scene.add(this.ribbon);
+    this.aimRibbonGeo = new THREE.BufferGeometry();
+    this.aimRibbonGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(AIM_RIBBON_SEGS * 2 * 3), 3));
+    const aimIdx: number[] = [];
+    for (let i = 0; i < AIM_RIBBON_SEGS - 1; i++) {
+      const a = i * 2;
+      aimIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+    this.aimRibbonGeo.setIndex(aimIdx);
+    this.aimRibbon = new THREE.Mesh(
+      this.aimRibbonGeo,
+      new THREE.MeshBasicMaterial({
+        color: SCENE_TONE.aimRibbon,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: SCENE_TONE.aimRibbonOpacity,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    this.aimRibbon.visible = false;
+    this.scene.add(this.aimRibbon);
 
     this.scene.add(this.pin, this.grid);
     this.resize();
@@ -337,24 +386,35 @@ export class CourseScene {
     try {
       const kit = await loadArtKit(this.renderer, lite);
       bindFoliageArt(this.foliageKit, kit);
-      dressStandard(this.turfMat, kit.fairway, { roughness: 0.84, env: 0.36, normalScale: 1.05 });
-      dressStandard(this.greenMat, kit.green, { roughness: 0.3, env: 0.78, normalScale: 0.72 });
-      this.greenMat.clearcoat = 0.08;
-      this.greenMat.clearcoatRoughness = 0.52;
-      this.greenMat.sheen = 0.48;
+      dressStandard(this.turfMat, kit.fairway, {
+        color: SCENE_TONE.fairwayTint,
+        roughness: SCENE_TONE.fairwayRoughness,
+        env: SCENE_TONE.fairwayEnv,
+        normalScale: 1.05,
+      });
+      dressStandard(this.greenMat, kit.green, {
+        color: SCENE_TONE.greenTint,
+        roughness: SCENE_TONE.greenRoughness,
+        env: SCENE_TONE.greenEnv,
+        normalScale: 0.72,
+      });
+      this.greenMat.clearcoat = 0.02;
+      this.greenMat.clearcoatRoughness = 0.72;
+      this.greenMat.sheen = SCENE_TONE.greenSheen;
+      this.greenMat.sheenColor.set(SCENE_TONE.greenSheenColor);
       dressStandard(this.sandMat, kit.sand, { roughness: 0.95, env: 0.2, normalScale: 1.4 });
       dressStandard(this.countryMat, kit.rough, { roughness: 0.92, env: 0.3, normalScale: 1.1 });
       if (kit.env) {
         this.scene.environment = kit.env;
-        this.waterMat.envMapIntensity = 1.55;
-        (this.ball.material as THREE.MeshPhysicalMaterial).envMapIntensity = 1.5;
+        this.waterMat.envMapIntensity = 1.05;
+        (this.ball.material as THREE.MeshPhysicalMaterial).envMapIntensity = 1.55;
       }
       if (kit.background && !lite) {
         this.scene.background = kit.background;
-        this.scene.backgroundBlurriness = 0.045;
-        this.scene.backgroundIntensity = 1.05;
+        this.scene.backgroundBlurriness = SCENE_TONE.backgroundBlurriness;
+        this.scene.backgroundIntensity = SCENE_TONE.backgroundIntensity;
         this.sky.visible = false;
-        this.scene.fog = new THREE.Fog(0x8eb6d4, 2400, 6400);
+        this.scene.fog = new THREE.Fog(SCENE_TONE.fogColor, SCENE_TONE.fogNearHdr, SCENE_TONE.fogFarHdr);
       }
       this.pendingArtRebuild = true;
     } catch (err) {
@@ -366,7 +426,12 @@ export class CourseScene {
     try {
       const composer = new EffectComposer(this.renderer);
       composer.addPass(new RenderPass(this.scene, this.camera));
-      const bloom = new UnrealBloomPass(new THREE.Vector2(this.w, this.h), 0.16, 0.42, 0.74);
+      const bloom = new UnrealBloomPass(
+        new THREE.Vector2(this.w, this.h),
+        SCENE_TONE.bloomStrength,
+        SCENE_TONE.bloomRadius,
+        SCENE_TONE.bloomThreshold,
+      );
       composer.addPass(bloom);
       composer.addPass(new OutputPass());
       this.composer = composer;
@@ -416,7 +481,7 @@ export class CourseScene {
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
     this.placePin(hole);
-    this.updatePath(session);
+    this.updatePath(session, dt);
     this.updateTrail(session);
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
@@ -446,6 +511,9 @@ export class CourseScene {
     this.greenBlades = null;
     this.fringeBlades = null;
     this.trailCount = 0;
+    this.pathKey = "";
+    this.aimRibbonReady = false;
+    this.aimRibbon.visible = false;
 
     const b = hole.bounds;
     const pad = 110;
@@ -473,10 +541,11 @@ export class CourseScene {
       const z = pos.getZ(i);
       const lie = lieAt(hole, { x, y: z });
       const [cr, cg, cb] = surfaceColor(hole, x, z);
-      const lift = lie === "rough" ? 0.4 : lie === "bunker" ? 0.5 : 0.58;
-      colors[i * 3] = lift + cr * 0.48;
-      colors[i * 3 + 1] = lift + cg * 0.48;
-      colors[i * 3 + 2] = lift + cb * 0.48;
+      const lift = lie === "rough" ? 0.2 : lie === "bunker" ? 0.34 : SCENE_TONE.vertexLift;
+      const scale = SCENE_TONE.vertexColorScale;
+      colors[i * 3] = lift + cr * scale;
+      colors[i * 3 + 1] = lift + cg * scale;
+      colors[i * 3 + 2] = lift + cb * scale;
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
@@ -708,45 +777,97 @@ export class CourseScene {
     this.pin.position.set(hole.pin.x, groundHeight(hole, hole.pin.x, hole.pin.y), hole.pin.y);
   }
 
-  private updatePath(session: GameSession): void {
+  private updatePath(session: GameSession, dt: number): void {
     const aiming = session.swingPhase === "aim" || session.swingPhase === "power" || session.swingPhase === "accuracy";
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
-    let path: FlightSample[] = [];
-    if (aiming && session.screen === "play") path = session.previewFlight();
-    else if (flying) path = session.shotArc;
-    const show = session.screen === "play" && path.length > 1;
-    this.groundLine.visible = show && aiming;
-    this.landing.visible = show && aiming && session.club().id !== "putter";
+    const play = session.screen === "play";
+    if (aiming && play) {
+      const path = session.previewFlight();
+      const show = path.length > 1;
+      this.aimRibbon.visible = show;
+      this.groundLine.visible = show;
+      this.landing.visible = show && session.club().id !== "putter";
+      if (this.flightMesh) this.flightMesh.visible = false;
+      if (show) this.writeAimRibbon(session, path, dt);
+      else this.aimRibbonReady = false;
+      return;
+    }
+    this.aimRibbon.visible = false;
+    this.aimRibbonReady = false;
+    this.groundLine.visible = false;
+    this.landing.visible = false;
+    if (flying && play && session.shotArc.length > 1) {
+      const path = session.shotArc;
+      const last = path[path.length - 1];
+      const key = `arc:${path.length}:${last.pos.x.toFixed(2)}:${last.pos.y.toFixed(2)}`;
+      if (key !== this.pathKey) {
+        this.pathKey = key;
+        const hole = session.hole();
+        const pts = path.slice(0, MAX_PATH).map((s) => {
+          const gh = groundHeight(hole, s.pos.x, s.pos.y);
+          return new THREE.Vector3(s.pos.x, gh + Math.max(s.z, 0.05) + BALL_RADIUS, s.pos.y);
+        });
+        this.setFlightTube(pts, 0.07);
+      }
+      if (this.flightMesh) this.flightMesh.visible = true;
+      return;
+    }
     if (this.flightMesh) this.flightMesh.visible = false;
-    if (!show) return;
-    const puttingLine = session.club().id === "putter" || session.lie === "green";
-    const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
-    this.flightMat.color.set(shape > 0.2 ? 0x8eb8d8 : shape < -0.2 ? 0xe0b080 : 0xe6d4a0);
-    this.flightMat.opacity = puttingLine ? 0.28 : 0.46;
-    (this.groundLine.material as THREE.LineBasicMaterial).opacity = puttingLine ? 0.12 : 0.2;
-    (this.landing.material as THREE.MeshBasicMaterial).opacity = puttingLine ? 0.28 : 0.4;
+  }
+
+  private writeAimRibbon(session: GameSession, path: FlightSample[], dt: number): void {
+    const n = AIM_RIBBON_SEGS;
+    const putting = session.club().id === "putter" || session.lie === "green";
     const hole = session.hole();
-    const n = Math.min(path.length, MAX_PATH);
-    const pts: THREE.Vector3[] = [];
+    const k = this.aimRibbonReady ? 1 - Math.pow(0.5, Math.max(dt, 0) / 0.055) : 1;
+    const pos = this.aimRibbonGeo.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < n; i++) {
-      const s = path[Math.round((i / Math.max(n - 1, 1)) * (path.length - 1))];
+      const s = samplePathPoint(path, i / Math.max(n - 1, 1));
       const gh = groundHeight(hole, s.pos.x, s.pos.y);
-      pts.push(new THREE.Vector3(s.pos.x, gh + Math.max(s.z, 0.05) + BALL_RADIUS, s.pos.y));
-      this.groundPos[i * 3] = s.pos.x;
-      this.groundPos[i * 3 + 1] = gh + 0.04;
-      this.groundPos[i * 3 + 2] = s.pos.y;
+      const ix = i * 3;
+      this.aimCenter[ix] = lerp(this.aimCenter[ix], s.pos.x, k);
+      this.aimCenter[ix + 1] = lerp(this.aimCenter[ix + 1], gh + Math.max(s.z, 0.04) + BALL_RADIUS, k);
+      this.aimCenter[ix + 2] = lerp(this.aimCenter[ix + 2], s.pos.y, k);
     }
+    this.aimRibbonReady = true;
+    for (let i = 0; i < n; i++) {
+      const x = this.aimCenter[i * 3];
+      const y = this.aimCenter[i * 3 + 1];
+      const z = this.aimCenter[i * 3 + 2];
+      let dx = 0;
+      let dz = 1;
+      if (i < n - 1) {
+        dx = this.aimCenter[(i + 1) * 3] - x;
+        dz = this.aimCenter[(i + 1) * 3 + 2] - z;
+      } else {
+        dx = x - this.aimCenter[(i - 1) * 3];
+        dz = z - this.aimCenter[(i - 1) * 3 + 2];
+      }
+      const len = Math.hypot(dx, dz) || 1;
+      const half = aimRibbonHalfWidth(putting, i / Math.max(n - 1, 1));
+      const px = (-dz / len) * half;
+      const pz = (dx / len) * half;
+      pos.setXYZ(i * 2, x - px, y, z - pz);
+      pos.setXYZ(i * 2 + 1, x + px, y + 0.014, z + pz);
+      this.groundPos[i * 3] = x;
+      this.groundPos[i * 3 + 1] = groundHeight(hole, x, z) + 0.04;
+      this.groundPos[i * 3 + 2] = z;
+    }
+    pos.needsUpdate = true;
+    this.aimRibbonGeo.setDrawRange(0, (n - 1) * 6);
     setLine(this.groundLine, n);
-    const last = path[path.length - 1];
-    const key = `${n}:${last.pos.x.toFixed(1)}:${last.pos.y.toFixed(1)}:${last.z.toFixed(1)}`;
-    if (key !== this.pathKey) {
-      this.pathKey = key;
-      const radius = session.club().id === "putter" ? 0.02 : 0.09;
-      this.setFlightTube(pts, radius);
-    }
-    const warn = nearOb(hole, last.pos) || lieAt(hole, last.pos) === "ob";
-    this.landing.position.set(last.pos.x, groundHeight(hole, last.pos.x, last.pos.y) + 0.05, last.pos.y);
-    (this.landing.material as THREE.MeshBasicMaterial).color.set(warn ? 0xc62828 : 0xf0d78a);
+    (this.groundLine.material as THREE.LineBasicMaterial).opacity = putting ? 0.1 : 0.18;
+    const lastX = this.aimCenter[(n - 1) * 3];
+    const lastZ = this.aimCenter[(n - 1) * 3 + 2];
+    const raw = samplePathPoint(path, 1);
+    const warn = nearOb(hole, raw.pos) || lieAt(hole, raw.pos) === "ob";
+    this.landTarget.setHex(warn ? SCENE_TONE.landWarn : SCENE_TONE.landCream);
+    this.landColor.lerp(this.landTarget, k);
+    (this.landing.material as THREE.MeshBasicMaterial).color.copy(this.landColor);
+    (this.landing.material as THREE.MeshBasicMaterial).opacity = putting ? 0.24 : 0.36;
+    this.landPosTarget.set(lastX, groundHeight(hole, lastX, lastZ) + 0.05, lastZ);
+    this.landPos.lerp(this.landPosTarget, k);
+    this.landing.position.copy(this.landPos);
   }
 
   private updateTrail(session: GameSession): void {
@@ -978,7 +1099,7 @@ function createWaterMaterial(time: { value: number }, software: boolean): THREE.
     transparent: true,
     opacity: software ? 0.84 : 0.78,
     ior: 1.333,
-    envMapIntensity: 1.45,
+    envMapIntensity: 1.05,
     clearcoat: 0.42,
     clearcoatRoughness: 0.18,
     attenuationColor: new THREE.Color(0x063038),
@@ -1038,10 +1159,27 @@ ${shader.fragmentShader}`;
   return mat;
 }
 
+export function aimRibbonHalfWidth(putting: boolean, t: number): number {
+  const base = putting ? 0.038 : 0.1;
+  const fade = 0.6 + 0.4 * (1 - t) * (1 - t);
+  return base * fade;
+}
+
 function makeSky(): THREE.Mesh {
+  const tone = SCENE_TONE;
   return new THREE.Mesh(
     new THREE.BoxGeometry(4200, 4200, 4200),
     new THREE.ShaderMaterial({
+      uniforms: {
+        uZenith: { value: new THREE.Vector3(...tone.skyZenith) },
+        uMid: { value: new THREE.Vector3(...tone.skyMid) },
+        uHorizon: { value: new THREE.Vector3(...tone.skyHorizon) },
+        uGround: { value: new THREE.Vector3(...tone.skyGround) },
+        uHaze: { value: new THREE.Vector3(...tone.skyHaze) },
+        uGlow: { value: tone.sunGlow },
+        uWash: { value: tone.sunWash },
+        uCloud: { value: tone.cloudMix },
+      },
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,
       side: THREE.BackSide,

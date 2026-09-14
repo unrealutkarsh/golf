@@ -240,7 +240,32 @@ describe("tour session", () => {
     game.meter = 0.9;
     game.update(1 / 60);
     expect(game.visualPower).toBeGreaterThan(0.3);
-    expect(game.visualPower).toBeLessThan(0.85);
+    expect(game.visualPower).toBeLessThan(0.55);
+    const after = game.visualPower;
+    game.update(1 / 60);
+    expect(game.visualPower).toBeGreaterThan(after);
+    expect(game.visualPower).toBeLessThan(0.7);
+  });
+
+  it("eases preview aim and drive distance through a three-click swing", () => {
+    const game = new GameSession(7);
+    game.startTournament();
+    const startAim = game.aim;
+    game.visualAim = startAim;
+    game.nudgeAim(0.45);
+    game.update(1 / 60);
+    expect(Math.abs(game.visualAim - game.aim)).toBeGreaterThan(0.15);
+    expect(Math.abs(game.visualAim - startAim)).toBeGreaterThan(0.02);
+    game.visualPower = 0.28;
+    game.swingPhase = "power";
+    game.meter = 0.95;
+    const mid = game.previewLanding();
+    const midLen = Math.hypot(mid.x - game.ball.pos.x, mid.y - game.ball.pos.y);
+    game.update(1 / 60);
+    const eased = game.previewLanding();
+    const easedLen = Math.hypot(eased.x - game.ball.pos.x, eased.y - game.ball.pos.y);
+    expect(easedLen).toBeGreaterThan(midLen);
+    expect(easedLen).toBeLessThan(midLen + 50);
   });
 
   it("holes a tap-in from the putting view", () => {

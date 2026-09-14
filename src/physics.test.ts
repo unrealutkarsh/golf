@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { applyGreenGrip, createBall, flightApex, launchBall, puttSpeedForRoll, sampleFlightPath, stepBall } from "./physics";
+import { applyGreenGrip, createBall, flightApex, launchBall, puttSpeedForRoll, sampleFlightPath, samplePathPoint, stepBall } from "./physics";
 import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
@@ -291,6 +291,17 @@ describe("shot physics", () => {
     const travel = Math.hypot(ball.pos.x - from.x, ball.pos.y - from.y);
     expect(travel).toBeLessThan(14);
     expect(travel).toBeGreaterThan(6);
+  });
+
+  it("samples a flight path without jumping to a raw vertex", () => {
+    const path = [
+      { pos: { x: 0, y: 0 }, z: 0 },
+      { pos: { x: 10, y: 0 }, z: 4 },
+      { pos: { x: 20, y: 0 }, z: 0 },
+    ];
+    const mid = samplePathPoint(path, 0.25);
+    expect(mid.pos.x).toBeCloseTo(5, 5);
+    expect(mid.z).toBeCloseTo(2, 5);
   });
 });
 

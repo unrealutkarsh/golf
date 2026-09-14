@@ -2,7 +2,7 @@ import { AudioBus } from "./audio";
 import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubIndex, meterYardage, recommendClub, suggestedShotPower } from "./clubs";
 import { HARBOR_DUNES, lieAt, onGreen } from "./course";
-import { hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
+import { angleApproach, expApproach, hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
 import {
   isPuttingSituation,
   PUTT_HOLE_FILL,
@@ -90,6 +90,8 @@ export class GameSession {
   shotArc: FlightSample[] = [];
   /** Smoothed power used only for aim/power preview lines — HUD meter stays live. */
   visualPower = 0.3;
+  /** Smoothed heading for the preview ribbon — live aim stays on the stick. */
+  visualAim = 0;
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -173,23 +175,22 @@ export class GameSession {
   }
 
   private previewTargetPower(): number {
+    if (this.club().id === "putter") {
+      if (this.swingPhase === "aim") return PUTT_HOLE_FILL;
+      if (this.swingPhase === "power") return this.meter;
+      return puttPowerToMeterFill(this.power, this.toPin());
+    }
     if (this.swingPhase === "aim") return this.suggestedPower();
-    if (this.swingPhase === "power") return Math.max(this.meter, 0.2);
+    if (this.swingPhase === "power") return this.meter;
     return this.power;
   }
 
   private previewShot() {
     const putting = this.club().id === "putter";
-    const puttFill = this.swingPhase === "power" ? this.meter : this.swingPhase === "aim" ? PUTT_HOLE_FILL : puttPowerToMeterFill(this.power, this.toPin());
+    const puttFill = this.swingPhase === "aim" ? PUTT_HOLE_FILL : this.visualPower;
     return {
-      aim: this.aim,
-      power: putting
-        ? scaledPuttPower(puttFill, this.toPin())
-        : this.swingPhase === "aim" || this.swingPhase === "power"
-          ? this.visualPower
-          : this.swingPhase === "accuracy"
-            ? this.power
-            : this.visualPower,
+      aim: this.visualAim,
+      power: putting ? scaledPuttPower(puttFill, this.toPin()) : this.visualPower,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
@@ -223,6 +224,7 @@ export class GameSession {
     this.ball = createBall(hole.tee);
     this.lastShotPos = { ...hole.tee };
     this.aim = defaultAim(this.ball.pos, hole);
+    this.visualAim = this.aim;
     this.swingPhase = "aim";
     this.meter = 0;
     this.meterDir = 1;
@@ -238,7 +240,7 @@ export class GameSession {
     this.gir = false;
     this.wind = this.windForHole(index);
     this.autoClub();
-    this.visualPower = this.suggestedPower();
+    this.visualPower = this.previewTargetPower();
     this.cam.x = (hole.tee.x + hole.pin.x) / 2;
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
@@ -325,6 +327,7 @@ export class GameSession {
   private fire(): void {
     if (!this.aimExplicit) {
       this.aim = defaultAim(this.ball.pos, this.hole());
+      this.visualAim = this.aim;
     }
     const club = this.club();
     if (club.id === "putter") {
@@ -367,9 +370,9 @@ export class GameSession {
     this.messageTime = Math.max(0, this.messageTime - dt);
     if (this.screen !== "play") return;
     this.refreshLie();
-    const target = this.previewTargetPower();
-    const follow = this.swingPhase === "power" ? 0.018 : 0.00035;
-    this.visualPower += (target - this.visualPower) * (1 - Math.pow(follow, Math.max(dt, 0.001)));
+    const powerLife = this.swingPhase === "power" ? 0.08 : 0.11;
+    this.visualPower = expApproach(this.visualPower, this.previewTargetPower(), powerLife, dt);
+    this.visualAim = angleApproach(this.visualAim, this.aim, 0.07, dt);
 
     if (this.swingPhase === "power") {
       this.meter += this.meterDir * dt * 0.72;
@@ -457,13 +460,14 @@ export class GameSession {
     this.lockedAccuracy = false;
     this.shotArc = [];
     this.aim = defaultAim(this.ball.pos, hole);
+    this.visualAim = this.aim;
     this.aimExplicit = false;
     this.autoClub();
     if (this.club().id === "putter" || onGreen(hole, this.ball.pos)) {
       this.power = suggestedPuttPower(this.toPin());
       this.shape = 0;
     }
-    this.visualPower = this.suggestedPower();
+    this.visualPower = this.previewTargetPower();
   }
 
   refreshLie(): void {

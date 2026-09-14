@@ -290,6 +290,20 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
   };
 }
 
+export function samplePathPoint(path: FlightSample[], t: number): FlightSample {
+  if (path.length === 0) return { pos: { x: 0, y: 0 }, z: 0 };
+  if (path.length === 1) return { pos: clone(path[0].pos), z: path[0].z };
+  const x = clamp(t, 0, 1) * (path.length - 1);
+  const i = Math.min(Math.floor(x), path.length - 2);
+  const f = x - i;
+  const a = path[i];
+  const b = path[i + 1];
+  return {
+    pos: { x: a.pos.x + (b.pos.x - a.pos.x) * f, y: a.pos.y + (b.pos.y - a.pos.y) * f },
+    z: a.z + (b.z - a.z) * f,
+  };
+}
+
 export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilRest = false): FlightSample[] {
   let ball = launchBall(from, shot);
   const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
