@@ -48,11 +48,13 @@ describe("course terrain", () => {
     const address = camFraming("player");
     const putt = camFraming("putt");
     const follow = camFraming("follow");
-    expect(address.back).toBeLessThan(8);
-    expect(address.height).toBeGreaterThan(2.4);
+    expect(address.back).toBeLessThan(6);
+    expect(address.height).toBeGreaterThan(1.8);
     expect(address.side).toBeLessThan(0.25);
-    expect(putt.side).toBeLessThan(0.28);
+    expect(putt.side).toBeLessThan(0.5);
+    expect(putt.side).toBeGreaterThan(0.2);
     expect(putt.back).toBeLessThan(address.back);
+    expect(putt.height).toBeGreaterThan(1.4);
     expect(putt.lookAhead).toBeGreaterThan(0.7);
     expect(follow.lookAhead).toBe(0);
     expect(follow.back).toBeGreaterThan(address.back);

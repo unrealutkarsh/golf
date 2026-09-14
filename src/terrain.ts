@@ -20,12 +20,14 @@ export interface CamFraming {
 
 export function camFraming(view: ResolvedCam): CamFraming {
   if (view === "putt") {
-    return { back: 2.08, height: 1.24, side: 0.14, lookAhead: 0.82, fov: 48 };
+    // Over the ball, slightly off-center so the ball sits above the HUD dock.
+    return { back: 2.48, height: 1.62, side: 0.36, lookAhead: 0.76, fov: 48 };
   }
   if (view === "follow") {
     return { back: 12.8, height: 5.4, side: 0, lookAhead: 0, fov: 50 };
   }
-  return { back: 5.4, height: 3.45, side: 0.08, lookAhead: 0.58, fov: 52 };
+  // Over-the-ball address: ball stays readable in the lower third.
+  return { back: 3.85, height: 2.22, side: 0.12, lookAhead: 0.38, fov: 50 };
 }
 
 export function camLabel(view: ResolvedCam): string {
