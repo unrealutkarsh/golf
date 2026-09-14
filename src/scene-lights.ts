@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { renderPixelRatio } from "./art";
 import { SCENE_TONE } from "./look";
 
 export function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
@@ -13,11 +14,12 @@ export function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
 }
 
 export function configureWebGLRenderer(renderer: THREE.WebGLRenderer, software: boolean): void {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(renderPixelRatio(window.devicePixelRatio));
   renderer.setClearColor(SCENE_TONE.clearColor, 1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
+  // Neutral keeps the stylized palette's hues; ACES pulled the greens toward gray-olive.
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = software ? SCENE_TONE.exposureSoftware : SCENE_TONE.exposureHardware;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 }

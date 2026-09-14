@@ -5,59 +5,48 @@ export const SUN = {
   y: 0.38,
 };
 
-/** Outdoor presentation after the PBR merge: dusk-adjacent, not washed-out noon. */
+/** Clear-day presentation for the stylized course: bright, saturated, crisp shadows, light haze only far out. */
 export const SCENE_TONE = {
-  clearColor: 0x3d5a70,
-  fogColor: 0x5e7584,
-  fogNear: 1400,
-  fogFar: 5000,
-  fogNearHdr: 1700,
-  fogFarHdr: 5100,
-  exposureHardware: 0.74,
+  clearColor: 0xb9d9ee,
+  fogColor: 0xc4dcea,
+  fogNear: 260,
+  fogFar: 1900,
+  exposureHardware: 0.86,
   exposureSoftware: 1.05,
-  sunColor: 0xeddeb8,
-  sunHardware: 1.08,
-  sunSoftware: 1.16,
-  hemiSkyHardware: 0xa8c0d4,
-  hemiGroundHardware: 0x1a2212,
-  hemiHardware: 0.2,
-  hemiSkySoftware: 0xc0d2bc,
-  hemiGroundSoftware: 0x28401c,
-  hemiSoftware: 0.76,
-  ambientHardware: 0x7e94a4,
-  ambientHardwareInt: 0.06,
-  ambientSoftware: 0xa8b8a8,
-  ambientSoftwareInt: 0.46,
-  fillSoftware: 0xadc2a2,
-  fillSoftwareInt: 0.2,
-  bloomStrength: 0.05,
-  bloomRadius: 0.52,
-  bloomThreshold: 0.9,
-  backgroundIntensity: 0.55,
-  backgroundBlurriness: 0.09,
-  skyZenith: [0.055, 0.16, 0.36] as const,
-  skyMid: [0.18, 0.32, 0.52] as const,
-  skyHorizon: [0.38, 0.48, 0.58] as const,
-  skyGround: [0.09, 0.14, 0.12] as const,
-  skyHaze: [0.46, 0.56, 0.64] as const,
-  sunGlow: 0.28,
-  sunWash: 0.06,
-  cloudMix: 0.26,
-  greenTint: 0xb2b892,
-  fairwayTint: 0x96a672,
-  greenEnv: 0.28,
-  fairwayEnv: 0.16,
-  greenRoughness: 0.62,
-  fairwayRoughness: 0.9,
-  greenSheen: 0.16,
-  greenSheenColor: 0x5a6840,
-  vertexLift: 0.32,
-  vertexColorScale: 0.4,
+  sunColor: 0xfff0d2,
+  sunHardware: 2.1,
+  sunSoftware: 2,
+  hemiSkyHardware: 0xcfe6ff,
+  hemiGroundHardware: 0x4f7334,
+  hemiHardware: 0.85,
+  hemiSkySoftware: 0xcfe6ff,
+  hemiGroundSoftware: 0x4f7334,
+  hemiSoftware: 1,
+  ambientHardware: 0xffffff,
+  ambientHardwareInt: 0,
+  ambientSoftware: 0xffffff,
+  ambientSoftwareInt: 0.1,
+  fillSoftware: 0xdfe8d6,
+  fillSoftwareInt: 0.25,
+  bloomStrength: 0.04,
+  bloomRadius: 0.4,
+  bloomThreshold: 0.96,
+  skyZenith: [0.17, 0.42, 0.8] as const,
+  skyMid: [0.36, 0.6, 0.88] as const,
+  skyHorizon: [0.7, 0.83, 0.92] as const,
+  skyGround: [0.3, 0.44, 0.26] as const,
+  skyHaze: [0.78, 0.87, 0.93] as const,
+  sunGlow: 0.35,
+  sunWash: 0.08,
+  cloudMix: 0.55,
   aimRibbon: 0xfff2d4,
   aimRibbonOpacity: 0.68,
-  landCream: 0xe4d09a,
-  landWarn: 0x7a4e3c,
+  landCream: 0xfff0b8,
+  landWarn: 0xe0553a,
 } as const;
+
+/** Near-white speckle that breaks up flat vertex color without tinting it. */
+export const NEUTRAL_DETAIL_COLORS = ["#f4f4f0", "#e9eae4", "#dfe0d9", "#ffffff", "#e4e5de"];
 
 export const GRASS_TILE_COLORS = ["#2a4a28", "#355434", "#243c22", "#3c5830", "#2c482c", "#334c2a", "#263e22"];
 
@@ -145,42 +134,4 @@ export function patternFrom(ctx: CanvasRenderingContext2D, tile: HTMLCanvasEleme
   const pattern = ctx.createPattern(tile, "repeat");
   if (!pattern) throw new Error("Pattern unavailable");
   return pattern;
-}
-
-/** Tiled grass-blade normal from a height-speckle field. */
-export function grassNormalTile(seed: string, size = 128): HTMLCanvasElement {
-  const tile = document.createElement("canvas");
-  tile.width = size;
-  tile.height = size;
-  const ctx = tile.getContext("2d");
-  if (!ctx) throw new Error("Grass normal unavailable");
-  const rng = mulberry32(hashString(seed));
-  const height = new Float32Array(size * size);
-  const salt = rng() * 8;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      height[y * size + x] =
-        hashNoise(x * 0.21 + salt, y * 0.19) * 0.46 +
-        hashNoise(x * 0.73, y * 0.68) * 0.34 +
-        hashNoise(x * 1.9 + salt, y * 1.7) * 0.2;
-    }
-  }
-  const img = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const hL = height[y * size + ((x + size - 1) % size)];
-      const hR = height[y * size + ((x + 1) % size)];
-      const hD = height[((y + size - 1) % size) * size + x];
-      const hU = height[((y + 1) % size) * size + x];
-      const [nx, ny, nz] = heightToNormal(hL, hR, hD, hU, 2.4);
-      const packed = packNormalRgb(nx, ny, nz);
-      const i = (y * size + x) * 4;
-      img.data[i] = Math.round(packed[0] * 255);
-      img.data[i + 1] = Math.round(packed[1] * 255);
-      img.data[i + 2] = Math.round(packed[2] * 255);
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return tile;
 }

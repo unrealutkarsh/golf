@@ -79,13 +79,46 @@ export function bindFoliageArt(kit: FoliageKit, art: ArtKit): void {
   kit.bark.map = art.bark.map;
   kit.bark.normalMap = art.bark.normal;
   kit.bark.needsUpdate = true;
-  kit.impostor.map = art.leaf.map;
-  kit.impostor.alphaMap = art.leaf.alpha;
-  kit.impostor.transparent = true;
-  kit.impostor.alphaTest = 0.22;
+  // Far tree lines use a painted clump silhouette; the photo leaf strips read as black sticks at distance.
+  kit.impostor.map = makeTreeLineTexture();
+  kit.impostor.alphaMap = null;
+  kit.impostor.color.set(0xffffff);
+  kit.impostor.transparent = false;
+  kit.impostor.opacity = 1;
+  kit.impostor.alphaTest = 0.4;
   kit.impostor.side = THREE.DoubleSide;
   kit.impostor.needsUpdate = true;
   kit.ready = art.trees.length > 0;
+}
+
+export function makeTreeLineTexture(): THREE.CanvasTexture {
+  const w = 128;
+  const h = 192;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#4a3a2a";
+    ctx.fillRect(w * 0.46, h * 0.62, w * 0.08, h * 0.38);
+    const blobs = [
+      [0.5, 0.3, 0.3, "#4f8a3a"],
+      [0.32, 0.46, 0.24, "#467f34"],
+      [0.68, 0.46, 0.24, "#467f34"],
+      [0.5, 0.56, 0.28, "#3d7230"],
+      [0.42, 0.2, 0.18, "#5a9642"],
+      [0.6, 0.24, 0.16, "#5a9642"],
+    ] as const;
+    for (const [x, y, r, color] of blobs) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x * w, y * h, r * w, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 function pickTemplate(kit: FoliageKit, kind: TreeKind, x: number, z: number): THREE.Group | null {
@@ -266,11 +299,14 @@ function addHorizonImpostors(parent: THREE.Group, kit: FoliageKit, hole: Hole): 
     const x = cx + Math.cos(a) * rad;
     const z = cz + Math.sin(a) * rad;
     if (playableLie(lieAt(hole, { x, y: z }))) continue;
+    // Flat cards only hold up far away; anywhere near the line of play they read as cutouts.
+    if (distToSegment(x, z, hole.tee.x, hole.tee.y, hole.pin.x, hole.pin.y) < 85) continue;
     const ground = groundHeight(hole, x, z);
     const h = 16 + hashNoise(i, 9) * 14;
     const w = 10 + hashNoise(i, 11) * 8;
     dummy.position.set(x, ground + h * 0.46, z);
-    dummy.rotation.set(0, a + 0.4, (hashNoise(i, 4) - 0.5) * 0.08);
+    // Face the hole so the flat card is never seen edge-on (edge-on cards read as tall sticks).
+    dummy.rotation.set(0, Math.atan2(cx - x, cz - z), (hashNoise(i, 4) - 0.5) * 0.08);
     dummy.scale.set(w, h, 1);
     dummy.updateMatrix();
     mats.push(dummy.matrix.clone());
@@ -281,6 +317,13 @@ function addHorizonImpostors(parent: THREE.Group, kit: FoliageKit, hole: Hole): 
   mesh.frustumCulled = false;
   if (mats.length === 0) mesh.count = 0;
   parent.add(mesh);
+}
+
+function distToSegment(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
 }
 
 export function volumeTreeMeshCount(kind: TreeKind = "oak"): number {

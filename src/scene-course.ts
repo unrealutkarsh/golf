@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { buildFringeBladeField, buildGreenBladeField } from "./blades";
-import { lieAt } from "./course";
 import { addCourseFoliage, type FoliageKit } from "./foliage";
-import { hashNoise, SCENE_TONE } from "./look";
-import { groundHeight, surfaceColor } from "./terrain";
+import { courseColor } from "./art";
+import { hashNoise } from "./look";
+import { groundHeight } from "./terrain";
 import { buildGreenOverlay } from "./turf";
 import type { Hole } from "./types";
 
@@ -26,7 +26,7 @@ export function addBunkerLips(
   sand: THREE.MeshStandardMaterial,
   countryMat: THREE.MeshStandardMaterial,
 ): void {
-  const lip = new THREE.MeshStandardMaterial({ color: 0x6a7a48, roughness: 0.94, map: countryMat.map ?? undefined });
+  const lip = new THREE.MeshStandardMaterial({ color: 0x5f9f37, roughness: 1, map: countryMat.map ?? undefined });
   const profile = [
     new THREE.Vector2(0, -0.34),
     new THREE.Vector2(0.22, -0.3),
@@ -129,22 +129,24 @@ export function addRollingCountry(group: THREE.Group, hole: Hole, cx: number, cz
 
 export function rebuildPin(pin: THREE.Group): void {
   pin.clear();
+  // A regulation-height stick (~7 ft) with a flag that stays saturated in any light.
   const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.014, 0.018, 1.85, 10),
-    new THREE.MeshStandardMaterial({ color: 0xf7f3ec, roughness: 0.28, metalness: 0.08 }),
+    new THREE.CylinderGeometry(0.02, 0.024, 2.4, 10),
+    new THREE.MeshStandardMaterial({ color: 0xfaf7ef, roughness: 0.4 }),
   );
-  pole.position.y = 0.96;
+  pole.position.y = 1.2;
   pole.castShadow = true;
   const ferrule = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 0.04, 8),
-    new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.35, metalness: 0.4 }),
+    new THREE.CylinderGeometry(0.03, 0.03, 0.05, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.35 }),
   );
-  ferrule.position.y = 1.86;
+  ferrule.position.y = 2.42;
   const flag = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.62, 0.34),
-    new THREE.MeshStandardMaterial({ color: 0xc62828, side: THREE.DoubleSide, roughness: 0.46 }),
+    new THREE.PlaneGeometry(0.95, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0xff3b2f, side: THREE.DoubleSide, toneMapped: false }),
   );
-  flag.position.set(0.33, 1.68, 0);
+  flag.position.set(0.5, 2.1, 0);
+  flag.castShadow = true;
   const well = new THREE.Mesh(
     new THREE.CylinderGeometry(0.19, 0.17, 0.16, 20),
     new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.9 }),
@@ -220,15 +222,7 @@ export function buildPlayableTerrain(hole: Hole, turfMat: THREE.MeshStandardMate
   }
   const colors = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    const lie = lieAt(hole, { x, y: z });
-    const [cr, cg, cb] = surfaceColor(hole, x, z);
-    const lift = lie === "rough" ? 0.2 : lie === "bunker" ? 0.34 : SCENE_TONE.vertexLift;
-    const scale = SCENE_TONE.vertexColorScale;
-    colors[i * 3] = lift + cr * scale;
-    colors[i * 3 + 1] = lift + cg * scale;
-    colors[i * 3 + 2] = lift + cb * scale;
+    colors.set(courseColor(hole, pos.getX(i), pos.getZ(i)), i * 3);
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();

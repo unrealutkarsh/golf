@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { lieAt, onGreen } from "./course";
-import { fbm, grassNormalTile, grassTile, GRASS_TILE_COLORS, hashNoise, heightToNormal, packNormalRgb } from "./look";
+import { COURSE_PALETTE, courseColor } from "./art";
+import { fbm, grassTile, hashNoise, heightToNormal, NEUTRAL_DETAIL_COLORS, packNormalRgb } from "./look";
 import { ellipseRadial } from "./math";
 import { groundHeight } from "./terrain";
 import type { Hole } from "./types";
@@ -226,7 +227,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
 }
 
 export function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", [...GRASS_TILE_COLORS], 256, 6400);
+  const tile = grassTile("ptg-grass-detail", [...NEUTRAL_DETAIL_COLORS], 256, 6400);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -235,35 +236,26 @@ export function makeGrassDetailTex(): THREE.CanvasTexture {
   return tex;
 }
 
-export function makeGrassDetailNormal(): THREE.CanvasTexture {
-  const tex = new THREE.CanvasTexture(grassNormalTile("ptg-grass-n", 128));
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 export function createTurfMaterial(): THREE.MeshStandardMaterial {
+  // Flat, matte turf: color comes from the baked palette in the vertex colors, the map only adds speckle.
   const mat = new THREE.MeshStandardMaterial({
     map: makeGrassDetailTex(),
-    normalMap: makeGrassDetailNormal(),
-    roughness: 0.88,
+    roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.22,
+    envMapIntensity: 0.05,
     vertexColors: true,
   });
-  attachWorldUv(mat, 0.038);
+  attachWorldUv(mat, 0.05);
   return mat;
 }
 
 export function createCountryMaterial(): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
     map: makeGrassDetailTex(),
-    normalMap: makeGrassDetailNormal(),
-    color: 0xc8d4b0,
-    roughness: 0.92,
+    color: COURSE_PALETTE.country,
+    roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.28,
+    envMapIntensity: 0.05,
   });
   attachWorldUv(mat, 0.022);
   return mat;
@@ -271,10 +263,10 @@ export function createCountryMaterial(): THREE.MeshStandardMaterial {
 
 export function createSandMaterial(): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xe8c98a,
-    roughness: 0.94,
+    color: COURSE_PALETTE.bunker,
+    roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.18,
+    envMapIntensity: 0.05,
   });
   attachWorldUv(mat, 0.09);
   return mat;
@@ -283,16 +275,10 @@ export function createSandMaterial(): THREE.MeshStandardMaterial {
 export function createGreenMaterial(): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({
     map: makeGrassDetailTex(),
-    normalMap: makeGrassDetailNormal(),
-    roughness: 0.62,
+    roughness: 0.9,
     metalness: 0,
-    envMapIntensity: 0.28,
-    sheen: 0.16,
-    sheenColor: new THREE.Color(0x5a6840),
-    sheenRoughness: 0.62,
-    clearcoat: 0.02,
-    clearcoatRoughness: 0.72,
-    ior: 1.33,
+    envMapIntensity: 0.05,
+    vertexColors: true,
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
@@ -369,6 +355,12 @@ export function buildGreenOverlay(hole: Hole, mat: THREE.MeshStandardMaterial): 
     const z = g.cy + lx * Math.sin(g.rotation) + lz * Math.cos(g.rotation);
     pos.setXYZ(i, x, groundHeight(hole, x, z) + 0.018, z);
   }
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const [r, gr, b] = courseColor(hole, pos.getX(i), pos.getZ(i));
+    colors.set([r, gr, b], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
