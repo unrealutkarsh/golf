@@ -3,10 +3,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { clubById, clubIndex } from "./clubs";
-import { HARBOR_DUNES } from "./course";
+import { HARBOR_DUNES, lieAt } from "./course";
 import { GameSession } from "./game";
 import { dist } from "./math";
 import { applyGreenGrip, createBall, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
 import { ballRollAxis, ballRollRadians } from "./scene3d";
 import { camFraming, camLabel, resolveCamView, suggestedPuttPower } from "./terrain";
 
@@ -53,6 +54,17 @@ describe("dummy golfer stays gone", () => {
     expect(scene).not.toMatch(/this\.scene\.add\([^)]*this\.golfer/);
     expect(scene).not.toMatch(/new THREE\.CylinderGeometry\(0\.13,\s*0\.15,\s*0\.82/);
     expect(scene).not.toMatch(/new THREE\.SphereGeometry\(0\.13,\s*10,\s*8\)/);
+    expect(scene).not.toMatch(/buildAddressGolfer|snapGolferToBall|poseGolferClub/);
+    expect(scene).not.toMatch(/root\.name\s*=\s*"golfer"/);
+  });
+
+  it("does not mention a dummy player mesh in HUD or boot", () => {
+    const ui = readSrc("ui.ts");
+    const main = readSrc("main.ts");
+    expect(ui).not.toMatch(/\bbuildGolfer\b|\bplaceGolfer\b/);
+    expect(main).not.toMatch(/\bbuildGolfer\b|\bplaceGolfer\b/);
+    expect(ui).toMatch(/no player mesh/);
+    expect(ui).toMatch(/over the ball/);
   });
 
   it("does not frame cameras around dummy clearance", () => {
@@ -73,6 +85,31 @@ describe("tour-sim cameras", () => {
     expect(camFraming("follow").lookAhead).toBe(0);
     expect(camFraming("putt").lookAhead).toBeGreaterThan(0.65);
     expect(camFraming("follow").back).toBeGreaterThan(camFraming("player").back);
+  });
+
+  it("resolves play cameras from the live session without a dummy frame", () => {
+    const game = new GameSession(31);
+    game.startTournament();
+    game.camMode = "auto";
+    expect(game.putting()).toBe(false);
+    expect(game.resolvedCam()).toBe("player");
+    expect(camLabel(game.resolvedCam())).toBe("address");
+
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 6, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    expect(game.putting()).toBe(true);
+    expect(game.resolvedCam()).toBe("putt");
+
+    game.startTournament();
+    game.power = 1;
+    game.accuracy = 0;
+    game.swingPhase = "accuracy";
+    game.meter = 0.5;
+    game.tap();
+    expect(game.swingPhase).toBe("flight");
+    expect(game.resolvedCam()).toBe("follow");
   });
 });
 
@@ -108,6 +145,10 @@ describe("putting grip and roll", () => {
   it("rotates the 3D ball about the travel-normal axis", () => {
     const axis = ballRollAxis(8, 0);
     expect(axis).toEqual({ x: 0, y: 0, z: -1 });
+    const diag = ballRollAxis(3, 4);
+    expect(diag).toBeTruthy();
+    expect(diag!.x * 3 + diag!.z * 4).toBeCloseTo(0, 8);
+    expect(diag!.y).toBe(0);
     expect(ballRollAxis(0, 0)).toBeNull();
     expect(ballRollRadians(8, 1 / 60)).toBeGreaterThan(0.8);
     expect(ballRollRadians(0, 1 / 60)).toBe(0);
@@ -171,5 +212,35 @@ describe("soft preview line", () => {
     expect(renderer).toMatch(/rgba\(212, 175, 55, 0\.38\)/);
     expect(renderer).not.toMatch(/rgba\(212, 175, 55, 0\.85\)/);
     expect(renderer).toMatch(/rgba\(230, 212, 160, 0\.55\)/);
+  });
+
+  it("keeps the 3D putt tube and pin line faded", () => {
+    const scene = readSrc("scene3d.ts");
+    expect(scene).toMatch(/LineDashedMaterial/);
+    expect(scene).toMatch(/puttingLine \? 0\.28 : 0\.46/);
+    expect(scene).toMatch(/putter" \? 0\.02 : 0\.09/);
+  });
+});
+
+describe("course, lies, and scoring still hold", () => {
+  it("keeps Harbor Dunes a par-36 nine with green pins", () => {
+    expect(HARBOR_DUNES.holes).toHaveLength(9);
+    expect(HARBOR_DUNES.par).toBe(36);
+    for (const hole of HARBOR_DUNES.holes) {
+      expect(lieAt(hole, hole.pin)).toBe("green");
+      expect(["tee", "fairway"]).toContain(lieAt(hole, hole.tee));
+    }
+  });
+
+  it("still names scores and signs a card", () => {
+    expect(scoreName(3, 4)).toBe("Birdie");
+    expect(scoreName(1, 3)).toBe("Ace");
+    const game = new GameSession(40);
+    game.startTournament();
+    game.playThroughForTest();
+    expect(totalStrokes(game.results)).toBe(36);
+    expect(toPar(game.results)).toBe(0);
+    expect(formatToPar(0)).toBe("E");
+    expect(game.screen).toBe("roundEnd");
   });
 });
