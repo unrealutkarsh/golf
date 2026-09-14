@@ -8,6 +8,10 @@ import {
   groundHeight,
   camFraming,
   camLabel,
+  PUTT_HOLE_FILL,
+  PUTT_ROLL_YARDS,
+  puttMeterYards,
+  puttPowerToMeterFill,
   resolveCamView,
   shapeLabel,
   scaledPuttPower,
@@ -68,12 +72,18 @@ describe("course terrain", () => {
   });
 
   it("scales putt power with leftover distance", () => {
+    expect(PUTT_ROLL_YARDS).toBe(42);
+    expect(PUTT_HOLE_FILL).toBe(0.5);
     expect(suggestedPuttPower(6)).toBeLessThan(suggestedPuttPower(18));
     expect(suggestedPuttPower(6)).toBeGreaterThan(0.08);
     expect(suggestedPuttPower(80)).toBeLessThanOrEqual(0.64);
+    expect(suggestedPuttPower(8)).toBeCloseTo(scaledPuttPower(PUTT_HOLE_FILL, 8), 8);
     expect(scaledPuttPower(0.5, 1.2)).toBeLessThan(0.12);
     expect(scaledPuttPower(0.5, 1.2)).toBeGreaterThan(0.02);
     expect(scaledPuttPower(1, 8)).toBeGreaterThan(scaledPuttPower(0.4, 8));
+    expect(puttMeterYards(PUTT_HOLE_FILL, 10)).toBeCloseTo(10, 5);
+    expect(puttPowerToMeterFill(scaledPuttPower(0.42, 7), 7)).toBeCloseTo(0.42, 5);
+    expect(puttPowerToMeterFill(scaledPuttPower(0.8, 14), 14)).toBeCloseTo(0.8, 5);
     expect(shapeLabel(0.8)).toBe("Draw");
     expect(shapeLabel(-0.8)).toBe("Fade");
   });

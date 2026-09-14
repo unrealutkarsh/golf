@@ -3,7 +3,7 @@ import { lieAt, nearOb } from "./course";
 import { buildFringeBladeField, buildGreenBladeField, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
 import { addCourseFoliage, bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
-import { buildAddressGolfer, golferMeshCount as countGolferMeshes, poseGolferClub, snapGolferToBall } from "./golfer";
+import { golferMeshCount as countGolferMeshes } from "./golfer";
 import { dressStandard, loadArtKit } from "./kit";
 import { hashNoise } from "./look";
 import { dist, fromAngle, type Vec2 } from "./math";
@@ -13,20 +13,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { buildGreenOverlay, createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
-import {
-  bladeHeight,
-  bladeKeepChance,
-  bladeWidth,
-  grassBudget,
-  groundHeight,
-  isPuttingSituation,
-  camFraming,
-  resolveCamView,
-  surfaceColor,
-  turfLush,
-  type ResolvedCam,
-} from "./terrain";
+import { camFraming, groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
 const MAX_PATH = 140;
@@ -837,47 +824,6 @@ export class CourseScene {
     attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.08, to.y);
     attr.needsUpdate = true;
     this.puttAim.computeLineDistances();
-  }
-
-  private updateGrass(session: GameSession, hole: Hole, view: ResolvedCam): void {
-    const focus = session.ball.pos;
-    if (this.blades && dist(focus, this.grassAt) < 1.8) return;
-    this.grassAt = { ...focus };
-    if (this.blades) this.scene.remove(this.blades);
-    const budget = grassBudget(lieAt(hole, focus), BLADE_COUNT);
-    const mesh = new THREE.InstancedMesh(this.bladeGeo, this.bladeMat, budget);
-    const dummy = new THREE.Object3D();
-    const color = new THREE.Color();
-    let written = 0;
-    for (let i = 0; i < budget * 6 && written < budget; i++) {
-      const close = written < budget * 0.5;
-      const span = view === "putt" ? (close ? 3.6 : 8.5) : view === "player" ? (close ? 6 : 15) : (close ? 5 : 11);
-      const a = fbm(focus.x * 0.3 + i * 1.7, focus.y * 0.3 + i) * Math.PI * 2;
-      const r = Math.sqrt(fbm(i * 0.37, focus.x + i * 0.11)) * span;
-      const x = focus.x + Math.cos(a) * r;
-      const z = focus.y + Math.sin(a) * r;
-      const lie = lieAt(hole, { x, y: z });
-      const h = bladeHeight(lie);
-      if (h <= 0) continue;
-      if (fbm(x * 5.3 + 2.1, z * 5.3) > bladeKeepChance(lie)) continue;
-      dummy.position.set(x, groundHeight(hole, x, z), z);
-      dummy.rotation.set(0, a, (fbm(x, z) - 0.5) * (lie === "rough" ? 0.38 : lie === "green" ? 0.04 : 0.12));
-      const lean = lie === "green" ? 0.94 + fbm(x * 2, z * 2) * 0.08 : 0.82 + fbm(x * 2, z * 2) * 0.4;
-      dummy.scale.set(bladeWidth(lie), h * lean, 1);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(written, dummy.matrix);
-      const c = surfaceColor(hole, x, z);
-      if (lie === "green") color.setRGB(0.2, 0.46, 0.3);
-      else if (lie === "rough") color.setRGB(0.32 + c[0] * 0.2, 0.42 + c[1] * 0.15, 0.16);
-      else color.setRGB(Math.min(1, c[0] * 0.85 + 0.06), Math.min(1, c[1] * 1.18), c[2] * 0.8);
-      mesh.setColorAt(written, color);
-      written += 1;
-    }
-    mesh.count = written;
-    mesh.frustumCulled = false;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    this.blades = mesh;
-    this.scene.add(mesh);
   }
 
   private updateCamera(session: GameSession, hole: Hole, view: ResolvedCam, putting: boolean, dt: number): void {
