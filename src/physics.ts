@@ -117,8 +117,9 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
 /** Launch speed that rolls about `yards` on a flat green. */
 export function puttSpeedForRoll(yards: number): number {
   const y = Math.max(0.2, yards);
+  // Short tap-ins need a floor so green die-off cannot stall them short of the cup.
   if (y < 3.5) return y * 2.4 + 1.1;
-  return y * 2.02 + 0.8;
+  return y * 1.62;
 }
 
 /** Grass grab on the putting surface: sliding friction bites harder than rolling. */

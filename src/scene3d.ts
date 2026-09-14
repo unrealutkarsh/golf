@@ -19,6 +19,18 @@ import type { Hole } from "./types";
 const MAX_PATH = 140;
 const TRAIL_LEN = 80;
 const BALL_RADIUS = 0.11;
+const BALL_ROLL_RADIUS = 0.16;
+
+/** World-space roll axis for a ground-travel velocity. Null when the ball is not moving. */
+export function ballRollAxis(vx: number, vy: number): { x: number; y: number; z: number } | null {
+  const speed = Math.hypot(vx, vy);
+  if (speed <= 0.04) return null;
+  return { x: vy / speed, y: 0, z: -vx / speed };
+}
+
+export function ballRollRadians(speed: number, dt: number, radius = BALL_ROLL_RADIUS): number {
+  return (speed * dt) / radius;
+}
 
 const SKY_VERT = /* glsl */ `
   varying vec3 vDir;
@@ -686,9 +698,9 @@ export class CourseScene {
     this.shadow.scale.setScalar(air);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = session.ball.z > 8 ? 0.12 : 0.36;
     const speed = Math.hypot(session.ball.vel.x, session.ball.vel.y);
-    if (speed > 0.04) {
-      const axis = new THREE.Vector3(session.ball.vel.y, 0, -session.ball.vel.x).normalize();
-      this.ball.rotateOnWorldAxis(axis, (speed * dt) / 0.16);
+    const axis = ballRollAxis(session.ball.vel.x, session.ball.vel.y);
+    if (axis) {
+      this.ball.rotateOnWorldAxis(new THREE.Vector3(axis.x, axis.y, axis.z), ballRollRadians(speed, dt));
     }
   }
 

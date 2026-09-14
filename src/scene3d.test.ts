@@ -54,6 +54,11 @@ describe("merge leftovers", () => {
     expect(sceneSrc.match(/type ResolvedCam/g)).toHaveLength(1);
     expect(sceneSrc).not.toMatch(/new THREE\.CylinderGeometry\([^)]+\),\s*m\.(skin|shirt|pants)/);
     expect(sceneSrc).not.toMatch(/buildDummyGolfer|dummyGolfer|stick figure/i);
+    expect(sceneSrc).not.toMatch(/\bbuildGolfer\s*\(/);
+    expect(sceneSrc).not.toMatch(/\bplaceGolfer\s*\(/);
+    expect(sceneSrc).not.toMatch(/private golfer\s*=/);
+    expect(sceneSrc).not.toMatch(/this\.golfer/);
+    expect(sceneSrc).not.toMatch(/buildAddressGolfer\s*\(/);
   });
 
   it("exports leftover-relative putt constants used by the session", () => {
