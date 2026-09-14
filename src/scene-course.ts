@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { buildFringeBladeField, buildGreenBladeField } from "./blades";
 import { addCourseFoliage, type FoliageKit } from "./foliage";
 import { courseColor } from "./art";
+import { disposeChildren } from "./scene-dispose";
 import { hashNoise } from "./look";
 import { groundHeight } from "./terrain";
 import { buildGreenOverlay } from "./turf";
@@ -128,7 +129,7 @@ export function addRollingCountry(group: THREE.Group, hole: Hole, cx: number, cz
 }
 
 export function rebuildPin(pin: THREE.Group): void {
-  pin.clear();
+  disposeChildren(pin);
   // A regulation-height stick (~7 ft) with a flag that stays saturated in any light.
   const pole = new THREE.Mesh(
     new THREE.CylinderGeometry(0.02, 0.024, 2.4, 10),
@@ -162,7 +163,7 @@ export function rebuildPin(pin: THREE.Group): void {
 }
 
 export function rebuildPuttGrid(grid: THREE.Group, hole: Hole): void {
-  grid.clear();
+  disposeChildren(grid);
   const g = hole.green;
   const rot = g.rotation;
   const cos = Math.cos(rot);

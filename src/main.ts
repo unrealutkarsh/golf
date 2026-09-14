@@ -130,8 +130,10 @@ window.addEventListener("keydown", (e) => {
     if (session.screen === "play" && !session.helpOpen && !session.scorecardOpen) session.tap();
     return;
   }
-  if (key === "arrowleft" || key === "a") session.nudgeAim(-0.04);
-  if (key === "arrowright" || key === "d") session.nudgeAim(0.04);
+  // Finer steps on the green, where a few inches of aim decide whether the break takes it in.
+  const nudge = session.putting() ? 0.008 : 0.04;
+  if (key === "arrowleft" || key === "a") session.nudgeAim(-nudge);
+  if (key === "arrowright" || key === "d") session.nudgeAim(nudge);
   if (key === "q" || key === "[") session.cycleClub(-1);
   if (key === "e" || key === "]") session.cycleClub(1);
   if (key === "z") session.nudgeShape(-0.25);

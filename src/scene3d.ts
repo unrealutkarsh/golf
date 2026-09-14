@@ -5,7 +5,7 @@ import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { loadArtKit } from "./kit";
 import { SCENE_TONE } from "./look";
-import { fromAngle, lerp, type Vec2 } from "./math";
+import { lerp, type Vec2 } from "./math";
 import { samplePathPoint, type FlightSample } from "./physics";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
@@ -15,6 +15,8 @@ import { pinMarkerOpacity, renderPixelRatio, screenConstantScale } from "./art";
 import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
+import { collectShared, disposeChildren } from "./scene-dispose";
+import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
 import { makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
@@ -65,7 +67,8 @@ export class CourseScene implements CameraRig {
   private trailGlow: THREE.Line;
   private trailPos: Float32Array;
   private trailCount = 0;
-  private puttAim: THREE.Line;
+  /** Dotted putt preview that bends with the green's slope. */
+  private puttLine: PuttLine;
   private turfMat: THREE.MeshStandardMaterial;
   private sandMat: THREE.MeshStandardMaterial;
   private countryMat: THREE.MeshStandardMaterial;
@@ -121,19 +124,8 @@ export class CourseScene implements CameraRig {
     this.foliageKit = createFoliageKit();
     void this.loadCourseArt(software);
 
-    const puttGeo = new THREE.BufferGeometry();
-    puttGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
-    this.puttAim = new THREE.Line(
-      puttGeo,
-      new THREE.LineDashedMaterial({
-        color: 0xe8d8b0,
-        transparent: true,
-        opacity: 0.55,
-        dashSize: 0.32,
-        gapSize: 0.22,
-      }),
-    );
-    this.scene.add(this.puttAim);
+    this.puttLine = createPuttLine();
+    this.scene.add(this.puttLine.dots, this.puttLine.stop);
 
     this.ball = createGolfBallMesh();
     this.ballGlow = createBallGlow();
@@ -332,7 +324,13 @@ export class CourseScene implements CameraRig {
 
   private rebuildHole(hole: Hole, index: number): void {
     this.builtHole = index;
-    this.holeGroup.clear();
+    // Free the previous hole's GPU buffers; only the materials and tree templates reused by every hole survive.
+    const kit = this.foliageKit;
+    const shared = collectShared(kit.trees, [
+      this.turfMat, this.greenMat, this.bladeMat, this.fringeMat, this.countryMat, this.sandMat, this.waterMat,
+      kit.leaf, kit.bark, kit.contact, kit.impostor, kit.card,
+    ]);
+    disposeChildren(this.holeGroup, shared);
     this.terrain = null;
     this.greenBlades = null;
     this.fringeBlades = null;
@@ -579,18 +577,14 @@ export class CourseScene implements CameraRig {
   }
 
   private updatePuttAim(session: GameSession, hole: Hole, putting: boolean): void {
-    const show = session.screen === "play" && putting && session.swingPhase !== "flight";
-    this.puttAim.visible = show;
-    if (!show) return;
-    const from = session.ball.pos;
-    const yards = Math.max(1.1, Math.min(session.meterYards(), session.toPin() * 1.35));
-    const ahead = fromAngle(session.visualAim, yards);
-    const to = { x: from.x + ahead.x, y: from.y + ahead.y };
-    const attr = this.puttAim.geometry.getAttribute("position") as THREE.BufferAttribute;
-    attr.setXYZ(0, from.x, groundHeight(hole, from.x, from.y) + 0.08, from.y);
-    attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.08, to.y);
-    attr.needsUpdate = true;
-    this.puttAim.computeLineDistances();
+    const aiming = session.swingPhase === "aim" || session.swingPhase === "power" || session.swingPhase === "accuracy";
+    const show = session.screen === "play" && putting && aiming && session.club().id === "putter";
+    if (!show) {
+      this.puttLine.dots.visible = false;
+      this.puttLine.stop.visible = false;
+      return;
+    }
+    writePuttLine(this.puttLine, hole, session.previewPutt());
   }
 }
 
