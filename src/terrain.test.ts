@@ -6,8 +6,15 @@ import {
   bladeWidth,
   grassBudget,
   groundHeight,
+  camFraming,
+  camLabel,
+  PUTT_HOLE_FILL,
+  PUTT_ROLL_YARDS,
+  puttMeterYards,
+  puttPowerToMeterFill,
   resolveCamView,
   shapeLabel,
+  scaledPuttPower,
   suggestedPuttPower,
   surfaceColor,
   turfLush,
@@ -26,6 +33,10 @@ describe("course terrain", () => {
     const [r, g, b] = surfaceColor(hole, hole.green.cx, hole.green.cy);
     expect(g).toBeGreaterThan(r);
     expect(g).toBeGreaterThan(b);
+    const fringe = surfaceColor(hole, hole.green.cx + hole.green.rx * 1.14, hole.green.cy);
+    expect(fringe[0] / fringe[1]).toBeGreaterThan(r / g);
+    const fairway = surfaceColor(hole, hole.tee.x + 48, hole.tee.y);
+    expect(fairway[1]).toBeGreaterThan(0.35);
   });
 
   it("picks player, follow, and putting cameras", () => {
@@ -35,6 +46,22 @@ describe("course terrain", () => {
     expect(resolveCamView("auto", "flight", false)).toBe("follow");
     expect(resolveCamView("auto", "aim", false)).toBe("player");
     expect(resolveCamView("follow", "aim", true)).toBe("follow");
+    expect(camLabel("player")).toBe("address");
+    expect(camLabel("follow")).toBe("follow");
+    expect(camLabel("putt")).toBe("putt");
+    const address = camFraming("player");
+    const putt = camFraming("putt");
+    const follow = camFraming("follow");
+    expect(address.back).toBeLessThan(6);
+    expect(address.height).toBeGreaterThan(1.8);
+    expect(address.side).toBeLessThan(0.25);
+    expect(putt.side).toBeLessThan(0.5);
+    expect(putt.side).toBeGreaterThan(0.2);
+    expect(putt.back).toBeLessThan(address.back);
+    expect(putt.height).toBeGreaterThan(1.4);
+    expect(putt.lookAhead).toBeGreaterThan(0.7);
+    expect(follow.lookAhead).toBe(0);
+    expect(follow.back).toBeGreaterThan(address.back);
     expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);
     expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
     expect(bladeWidth("green")).toBeLessThan(bladeWidth("fairway"));
@@ -45,9 +72,18 @@ describe("course terrain", () => {
   });
 
   it("scales putt power with leftover distance", () => {
+    expect(PUTT_ROLL_YARDS).toBe(42);
+    expect(PUTT_HOLE_FILL).toBe(0.5);
     expect(suggestedPuttPower(6)).toBeLessThan(suggestedPuttPower(18));
-    expect(suggestedPuttPower(6)).toBeGreaterThan(0.13);
+    expect(suggestedPuttPower(6)).toBeGreaterThan(0.08);
     expect(suggestedPuttPower(80)).toBeLessThanOrEqual(0.64);
+    expect(suggestedPuttPower(8)).toBeCloseTo(scaledPuttPower(PUTT_HOLE_FILL, 8), 8);
+    expect(scaledPuttPower(0.5, 1.2)).toBeLessThan(0.12);
+    expect(scaledPuttPower(0.5, 1.2)).toBeGreaterThan(0.02);
+    expect(scaledPuttPower(1, 8)).toBeGreaterThan(scaledPuttPower(0.4, 8));
+    expect(puttMeterYards(PUTT_HOLE_FILL, 10)).toBeCloseTo(10, 5);
+    expect(puttPowerToMeterFill(scaledPuttPower(0.42, 7), 7)).toBeCloseTo(0.42, 5);
+    expect(puttPowerToMeterFill(scaledPuttPower(0.8, 14), 14)).toBeCloseTo(0.8, 5);
     expect(shapeLabel(0.8)).toBe("Draw");
     expect(shapeLabel(-0.8)).toBe("Fade");
   });

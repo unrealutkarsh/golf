@@ -82,6 +82,8 @@ export interface Ball {
   spinning: number;
   /** Lateral curve rate while airborne. Positive is a draw (left of aim). */
   curve: number;
+  /** True after a lip-out this stroke so the cup does not keep kicking. */
+  lipped: boolean;
 }
 
 export type CamMode = "auto" | "player" | "follow" | "putt";

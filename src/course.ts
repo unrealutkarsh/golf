@@ -12,6 +12,8 @@ import type { Course, Ellipse, Hole, Lie, Tree } from "./types";
 
 /** Extra yards beyond painted rough that still play as rough, not OB. */
 export const PLAYABLE_MARGIN = 20;
+/** Collar that still plays and paints as green so HUD/visual stay aligned. */
+export const GREEN_COLLAR = 0.9;
 
 interface HoleSpec {
   number: number;
@@ -123,8 +125,16 @@ const hole1 = buildHole({
     { cx: 414, cy: 128, rx: 8, ry: 5, rotation: -0.3 },
   ],
   trees: [
-    ...lineTrees({ x: 80, y: 168 }, { x: 360, y: 142 }, 8, -38, 8),
-    ...lineTrees({ x: 90, y: 168 }, { x: 340, y: 142 }, 6, 40, 7),
+    ...lineTrees({ x: 80, y: 168 }, { x: 360, y: 142 }, 14, -36, 8),
+    ...lineTrees({ x: 86, y: 168 }, { x: 350, y: 144 }, 12, 36, 7),
+    ...lineTrees({ x: 96, y: 168 }, { x: 370, y: 140 }, 10, -48, 9),
+    ...lineTrees({ x: 104, y: 168 }, { x: 352, y: 144 }, 8, 50, 8),
+    { x: 428, y: 142, r: 9 },
+    { x: 422, y: 158, r: 8 },
+    { x: 424, y: 126, r: 8 },
+    { x: 442, y: 152, r: 10 },
+    { x: 440, y: 132, r: 9 },
+    { x: 452, y: 142, r: 8 },
   ],
 });
 
@@ -388,7 +398,7 @@ function lieAtStrict(hole: Hole, p: Vec2): Lie {
   for (const bunker of hole.bunkers) {
     if (pointInEllipse(p, bunker.cx, bunker.cy, bunker.rx, bunker.ry, bunker.rotation)) return "bunker";
   }
-  if (pointInEllipse(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation)) {
+  if (inGreen(hole, p)) {
     return "green";
   }
   if (dist(p, hole.tee) < 9) return "tee";
@@ -435,14 +445,44 @@ export function nearOb(hole: Hole, p: Vec2): boolean {
   return d > 0 && d <= PLAYABLE_MARGIN;
 }
 
+export function inGreen(hole: Hole, p: Vec2, pad = GREEN_COLLAR): boolean {
+  return pointInEllipse(
+    p,
+    hole.green.cx,
+    hole.green.cy,
+    hole.green.rx + pad,
+    hole.green.ry + pad,
+    hole.green.rotation,
+  );
+}
+
 export function onGreen(hole: Hole, p: Vec2): boolean {
-  return pointInEllipse(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation);
+  return inGreen(hole, p);
+}
+
+export function lieId(lie: Lie): number {
+  switch (lie) {
+    case "tee":
+      return 1;
+    case "fairway":
+      return 2;
+    case "rough":
+      return 3;
+    case "green":
+      return 4;
+    case "bunker":
+      return 5;
+    case "water":
+      return 6;
+    case "ob":
+      return 7;
+  }
 }
 
 export function treeHit(hole: Hole, p: Vec2, z: number): Tree | null {
   if (z > 14) return null;
   for (const tree of hole.trees) {
-    if (dist(p, tree) < tree.r * 0.72) return tree;
+    if (dist(p, tree) < tree.r * 0.58) return tree;
   }
   return null;
 }

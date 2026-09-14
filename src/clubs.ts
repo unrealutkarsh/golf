@@ -21,24 +21,47 @@ export function clubById(id: ClubId): Club {
   return club;
 }
 
+export function liePowerMul(lie: string): number {
+  if (lie === "rough") return 0.88;
+  if (lie === "bunker") return 0.7;
+  if (lie === "water") return 0.4;
+  return 1;
+}
+
+/** Typical total distance at a committed swing, including a bit of roll. */
+export function clubReach(club: Club, lie: string): number {
+  if (club.id === "putter") return club.roll;
+  return (club.carry + club.roll * 0.45) * liePowerMul(lie);
+}
+
+/** Swing-meter fill that should finish near `distanceYards` with this club. */
+export function suggestedShotPower(distanceYards: number, club: Club, lie: string): number {
+  if (club.id === "putter") return 0.5;
+  const reach = clubReach(club, lie);
+  return Math.max(0.36, Math.min(1, distanceYards / Math.max(reach, 1)));
+}
+
+/** Estimated finish yards for a meter fill (putt: roll; else carry+roll). */
+export function meterYardage(fill: number, club: Club, lie: string, leftoverYards: number): number {
+  if (club.id === "putter") {
+    const factor = 0.38 + Math.max(0.05, Math.min(1, fill)) * 1.24;
+    return Math.max(0.2, leftoverYards) * factor;
+  }
+  return clubReach(club, lie) * Math.max(0, Math.min(1.05, fill));
+}
+
 export function recommendClub(distanceYards: number, lie: string): Club {
   if (lie === "green") return clubById("putter");
   if (lie === "bunker") return clubById("sw");
-  const lieMul = lie === "rough" ? 0.88 : 1;
-  const target = Math.max(0, distanceYards / lieMul - 4);
-  let best = CLUBS[0];
-  let bestErr = Infinity;
-  for (const club of CLUBS) {
-    if (club.id === "putter") continue;
-    const reach = club.carry + club.roll * 0.55;
-    const err = Math.abs(reach - target);
-    if (err < bestErr) {
-      bestErr = err;
-      best = club;
-    }
-  }
+  const target = Math.max(0, distanceYards / liePowerMul(lie));
   if (target < 28) return clubById("putter");
-  return best;
+  const woods = CLUBS.filter((club) => club.id !== "putter");
+  const reachOf = (club: Club) => club.carry + club.roll * 0.45;
+  const reachers = woods.filter((club) => reachOf(club) >= target - 2);
+  if (reachers.length) {
+    return reachers.reduce((best, club) => (reachOf(club) < reachOf(best) ? club : best));
+  }
+  return woods.reduce((best, club) => (reachOf(club) > reachOf(best) ? club : best));
 }
 
 export function clubIndex(id: ClubId): number {

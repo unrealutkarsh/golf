@@ -1,5 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { dimpleIndent, makeGolfBallGeometry } from "./scene3d";
+import { golferMeshCount as addressGolferMeshCount } from "./golfer";
+import { dimpleIndent, golferMeshCount, makeGolfBallGeometry } from "./scene3d";
+
+const srcDir = dirname(fileURLToPath(import.meta.url));
+const readSrc = (name: string) => readFileSync(resolve(srcDir, name), "utf8");
 
 describe("golf ball dimples", () => {
   it("indents vertices that sit on a dimple center", () => {
@@ -28,5 +35,35 @@ describe("golf ball dimples", () => {
     expect(dented).toBeLessThan(pos.count * 0.85);
     expect(geo.getAttribute("color")).toBeTruthy();
     geo.dispose();
+  });
+
+  it("builds a multi-part golfer instead of a three-mesh stick figure", () => {
+    expect(golferMeshCount()).toBeGreaterThanOrEqual(12);
+    expect(golferMeshCount()).toBe(addressGolferMeshCount());
+  });
+});
+
+describe("merge leftovers", () => {
+  it("keeps a single applyGreenGrip and a complete Ball launch", () => {
+    const physics = readSrc("physics.ts");
+    expect(physics.match(/export function applyGreenGrip/g)).toHaveLength(1);
+    expect(physics).toMatch(/spinning: speed, curve: 0, lipped: false/);
+  });
+
+  it("does not keep the dead instanced-grass updater or a dummy cylinder golfer", () => {
+    const scene = readSrc("scene3d.ts");
+    expect(scene).not.toMatch(/updateGrass\s*\(/);
+    expect(scene).not.toMatch(/this\.blades/);
+    expect(scene).not.toMatch(/BLADE_COUNT/);
+    expect(scene).not.toMatch(/this\.bladeGeo/);
+    expect(scene.match(/type ResolvedCam/g)).toHaveLength(1);
+    expect(scene).not.toMatch(/new THREE\.CylinderGeometry\([^)]+\),\s*m\.(skin|shirt|pants)/);
+    expect(scene).not.toMatch(/buildDummyGolfer|dummyGolfer|stick figure/i);
+  });
+
+  it("exports leftover-relative putt constants used by the session", () => {
+    const terrain = readSrc("terrain.ts");
+    expect(terrain).toMatch(/export const PUTT_ROLL_YARDS = 42/);
+    expect(terrain).toMatch(/export const PUTT_HOLE_FILL = 0\.5/);
   });
 });

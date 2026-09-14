@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
 import { applyGreenGrip, createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
-import { suggestedPuttPower } from "./terrain";
+import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];
@@ -50,7 +50,7 @@ describe("shot physics", () => {
     let ball = createBall(from);
     ball = launchBall(from, {
       aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x),
-      power: 0.12,
+      power: scaledPuttPower(0.5, 0.6),
       accuracy: 0,
       club,
       lie: "green",
@@ -123,6 +123,85 @@ describe("shot physics", () => {
     expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 8);
   });
 
+  it("lips a fast putt once, then holes the tap-in", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 2.4, y: hole.pin.y };
+    const wind = { speed: 0, dir: 0 };
+    const club = clubById("putter");
+    let ball = launchBall(from, {
+      aim: 0,
+      power: 0.58,
+      accuracy: 0,
+      club,
+      lie: "green",
+      wind,
+    });
+    let lipped = false;
+    let holed = false;
+    for (let i = 0; i < 240; i++) {
+      const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+      ball = step.ball;
+      if (step.events.some((e) => e.type === "lip")) lipped = true;
+      if (step.holed) {
+        holed = true;
+        break;
+      }
+      if (!step.flying) break;
+    }
+    expect(lipped).toBe(true);
+    expect(holed).toBe(false);
+    expect(ball.lipped).toBe(true);
+    const rest = { ...ball.pos };
+    expect(Math.hypot(rest.x - hole.pin.x, rest.y - hole.pin.y)).toBeLessThan(3.5);
+    ball = launchBall(rest, {
+      aim: Math.atan2(hole.pin.y - rest.y, hole.pin.x - rest.x),
+      power: scaledPuttPower(0.55, Math.hypot(rest.x - hole.pin.x, rest.y - hole.pin.y)),
+      accuracy: 0,
+      club,
+      lie: "green",
+      wind,
+    });
+    for (let i = 0; i < 360; i++) {
+      const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+      ball = step.ball;
+      if (step.holed) {
+        holed = true;
+        break;
+      }
+      if (!step.flying) break;
+    }
+    expect(holed).toBe(true);
+  });
+
+  it("holes a 1-yard and 2-yard putt aimed at the pin", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const wind = { speed: 0, dir: 0 };
+    const club = clubById("putter");
+    for (const yards of [1, 2]) {
+      const from = { x: hole.pin.x - yards, y: hole.pin.y };
+      let ball = launchBall(from, {
+        aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x),
+        power: scaledPuttPower(0.5, yards),
+        accuracy: 0,
+        club,
+        lie: "green",
+        wind,
+      });
+      let holed = false;
+      for (let i = 0; i < 360; i++) {
+        const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+        ball = step.ball;
+        if (step.holed) {
+          holed = true;
+          break;
+        }
+        if (!step.flying) break;
+      }
+      expect(holed, `${yards}y putt`).toBe(true);
+      expect(Math.hypot(ball.pos.x - hole.pin.x, ball.pos.y - hole.pin.y)).toBeLessThan(0.3);
+    }
+  });
+
   it("lets a missed putt come to rest instead of creeping on the break", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 8.5, y: hole.pin.y + 3.2 };
@@ -155,6 +234,30 @@ describe("shot physics", () => {
     expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
   });
 
+  it("launches every stroke with lipped cleared", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 4, y: hole.pin.y };
+    const putt = launchBall(from, {
+      aim: 0,
+      power: 0.2,
+      accuracy: 0,
+      club: clubById("putter"),
+      lie: "green",
+      wind: { speed: 0, dir: 0 },
+    });
+    const drive = launchBall(hole.tee, {
+      aim: 0,
+      power: 0.9,
+      accuracy: 0,
+      club: clubById("driver"),
+      lie: "tee",
+      wind: { speed: 0, dir: 0 },
+    });
+    expect(putt.lipped).toBe(false);
+    expect(drive.lipped).toBe(false);
+    expect(createBall(from).lipped).toBe(false);
+  });
+
   it("starts a putt already rolling instead of sliding", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 6, y: hole.pin.y };
@@ -171,8 +274,8 @@ describe("shot physics", () => {
   });
 
   it("grabs a sliding ball on the green harder than a rolling one", () => {
-    const slide = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0 }, 1 / 60);
-    const roll = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 12, curve: 0 }, 1 / 60);
+    const slide = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0, lipped: false }, 1 / 60);
+    const roll = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 12, curve: 0, lipped: false }, 1 / 60);
     expect(Math.hypot(slide.vel.x, slide.vel.y)).toBeLessThan(Math.hypot(roll.vel.x, roll.vel.y) - 0.4);
     expect(slide.spinning).toBeGreaterThan(0.4);
   });

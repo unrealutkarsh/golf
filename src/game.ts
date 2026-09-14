@@ -1,9 +1,17 @@
 import { AudioBus } from "./audio";
 import { loadProfile, recordRound, saveProfile } from "./career";
-import { CLUBS, clubIndex, recommendClub } from "./clubs";
+import { CLUBS, clubIndex, meterYardage, recommendClub, suggestedShotPower } from "./clubs";
 import { HARBOR_DUNES, lieAt, onGreen } from "./course";
 import { hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
-import { isPuttingSituation, resolveCamView, suggestedPuttPower, type ResolvedCam } from "./terrain";
+import {
+  isPuttingSituation,
+  PUTT_HOLE_FILL,
+  puttPowerToMeterFill,
+  resolveCamView,
+  scaledPuttPower,
+  suggestedPuttPower,
+  type ResolvedCam,
+} from "./terrain";
 import {
   createBall,
   defaultAim,
@@ -64,8 +72,10 @@ export class GameSession {
   cam: Camera = { x: 200, y: 150, zoom: 3 };
   camHold = false;
   camMode: CamMode = "auto";
-  puttGrid = true;
+  puttGrid = false;
   shape = 0;
+  /** True only after an intentional drag or key nudge. Hover / tap-to-swing must not steal aim. */
+  aimExplicit = false;
   tipVisible = true;
   helpOpen = false;
   scorecardOpen = false;
@@ -107,14 +117,35 @@ export class GameSession {
   }
 
   suggestedPower(): number {
-    if (this.club().id === "putter") return suggestedPuttPower(this.toPin());
-    return 0.92;
+    return suggestedShotPower(this.toPin(), this.club(), this.lie);
+  }
+
+  /** 0-1 meter fill to draw (putts are leftover-relative; 50% dies at the hole). */
+  meterFill(): number {
+    if (this.club().id === "putter") {
+      if (this.swingPhase === "aim") return PUTT_HOLE_FILL;
+      if (this.swingPhase === "power") return this.meter;
+      return puttPowerToMeterFill(this.power, this.toPin());
+    }
+    if (this.swingPhase === "aim") return this.suggestedPower();
+    if (this.swingPhase === "power") return this.meter;
+    return this.power;
+  }
+
+  meterYards(): number {
+    const fill = this.swingPhase === "power" ? this.meter : this.meterFill();
+    return meterYardage(fill, this.club(), this.lie, this.toPin());
+  }
+
+  meterPercent(): number {
+    return Math.round(this.meterFill() * 100);
   }
 
   cycleCam(): void {
     const order: CamMode[] = ["auto", "player", "follow", "putt"];
     this.camMode = order[(order.indexOf(this.camMode) + 1) % order.length];
-    this.flash(this.camMode === "auto" ? "Camera · Auto" : `Camera · ${this.camMode}`);
+    const label = this.camMode === "player" ? "address" : this.camMode;
+    this.flash(this.camMode === "auto" ? "Camera · Auto" : `Camera · ${label}`);
   }
 
   toggleGrid(): void {
@@ -148,9 +179,17 @@ export class GameSession {
   }
 
   private previewShot() {
+    const putting = this.club().id === "putter";
+    const puttFill = this.swingPhase === "power" ? this.meter : this.swingPhase === "aim" ? PUTT_HOLE_FILL : puttPowerToMeterFill(this.power, this.toPin());
     return {
       aim: this.aim,
-      power: this.swingPhase === "aim" || this.swingPhase === "power" ? this.visualPower : this.swingPhase === "accuracy" ? this.power : this.visualPower,
+      power: putting
+        ? scaledPuttPower(puttFill, this.toPin())
+        : this.swingPhase === "aim" || this.swingPhase === "power"
+          ? this.visualPower
+          : this.swingPhase === "accuracy"
+            ? this.power
+            : this.visualPower,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
@@ -205,6 +244,7 @@ export class GameSession {
     this.cam.zoom = 2.8;
     this.camHold = false;
     this.shape = 0;
+    this.aimExplicit = false;
     this.shotArc = [];
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
@@ -237,11 +277,15 @@ export class GameSession {
   nudgeAim(delta: number): void {
     if (this.swingPhase !== "aim") return;
     this.aim = wrapAngle(this.aim + delta);
+    this.aimExplicit = true;
   }
 
   aimAt(world: Vec2): void {
     if (this.swingPhase !== "aim") return;
+    if (this.putting() || this.lie === "green" || onGreen(this.hole(), this.ball.pos)) return;
+    if (dist(world, this.ball.pos) < 22) return;
     this.aim = Math.atan2(world.y - this.ball.pos.y, world.x - this.ball.pos.x);
+    this.aimExplicit = true;
   }
 
   tap(): void {
@@ -255,7 +299,8 @@ export class GameSession {
       return;
     }
     if (this.swingPhase === "power") {
-      this.power = clamp(this.meter, 0.08, 1);
+      this.power =
+        this.club().id === "putter" ? scaledPuttPower(this.meter, this.toPin()) : clamp(this.meter, 0.08, 1);
       this.swingPhase = "accuracy";
       this.meter = 0.5;
       this.meterDir = 1;
@@ -264,7 +309,7 @@ export class GameSession {
     }
     if (this.swingPhase === "accuracy") {
       const raw = clamp(this.meter * 2 - 1, -1, 1);
-      this.accuracy = Math.abs(raw) < 0.12 ? 0 : Math.sign(raw) * raw * raw;
+      this.accuracy = Math.abs(raw) < 0.2 ? 0 : Math.sign(raw) * raw * raw;
       this.lockedAccuracy = true;
       this.fire();
     }
@@ -278,9 +323,19 @@ export class GameSession {
   }
 
   private fire(): void {
+    if (!this.aimExplicit) {
+      this.aim = defaultAim(this.ball.pos, this.hole());
+    }
+    const club = this.club();
+    if (club.id === "putter") {
+      const leftover = this.toPin();
+      const intended = club.roll * this.power;
+      if (intended > leftover * 2.2) {
+        this.power = scaledPuttPower(this.power, leftover);
+      }
+    }
     this.lastShotPos = { ...this.ball.pos };
     this.strokes += 1;
-    const club = this.club();
     if (club.id === "putter") {
       this.audio.putt();
       if (this.lie === "green") this.putts += 1;
@@ -305,6 +360,7 @@ export class GameSession {
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     if (this.screen !== "play") return;
+    this.refreshLie();
     const target = this.previewTargetPower();
     const follow = this.swingPhase === "power" ? 0.018 : 0.00035;
     this.visualPower += (target - this.visualPower) * (1 - Math.pow(follow, Math.max(dt, 0.001)));
@@ -338,6 +394,7 @@ export class GameSession {
     const hole = this.hole();
     const step = stepBall(this.ball, hole, this.wind, dt, this.club().bounce);
     this.ball = step.ball;
+    this.refreshLie();
 
     for (const ev of step.events) {
       if (ev.type === "splash") {
@@ -394,12 +451,18 @@ export class GameSession {
     this.lockedAccuracy = false;
     this.shotArc = [];
     this.aim = defaultAim(this.ball.pos, hole);
+    this.aimExplicit = false;
     this.autoClub();
     if (this.club().id === "putter" || onGreen(hole, this.ball.pos)) {
       this.power = suggestedPuttPower(this.toPin());
       this.shape = 0;
     }
     this.visualPower = this.suggestedPower();
+  }
+
+  refreshLie(): void {
+    if (this.ball.z > 0.55) return;
+    this.lie = lieAt(this.hole(), this.ball.pos);
   }
 
   isHoled(): boolean {
