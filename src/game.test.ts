@@ -130,6 +130,7 @@ describe("tour session", () => {
     game.lie = "green";
     game.clubIndex = clubIndex("putter");
     game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x) + 0.75;
+    game.aimExplicit = true;
     game.power = 0.3;
     game.accuracy = 0;
     game.swingPhase = "accuracy";

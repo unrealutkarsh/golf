@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { applyGreenGrip, createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { applyGreenGrip, createBall, flightApex, launchBall, puttSpeedForRoll, sampleFlightPath, stepBall } from "./physics";
 import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
@@ -256,6 +256,8 @@ describe("shot physics", () => {
     expect(putt.lipped).toBe(false);
     expect(drive.lipped).toBe(false);
     expect(createBall(from).lipped).toBe(false);
+    expect(Math.hypot(putt.vel.x, putt.vel.y)).toBeCloseTo(puttSpeedForRoll(clubById("putter").roll * 0.2), 5);
+    expect(putt.spinning).toBeGreaterThan(Math.hypot(putt.vel.x, putt.vel.y) * 0.95);
   });
 
   it("starts a putt already rolling instead of sliding", () => {
