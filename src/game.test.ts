@@ -79,6 +79,18 @@ describe("tour session", () => {
     expect(game.canShape()).toBe(false);
   });
 
+  it("eases preview power so the aim line does not snap with the meter", () => {
+    const game = new GameSession(7);
+    game.startTournament();
+    game.clubIndex = clubIndex("putter");
+    game.visualPower = 0.3;
+    game.swingPhase = "power";
+    game.meter = 0.9;
+    game.update(1 / 60);
+    expect(game.visualPower).toBeGreaterThan(0.3);
+    expect(game.visualPower).toBeLessThan(0.85);
+  });
+
   it("holes a tap-in from the putting view", () => {
     const game = new GameSession(5);
     game.startTournament();

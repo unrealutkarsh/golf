@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { applyGreenGrip, createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];
@@ -153,5 +154,63 @@ describe("shot physics", () => {
     expect(stopped).toBe(true);
     expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
   });
+
+  it("starts a putt already rolling instead of sliding", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 6, y: hole.pin.y };
+    const ball = launchBall(from, {
+      aim: 0,
+      power: 0.28,
+      accuracy: 0,
+      club: clubById("putter"),
+      lie: "green",
+      wind: { speed: 0, dir: 0 },
+    });
+    const speed = Math.hypot(ball.vel.x, ball.vel.y);
+    expect(ball.spinning).toBeGreaterThan(speed * 0.95);
+  });
+
+  it("grabs a sliding ball on the green harder than a rolling one", () => {
+    const slide = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0 }, 1 / 60);
+    const roll = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 12, curve: 0 }, 1 / 60);
+    expect(Math.hypot(slide.vel.x, slide.vel.y)).toBeLessThan(Math.hypot(roll.vel.x, roll.vel.y) - 0.4);
+    expect(slide.spinning).toBeGreaterThan(0.4);
+  });
+
+  it("stops a lag putt near the hole instead of skating past", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 10, y: hole.pin.y };
+    const { ball, holed } = settlePutt(from, suggestedPuttPower(10), 0);
+    const leftover = Math.hypot(ball.pos.x - hole.pin.x, ball.pos.y - hole.pin.y);
+    expect(holed || leftover < 4.2).toBe(true);
+    const travel = Math.hypot(ball.pos.x - from.x, ball.pos.y - from.y);
+    expect(travel).toBeLessThan(14);
+    expect(travel).toBeGreaterThan(6);
+  });
 });
+
+function settlePutt(from: { x: number; y: number }, power: number, aimNudge = 0) {
+  const hole = HARBOR_DUNES.holes[0];
+  const wind = { speed: 0, dir: 0 };
+  const club = clubById("putter");
+  let ball = launchBall(from, {
+    aim: Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x) + aimNudge,
+    power,
+    accuracy: 0,
+    club,
+    lie: "green",
+    wind,
+  });
+  let holed = false;
+  for (let i = 0; i < 600; i++) {
+    const step = stepBall(ball, hole, wind, 1 / 60, club.bounce);
+    ball = step.ball;
+    if (step.holed) {
+      holed = true;
+      break;
+    }
+    if (!step.flying) break;
+  }
+  return { ball, holed, hole };
+}
 

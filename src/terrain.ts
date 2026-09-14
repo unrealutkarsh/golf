@@ -5,6 +5,34 @@ import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
 
+/** Launch-monitor / tour framing: ball + course, no character mesh to clear. */
+export interface CamFraming {
+  /** Yards behind the ball along the aim or travel heading. */
+  back: number;
+  /** Height above the ball. */
+  height: number;
+  /** Small broadcast offset to the right of the line. Not dummy clearance. */
+  side: number;
+  /** 0 look at the ball, 1 look at the pin. */
+  lookAhead: number;
+  fov: number;
+}
+
+export function camFraming(view: ResolvedCam): CamFraming {
+  if (view === "putt") {
+    return { back: 2.08, height: 1.24, side: 0.14, lookAhead: 0.82, fov: 48 };
+  }
+  if (view === "follow") {
+    return { back: 12.8, height: 5.4, side: 0, lookAhead: 0, fov: 50 };
+  }
+  return { back: 5.4, height: 3.45, side: 0.08, lookAhead: 0.58, fov: 52 };
+}
+
+export function camLabel(view: ResolvedCam): string {
+  if (view === "player") return "address";
+  return view;
+}
+
 export function suggestedPuttPower(yardsToPin: number): number {
   return Math.max(0.14, Math.min(0.64, yardsToPin / 30));
 }

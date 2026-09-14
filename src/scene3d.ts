@@ -11,6 +11,7 @@ import {
   grassBudget,
   groundHeight,
   isPuttingSituation,
+  camFraming,
   resolveCamView,
   surfaceColor,
   turfLush,
@@ -132,7 +133,6 @@ export class CourseScene {
   private ball: THREE.Mesh;
   private shadow: THREE.Mesh;
   private pin = new THREE.Group();
-  private golfer = new THREE.Group();
   private grid = new THREE.Group();
   private landing: THREE.Mesh;
   private flightMesh: THREE.Mesh | null = null;
@@ -209,7 +209,16 @@ export class CourseScene {
     });
     const puttGeo = new THREE.BufferGeometry();
     puttGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
-    this.puttAim = new THREE.Line(puttGeo, new THREE.LineBasicMaterial({ color: 0xf3e2a0, transparent: true, opacity: 0.9 }));
+    this.puttAim = new THREE.Line(
+      puttGeo,
+      new THREE.LineDashedMaterial({
+        color: 0xd4c49a,
+        transparent: true,
+        opacity: 0.32,
+        dashSize: 0.38,
+        gapSize: 0.28,
+      }),
+    );
     this.scene.add(this.puttAim);
 
     this.ball = new THREE.Mesh(
@@ -233,18 +242,17 @@ export class CourseScene {
 
     this.landing = new THREE.Mesh(
       new THREE.RingGeometry(0.7, 1.05, 28),
-      new THREE.MeshBasicMaterial({ color: 0xf0d78a, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }),
+      new THREE.MeshBasicMaterial({ color: 0xe6d4a0, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false }),
     );
     this.landing.rotation.x = -Math.PI / 2;
     this.scene.add(this.landing);
 
-    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xf3d27a, transparent: true, opacity: 0.92 });
+    this.flightMat = new THREE.MeshBasicMaterial({ color: 0xe6d4a0, transparent: true, opacity: 0.4, depthWrite: false });
     this.groundPos = new Float32Array(MAX_PATH * 3);
     this.groundLine = makeLine(this.groundPos, 0x111111);
     this.scene.add(this.groundLine);
 
-    this.scene.add(this.pin, this.golfer, this.grid);
-    this.buildGolfer();
+    this.scene.add(this.pin, this.grid);
     this.resize();
     window.addEventListener("resize", () => this.resize());
   }
@@ -280,9 +288,8 @@ export class CourseScene {
 
     const putting = isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
-    this.placeBall(session);
+    this.placeBall(session, dt);
     this.placePin(hole);
-    this.placeGolfer(session, view);
     this.updatePath(session);
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
@@ -466,27 +473,7 @@ export class CourseScene {
     this.grid.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xdde8c8, transparent: true, opacity: 0.42 })));
   }
 
-  private buildGolfer(): void {
-    this.golfer.clear();
-    const slacks = new THREE.MeshStandardMaterial({ color: 0x243028, roughness: 0.72 });
-    const shirt = new THREE.MeshStandardMaterial({ color: 0xece7dc, roughness: 0.58 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc4a882, roughness: 0.52 });
-    const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.82, 8), slacks);
-    legs.position.y = 0.42;
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 0.58, 8), shirt);
-    torso.position.y = 1.05;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), skin);
-    head.position.y = 1.48;
-    const club = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.018, 0.022, 1.02, 6),
-      new THREE.MeshStandardMaterial({ color: 0x8b9096, roughness: 0.3, metalness: 0.45 }),
-    );
-    club.position.set(0.22, 0.72, 0.1);
-    club.rotation.z = 0.32;
-    this.golfer.add(legs, torso, head, club);
-  }
-
-  private placeBall(session: GameSession): void {
+  private placeBall(session: GameSession, dt: number): void {
     const p = session.ball.pos;
     const gh = groundHeight(session.hole(), p.x, p.y);
     this.ball.position.set(p.x, gh + Math.max(session.ball.z, 0) + 0.16, p.y);
@@ -494,22 +481,15 @@ export class CourseScene {
     const air = Math.max(0.1, 0.26 - session.ball.z * 0.01);
     this.shadow.scale.setScalar(air);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = session.ball.z > 8 ? 0.12 : 0.36;
+    const speed = Math.hypot(session.ball.vel.x, session.ball.vel.y);
+    if (speed > 0.04) {
+      const axis = new THREE.Vector3(session.ball.vel.y, 0, -session.ball.vel.x).normalize();
+      this.ball.rotateOnWorldAxis(axis, (speed * dt) / 0.16);
+    }
   }
 
   private placePin(hole: Hole): void {
     this.pin.position.set(hole.pin.x, groundHeight(hole, hole.pin.x, hole.pin.y), hole.pin.y);
-  }
-
-  private placeGolfer(session: GameSession, view: ResolvedCam): void {
-    const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
-    this.golfer.visible = session.screen === "play" && !flying;
-    const p = session.ball.pos;
-    const hole = session.hole();
-    const aim = view === "putt" ? Math.atan2(hole.pin.y - p.y, hole.pin.x - p.x) : session.aim;
-    const back = fromAngle(aim + Math.PI, view === "putt" ? 1.15 : 1.2);
-    const left = fromAngle(aim - Math.PI / 2, view === "putt" ? 0.55 : 0);
-    this.golfer.position.set(p.x + back.x + left.x, groundHeight(hole, p.x, p.y), p.y + back.y + left.y);
-    this.golfer.rotation.y = -aim + Math.PI / 2;
   }
 
   private updatePath(session: GameSession): void {
@@ -523,8 +503,12 @@ export class CourseScene {
     this.landing.visible = show && aiming;
     if (this.flightMesh) this.flightMesh.visible = show;
     if (!show) return;
+    const puttingLine = session.club().id === "putter" || session.lie === "green";
     const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
-    this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xffb060 : 0xf3d27a);
+    this.flightMat.color.set(shape > 0.2 ? 0x8eb8d8 : shape < -0.2 ? 0xe0b080 : 0xe6d4a0);
+    this.flightMat.opacity = puttingLine ? 0.28 : 0.46;
+    (this.groundLine.material as THREE.LineBasicMaterial).opacity = puttingLine ? 0.12 : 0.2;
+    (this.landing.material as THREE.MeshBasicMaterial).opacity = puttingLine ? 0.28 : 0.4;
     const hole = session.hole();
     const n = Math.min(path.length, MAX_PATH);
     const pts: THREE.Vector3[] = [];
@@ -541,7 +525,7 @@ export class CourseScene {
     const key = `${n}:${last.pos.x.toFixed(1)}:${last.pos.y.toFixed(1)}:${last.z.toFixed(1)}`;
     if (key !== this.pathKey) {
       this.pathKey = key;
-      const radius = session.club().id === "putter" ? 0.04 : 0.13;
+      const radius = session.club().id === "putter" ? 0.02 : 0.09;
       this.setFlightTube(pts, radius);
     }
     const warn = nearOb(hole, last.pos) || lieAt(hole, last.pos) === "ob";
@@ -576,6 +560,7 @@ export class CourseScene {
     attr.setXYZ(0, from.x, groundHeight(hole, from.x, from.y) + 0.1, from.y);
     attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.1, to.y);
     attr.needsUpdate = true;
+    this.puttAim.computeLineDistances();
   }
 
   private updateGrass(session: GameSession, hole: Hole, view: ResolvedCam): void {
@@ -626,32 +611,37 @@ export class CourseScene {
     const bh = groundHeight(hole, ball.x, ball.y) + session.ball.z;
     const desired = new THREE.Vector3();
     const look = new THREE.Vector3();
-    let fov = 54;
+    const frame = camFraming(view);
+    let fov = frame.fov;
     if (session.screen !== "play") {
       const t = this.time * 0.1;
       desired.set((hole.tee.x + pin.x) * 0.5 + Math.cos(t) * 70, 28, (hole.tee.y + pin.y) * 0.5 + Math.sin(t) * 48);
       look.set((hole.tee.x + pin.x) * 0.55, 1.2, (hole.tee.y + pin.y) * 0.55);
       fov = 50;
     } else if (view === "putt") {
-      const back = fromAngle(aim + Math.PI, 2.25);
-      const side = fromAngle(aim + Math.PI / 2, 0.82);
-      desired.set(ball.x + back.x + side.x, bh + 1.32, ball.y + back.y + side.y);
-      look.set(ball.x * 0.22 + pin.x * 0.78, groundHeight(hole, pin.x, pin.y) + 0.2, ball.y * 0.22 + pin.y * 0.78);
-      fov = 50;
+      const back = fromAngle(aim + Math.PI, frame.back);
+      const side = fromAngle(aim + Math.PI / 2, frame.side);
+      desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
+      look.set(
+        ball.x * (1 - frame.lookAhead) + pin.x * frame.lookAhead,
+        groundHeight(hole, pin.x, pin.y) + 0.18,
+        ball.y * (1 - frame.lookAhead) + pin.y * frame.lookAhead,
+      );
     } else if (view === "follow") {
       const v = session.ball.vel;
       const heading = Math.hypot(v.x, v.y) > 0.4 ? Math.atan2(v.y, v.x) : session.aim;
-      const back = fromAngle(heading + Math.PI, 13);
+      const back = fromAngle(heading + Math.PI, frame.back);
       const curve = session.ball.curve || session.shape * 24;
-      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 9);
-      desired.set(ball.x + back.x + side.x, bh + 5.6 + session.ball.z * 0.18, ball.y + back.y + side.y);
-      look.set(ball.x, bh + 0.9, ball.y);
-      fov = 52;
+      const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 7.5);
+      desired.set(ball.x + back.x + side.x, bh + frame.height + session.ball.z * 0.16, ball.y + back.y + side.y);
+      look.set(ball.x, bh + 0.7, ball.y);
     } else {
-      const back = fromAngle(aim + Math.PI, putting ? 5 : 9.5);
-      desired.set(ball.x + back.x, bh + (putting ? 1.8 : 2.7), ball.y + back.y);
-      look.set(ball.x * 0.35 + pin.x * 0.65, 0.9, ball.y * 0.35 + pin.y * 0.65);
-      fov = 58;
+      const back = fromAngle(aim + Math.PI, frame.back);
+      const side = fromAngle(aim + Math.PI / 2, frame.side);
+      desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
+      const lookDist = Math.max(16, Math.min(72, dist(ball, pin) * frame.lookAhead + 14));
+      const ahead = fromAngle(aim, lookDist);
+      look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.55, ball.y + ahead.y);
     }
     const follow = view === "follow" ? 0.00022 : view === "putt" ? 0.0012 : 0.0005;
     const k = 1 - Math.pow(follow, Math.max(dt, 0.001));
