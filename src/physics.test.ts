@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { applyGreenGrip, createBall, flightApex, launchBall, puttSpeedForRoll, sampleFlightPath, samplePathPoint, stepBall } from "./physics";
+import { applyGreenGrip, createBall, flightApex, flightHangTime, forwardFlightPath, launchBall, puttSpeedForRoll, sampleFlightPath, samplePathPoint, stepBall } from "./physics";
 import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
@@ -291,6 +291,43 @@ describe("shot physics", () => {
     const travel = Math.hypot(ball.pos.x - from.x, ball.pos.y - from.y);
     expect(travel).toBeLessThan(14);
     expect(travel).toBeGreaterThan(6);
+  });
+
+  it("keeps a short SW chip as a forward arc instead of a moon-ball loop", () => {
+    const hole = HARBOR_DUNES.holes[1];
+    const from = { x: hole.pin.x - 27, y: hole.pin.y + 8 };
+    const aim = Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x);
+    const path = forwardFlightPath(
+      sampleFlightPath(
+        from,
+        {
+          aim,
+          power: 0.38,
+          accuracy: 0,
+          club: clubById("sw"),
+          lie: "rough",
+          wind: { speed: 0, dir: 0 },
+        },
+        hole,
+      ),
+      aim,
+    );
+    const last = path[path.length - 1];
+    const travel = Math.hypot(last.pos.x - from.x, last.pos.y - from.y);
+    const dirx = Math.cos(aim);
+    const diry = Math.sin(aim);
+    let prev = 0;
+    for (const sample of path) {
+      const along = (sample.pos.x - from.x) * dirx + (sample.pos.y - from.y) * diry;
+      expect(along).toBeGreaterThanOrEqual(prev - 0.05);
+      prev = along;
+    }
+    expect(travel).toBeGreaterThan(12);
+    expect(travel).toBeLessThan(55);
+    expect(flightApex(path)).toBeLessThan(18);
+    expect(flightApex(path)).toBeGreaterThan(2);
+    expect(flightHangTime(29, 56, 0.38)).toBeLessThan(2.2);
+    expect(flightHangTime(86, 56, 1)).toBeGreaterThan(3.2);
   });
 
   it("samples a flight path without jumping to a raw vertex", () => {

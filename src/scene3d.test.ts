@@ -73,6 +73,9 @@ describe("aim ribbon", () => {
     expect(sceneSrc).toMatch(/aimRibbonGeo/);
     expect(sceneSrc).not.toMatch(/flightMat\.color\.set\(shape/);
     expect(sceneSrc).not.toMatch(/warn \? 0xc62828 : 0xf0d78a/);
+    expect(sceneSrc).toMatch(/onPutt/);
+    expect(sceneSrc).toMatch(/playCamFraming/);
+    expect(sceneSrc).toMatch(/cameraHeightAboveGround/);
     expect(AIM_RIBBON_SEGS).toBeGreaterThanOrEqual(32);
     expect(aimRibbonHalfWidth(false, 0)).toBeGreaterThan(aimRibbonHalfWidth(false, 1));
     expect(aimRibbonHalfWidth(true, 0.5)).toBeLessThan(aimRibbonHalfWidth(false, 0.5));

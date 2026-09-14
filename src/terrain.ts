@@ -1,6 +1,6 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
-import { dist, ellipseRadial, type Vec2 } from "./math";
+import { clamp, dist, ellipseRadial, type Vec2 } from "./math";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -32,6 +32,34 @@ export function camFraming(view: ResolvedCam): CamFraming {
   }
   // Over-the-ball address: ball stays readable in the lower third.
   return { back: 3.85, height: 2.22, side: 0.12, lookAhead: 0.38, fov: 50 };
+}
+
+/** Address/putt framing that stays above turf on short leftover. */
+export function playCamFraming(view: ResolvedCam, leftoverYards: number): CamFraming {
+  const base = camFraming(view);
+  if (view === "putt") {
+    return { ...base, back: 2.72, height: 1.95 };
+  }
+  if (view === "player" && leftoverYards < 100) {
+    const t = clamp((100 - leftoverYards) / 75, 0, 1);
+    return {
+      ...base,
+      back: base.back + t * 3.5,
+      height: base.height + t * 2.35,
+      lookAhead: 0.58,
+      fov: 52,
+    };
+  }
+  return base;
+}
+
+export function cameraHeightAboveGround(groundY: number, desiredY: number, clearance = 1.7): number {
+  return Math.max(desiredY, groundY + clearance);
+}
+
+export function addressLookDistance(leftover: number, lookAhead: number): number {
+  if (leftover < 100) return clamp(leftover * 0.7, 8, leftover + 1.5);
+  return clamp(leftover * lookAhead + 10, 12, 38);
 }
 
 export function camLabel(view: ResolvedCam): string {

@@ -18,6 +18,7 @@ import {
   launchBall,
   predictedLanding,
   sampleFlightPath,
+  forwardFlightPath,
   stepBall,
   MAX_HOLE_STROKES,
   type FlightSample,
@@ -200,7 +201,8 @@ export class GameSession {
   }
 
   previewFlight(): FlightSample[] {
-    return sampleFlightPath(this.ball.pos, this.previewShot(), this.hole());
+    const shot = this.previewShot();
+    return forwardFlightPath(sampleFlightPath(this.ball.pos, shot, this.hole()), shot.aim);
   }
 
   previewLanding(): Vec2 {

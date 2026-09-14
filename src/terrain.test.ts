@@ -6,7 +6,10 @@ import {
   bladeWidth,
   grassBudget,
   groundHeight,
+  addressLookDistance,
+  cameraHeightAboveGround,
   camFraming,
+  playCamFraming,
   camLabel,
   PUTT_HOLE_FILL,
   PUTT_ROLL_YARDS,
@@ -63,6 +66,12 @@ describe("course terrain", () => {
     expect(putt.lookAhead).toBeGreaterThan(0.7);
     expect(follow.lookAhead).toBe(0);
     expect(follow.back).toBeGreaterThan(address.back);
+    const short = playCamFraming("player", 29);
+    expect(short.height).toBeGreaterThan(address.height + 0.8);
+    expect(short.back).toBeGreaterThan(address.back);
+    expect(cameraHeightAboveGround(0.4, 0.2, 1.7)).toBeGreaterThanOrEqual(2.1);
+    expect(addressLookDistance(29, 0.38)).toBeLessThan(29);
+    expect(addressLookDistance(29, 0.38)).toBeGreaterThan(8);
     expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);
     expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
     expect(bladeWidth("green")).toBeLessThan(bladeWidth("fairway"));

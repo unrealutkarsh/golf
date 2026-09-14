@@ -197,6 +197,35 @@ describe("tour session", () => {
     expect(travel).toBeLessThan(10);
   });
 
+  it("previews a hole-2 SW chip as a short forward shot, not a loop", () => {
+    const game = new GameSession(2);
+    game.startTournament();
+    game.holeIndex = 1;
+    game.resetHole(1, false);
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 27, y: hole.pin.y + 8 });
+    game.lie = "rough";
+    game.clubIndex = clubIndex("sw");
+    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+    game.visualAim = game.aim;
+    game.visualPower = 0.38;
+    game.swingPhase = "accuracy";
+    const path = game.previewFlight();
+    const last = path[path.length - 1];
+    const travel = Math.hypot(last.pos.x - game.ball.pos.x, last.pos.y - game.ball.pos.y);
+    const dirx = Math.cos(game.aim);
+    const diry = Math.sin(game.aim);
+    let prev = -0.01;
+    for (const sample of path) {
+      const along = (sample.pos.x - game.ball.pos.x) * dirx + (sample.pos.y - game.ball.pos.y) * diry;
+      expect(along).toBeGreaterThanOrEqual(prev);
+      prev = along;
+    }
+    expect(travel).toBeGreaterThan(10);
+    expect(travel).toBeLessThan(50);
+    expect(Math.max(...path.map((s) => s.z))).toBeLessThan(18);
+  });
+
   it("holes a mid-meter tap-in instead of blasting through the cup", () => {
     const game = new GameSession(9);
     game.startTournament();

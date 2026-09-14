@@ -13,7 +13,16 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { buildGreenOverlay, createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { camFraming, groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
+import {
+  addressLookDistance,
+  cameraHeightAboveGround,
+  groundHeight,
+  isPuttingSituation,
+  playCamFraming,
+  resolveCamView,
+  surfaceColor,
+  type ResolvedCam,
+} from "./terrain";
 import type { Hole } from "./types";
 
 const MAX_PATH = 140;
@@ -219,11 +228,11 @@ export class CourseScene {
     this.puttAim = new THREE.Line(
       puttGeo,
       new THREE.LineDashedMaterial({
-        color: 0xd4c49a,
+        color: 0xe8d8b0,
         transparent: true,
-        opacity: 0.32,
-        dashSize: 0.38,
-        gapSize: 0.28,
+        opacity: 0.55,
+        dashSize: 0.32,
+        gapSize: 0.22,
       }),
     );
     this.scene.add(this.puttAim);
@@ -782,11 +791,12 @@ export class CourseScene {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     const play = session.screen === "play";
     if (aiming && play) {
+      const onPutt = session.club().id === "putter" || session.lie === "green";
       const path = session.previewFlight();
-      const show = path.length > 1;
+      const show = path.length > 1 && !onPutt;
       this.aimRibbon.visible = show;
       this.groundLine.visible = show;
-      this.landing.visible = show && session.club().id !== "putter";
+      this.landing.visible = show;
       if (this.flightMesh) this.flightMesh.visible = false;
       if (show) this.writeAimRibbon(session, path, dt);
       else this.aimRibbonReady = false;
@@ -951,7 +961,9 @@ export class CourseScene {
     this.puttAim.visible = show;
     if (!show) return;
     const from = session.ball.pos;
-    const to = hole.pin;
+    const yards = Math.max(1.1, Math.min(session.meterYards(), session.toPin() * 1.35));
+    const ahead = fromAngle(session.visualAim, yards);
+    const to = { x: from.x + ahead.x, y: from.y + ahead.y };
     const attr = this.puttAim.geometry.getAttribute("position") as THREE.BufferAttribute;
     attr.setXYZ(0, from.x, groundHeight(hole, from.x, from.y) + 0.08, from.y);
     attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.08, to.y);
@@ -971,7 +983,8 @@ export class CourseScene {
     const bh = groundHeight(hole, ball.x, ball.y) + session.ball.z;
     const desired = new THREE.Vector3();
     const look = new THREE.Vector3();
-    const frame = camFraming(view);
+    const leftover = dist(ball, pin);
+    const frame = playCamFraming(view, leftover);
     let fov = frame.fov;
     if (session.screen !== "play") {
       const t = this.time * 0.1;
@@ -999,9 +1012,13 @@ export class CourseScene {
       const back = fromAngle(aim + Math.PI, frame.back);
       const side = fromAngle(aim + Math.PI / 2, frame.side);
       desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
-      const lookDist = Math.max(12, Math.min(38, dist(ball, pin) * frame.lookAhead + 10));
+      const lookDist = addressLookDistance(leftover, frame.lookAhead);
       const ahead = fromAngle(aim, lookDist);
       look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.42, ball.y + ahead.y);
+    }
+    if (session.screen === "play") {
+      const camGround = groundHeight(hole, desired.x, desired.z);
+      desired.y = cameraHeightAboveGround(camGround, desired.y, view === "putt" ? 1.45 : 1.85);
     }
     const catchup = this.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.36 : view === "putt" ? 0.18 : 0.14;
     const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));
