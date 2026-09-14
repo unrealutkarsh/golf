@@ -10,7 +10,7 @@ export function createWaterMaterial(time: { value: number }, software: boolean):
     transparent: true,
     opacity: software ? 0.84 : 0.78,
     ior: 1.333,
-    envMapIntensity: 1.45,
+    envMapIntensity: 1.05,
     clearcoat: 0.42,
     clearcoatRoughness: 0.18,
     attenuationColor: new THREE.Color(0x063038),

@@ -109,11 +109,13 @@ export function createGolfBallMesh(): THREE.Mesh {
       metalness: 0.04,
       clearcoat: 0.82,
       clearcoatRoughness: 0.08,
-      sheen: 0.22,
-      sheenRoughness: 0.32,
-      sheenColor: new THREE.Color(0xffffff),
-      envMapIntensity: 1.45,
-      vertexColors: true,
+        sheen: 0.22,
+        sheenRoughness: 0.32,
+        sheenColor: new THREE.Color(0xffffff),
+        emissive: new THREE.Color(0xf2efe6),
+        emissiveIntensity: 0.12,
+        envMapIntensity: 1.55,
+        vertexColors: true,
     }),
   );
   const ballMat = ball.material as THREE.MeshPhysicalMaterial;
@@ -128,7 +130,7 @@ export function createGolfBallMesh(): THREE.Mesh {
   ball.castShadow = true;
   const halo = new THREE.Mesh(
     new THREE.SphereGeometry(BALL_RADIUS * 1.55, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, depthWrite: false, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false }),
   );
   ball.add(halo);
   const marker = new THREE.Sprite(
