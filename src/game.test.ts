@@ -100,6 +100,33 @@ describe("tour session", () => {
     expect(game.profile.eventsPlayed).toBeGreaterThan(0);
   });
 
+  it("launches the ball after a completed three-tap swing", () => {
+    const game = new GameSession(12);
+    game.startTournament();
+    game.audio.muted = true;
+    game.wind = { speed: 0, dir: 0 };
+    const start = { ...game.ball.pos };
+    expect(game.swingPhase).toBe("aim");
+    game.tap();
+    expect(game.swingPhase).toBe("power");
+    expect(game.ball.pos).toEqual(start);
+    game.meter = 0.86;
+    game.tap();
+    expect(game.swingPhase).toBe("accuracy");
+    expect(game.power).toBeGreaterThan(0.8);
+    expect(Math.hypot(game.ball.vel.x, game.ball.vel.y)).toBeLessThan(0.01);
+    game.meter = 0.5;
+    game.tap();
+    expect(game.swingPhase).toBe("flight");
+    expect(game.strokes).toBe(1);
+    expect(Math.hypot(game.ball.vel.x, game.ball.vel.y)).toBeGreaterThan(20);
+    expect(game.ball.z).toBeGreaterThan(0);
+    for (let i = 0; i < 180; i++) game.update(1 / 60);
+    const travel = Math.hypot(game.ball.pos.x - start.x, game.ball.pos.y - start.y);
+    expect(travel).toBeGreaterThan(80);
+    expect(game.screen).toBe("play");
+  });
+
   it("stores a lofted shot arc when the ball is struck", () => {
     const game = new GameSession(3);
     game.startTournament();
