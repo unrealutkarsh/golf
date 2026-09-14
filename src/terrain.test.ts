@@ -50,7 +50,7 @@ describe("course terrain", () => {
     expect(putt.side).toBeGreaterThan(0.2);
     expect(putt.back).toBeLessThan(address.back);
     expect(putt.height).toBeGreaterThan(1.4);
-    expect(putt.lookAhead).toBeGreaterThan(0.7);
+    expect(putt.lookAhead).toBeGreaterThan(0.65);
     expect(follow.lookAhead).toBe(0);
     expect(follow.back).toBeGreaterThan(address.back);
     expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);

@@ -639,7 +639,7 @@ export class CourseScene {
       const back = fromAngle(aim + Math.PI, frame.back);
       const side = fromAngle(aim + Math.PI / 2, frame.side);
       desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
-      const lookDist = Math.max(12, Math.min(38, dist(ball, pin) * frame.lookAhead + 10));
+      const lookDist = Math.max(10, Math.min(22, dist(ball, pin) * frame.lookAhead + 8));
       const ahead = fromAngle(aim, lookDist);
       look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.42, ball.y + ahead.y);
     }
@@ -654,6 +654,11 @@ export class CourseScene {
     }
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(this.camLook);
+    // Pitch up so the ball sits in the lower third, above the HUD dock.
+    if (session.screen === "play") {
+      if (view === "putt") this.camera.rotateX(-0.18);
+      else if (view === "player") this.camera.rotateX(-0.14);
+    }
     this.camera.fov += (fov - this.camera.fov) * 0.12;
     this.camera.updateProjectionMatrix();
   }
