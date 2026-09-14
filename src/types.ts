@@ -27,6 +27,12 @@ export interface Club {
   loft: number;
   accuracy: number;
   bounce: number;
+  /** Peak height of a full swing, yards. */
+  apex: number;
+  /** Seconds in the air on a full swing. */
+  hang: number;
+  /** Horizontal air drag, 1/s. Higher values fall out of the sky steeper. */
+  drag: number;
 }
 
 export interface Ellipse {
@@ -84,6 +90,8 @@ export interface Ball {
   curve: number;
   /** True after a lip-out this stroke so the cup does not keep kicking. */
   lipped: boolean;
+  /** Launch flight model: rise / fall gravity and air drag. Cleared on first ground contact. */
+  flight?: { gUp: number; gDown: number; drag: number };
 }
 
 export type CamMode = "auto" | "player" | "follow" | "putt";

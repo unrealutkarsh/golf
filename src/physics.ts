@@ -19,6 +19,8 @@ export const CAPTURE_SPEED = 7.4;
 export const LIP_SPEED = 9.6;
 export const MAX_HOLE_STROKES = 10;
 export const GRAVITY = 28;
+/** Fixed simulation step. The live game and every preview integrate at this rate so they agree. */
+export const SIM_DT = 1 / 60;
 
 export interface FlightSample {
   pos: Vec2;
@@ -97,7 +99,8 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const spray = (1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016;
   const aim = shot.aim + spray;
   const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
-  const curve = shape * (0.7 + shot.club.loft / 40) * (0.55 + power * 0.7) * 32;
+  // Lateral curve distance at full swing ≈ curve / 2 yards; divided by hang² at launch to become an acceleration.
+  const curve = shape * (1.1 - shot.club.loft / 80) * (0.55 + power * 0.7) * 26;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
@@ -106,22 +109,31 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
     return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: speed, curve: 0, lipped: false };
   }
 
+  const profile = flightProfile(shot.club, power, lieMul);
+  const { hang, apex, drag, rise } = profile;
   const carry = shot.club.carry * power * lieMul;
-  const flightTime = flightHangTime(carry, shot.club.loft, power);
-  const horiz = carry / flightTime;
-  const vz = (flightTime * GRAVITY) / 2;
-  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve, lipped: false };
+  // Horizontal speed decays with drag, so solve for the launch speed that still carries `carry` in `hang` seconds.
+  const horiz = drag > 0 ? (carry * drag) / (1 - Math.exp(-drag * hang)) : carry / hang;
+  // The ball climbs for `rise` of the flight and falls faster than it rose — that is what gives the steep descent.
+  const tUp = hang * rise;
+  const tDown = hang - tUp;
+  const flight = { gUp: (2 * apex) / (tUp * tUp), gDown: (2 * apex) / (tDown * tDown), drag };
+  const vz = (2 * apex) / tUp;
+  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve: curve / (hang * hang), lipped: false, flight };
 }
 
-/** Hang time from loft, capped on short chips so a 30y SW is not a 50y moon-ball loop. */
-export function flightHangTime(carry: number, loftDeg: number, power: number): number {
-  const loftRad = (loftDeg * Math.PI) / 180;
-  const raw = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
-  if (carry >= 80) return raw;
-  const maxApex = 3.2 + Math.max(0, carry) * 0.24;
-  const rawApex = (raw * raw * GRAVITY) / 8;
-  if (rawApex <= maxApex) return raw;
-  return Math.sqrt((8 * maxApex) / GRAVITY);
+/** Hang time, apex, and drag for a swing. Partial swings fly lower and land sooner. */
+export function flightProfile(club: Club, power: number, lieMul = 1): { hang: number; apex: number; drag: number; rise: number } {
+  const p = clamp(power, 0.08, 1.05);
+  let hang = club.hang * (0.6 + 0.4 * p);
+  let apex = club.apex * (0.45 + 0.55 * p) * (0.85 + 0.15 * lieMul);
+  const carry = club.carry * p * lieMul;
+  if (carry < 80) {
+    // Short pitches and chips stay low and quick, so a 30y wedge is not a moon-ball.
+    apex = Math.min(apex, 3.2 + carry * 0.24);
+    hang = Math.min(hang, 1 + carry * 0.04);
+  }
+  return { hang, apex, drag: club.drag, rise: 0.58 - (club.loft - 11) * 0.0007 };
 }
 
 /** Launch speed that rolls about `yards` on a flat green. */
@@ -154,20 +166,24 @@ export function applyGreenGrip(ball: Ball, dt: number): { vel: Vec2; spinning: n
 export function windAccel(wind: Wind, z: number): Vec2 {
   if (z <= 0.2) return { x: 0, y: 0 };
   const mph = wind.speed;
-  const k = 0.34 * mph * (0.38 + Math.min(z, 20) / 20);
+  const k = 0.12 * mph * (0.5 + (Math.min(z, 30) / 30) * 0.8);
   return fromAngle(wind.dir, k);
 }
 
 export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBounce: number): StepResult {
   const events: SimEvent[] = [];
+  const flight = ball.flight;
+  const gravity = flight ? (ball.vz > 0 ? flight.gUp : flight.gDown) : GRAVITY;
+  const airKeep = flight ? Math.exp(-flight.drag * dt) : 1;
   let next: Ball = {
     pos: add(ball.pos, scale(ball.vel, dt)),
-    vel: add(ball.vel, scale(windAccel(wind, ball.z), dt)),
+    vel: add(scale(ball.vel, airKeep), scale(windAccel(wind, ball.z), dt)),
     z: ball.z + ball.vz * dt,
-    vz: ball.vz - GRAVITY * dt,
+    vz: ball.vz - gravity * dt,
     spinning: ball.spinning,
     curve: ball.curve,
     lipped: ball.lipped,
+    flight,
   };
 
   if (next.z > 0.35 && Math.abs(ball.curve) > 0.01) {
@@ -197,6 +213,8 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
   if (next.z <= 0) {
     next.z = 0;
+    // Bounces after touchdown use plain gravity so the ball does not float back up.
+    next.flight = undefined;
     const lie = lieAt(hole, next.pos);
     if (lie === "water" || (inWater(hole, next.pos) && next.z <= 0.05)) {
       events.push({ type: "splash", pos: clone(next.pos) });
@@ -226,7 +244,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
     if (Math.abs(ball.vz) > 2.2) {
       next.vz = -ball.vz * RESTITUTION[lie] * (0.64 + clubBounce * 0.42);
-      const rollKeep = 0.12 + Math.min(0.22, (ball.spinning / 28) * 0.18);
+      const rollKeep = 0.22 + Math.min(0.42, (ball.spinning / 28) * 0.45);
       next.vel = scale(next.vel, rollKeep);
       next.spinning *= 0.35;
       events.push({ type: "bounce", pos: clone(next.pos) });
@@ -336,8 +354,8 @@ export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilR
   let ball = launchBall(from, shot);
   const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
   let airborne = ball.z > 0.05;
-  for (let i = 0; i < 280; i++) {
-    const step = stepBall(ball, hole, shot.wind, 1 / 30, shot.club.bounce);
+  for (let i = 0; i < 900; i++) {
+    const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce);
     samples.push({ pos: clone(step.ball.pos), z: step.ball.z });
     if (step.penaltyKind || step.holed) break;
     if (!untilRest && airborne && step.ball.z <= 0.05) break;

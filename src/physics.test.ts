@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { applyGreenGrip, createBall, flightApex, flightHangTime, forwardFlightPath, launchBall, puttSpeedForRoll, sampleFlightPath, samplePathPoint, stepBall } from "./physics";
+import { applyGreenGrip, createBall, flightApex, flightProfile, forwardFlightPath, launchBall, puttSpeedForRoll, sampleFlightPath, samplePathPoint, stepBall, type FlightSample } from "./physics";
 import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
@@ -74,32 +74,43 @@ describe("shot physics", () => {
     expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
   });
 
-  it("flies with a visible apex that grows with loft", () => {
+  it("flies every club to a tour-like apex, with drivers hanging longest and wedges landing steepest", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = hole.tee;
     const aim = Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x);
     const wind = { speed: 0, dir: 0 };
     const pathOf = (id: "driver" | "iron7" | "sw") =>
-      sampleFlightPath(from, {
-        aim,
-        power: 1,
-        accuracy: 0,
-        club: clubById(id),
-        lie: "tee",
-        wind,
-      }, hole);
+      sampleFlightPath(from, { aim, power: 1, accuracy: 0, club: clubById(id), lie: "tee", wind }, hole);
+    const hang = (path: FlightSample[]) => (path.length - 1) / 60;
+    const descent = (path: FlightSample[]) => {
+      const a = path[path.length - 3];
+      const b = path[path.length - 1];
+      return Math.atan2(a.z - b.z, Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y));
+    };
     const driver = pathOf("driver");
     const iron = pathOf("iron7");
     const wedge = pathOf("sw");
-    const driverApex = flightApex(driver);
-    const ironApex = flightApex(iron);
-    const wedgeApex = flightApex(wedge);
-    expect(driverApex).toBeGreaterThan(10);
-    expect(ironApex).toBeGreaterThan(driverApex + 8);
-    expect(wedgeApex).toBeGreaterThan(ironApex + 8);
-    const mid = driver[Math.floor(driver.length / 2)];
-    expect(mid.z).toBeGreaterThan(4);
-    expect(wedge.filter((s) => s.z > 0.5).length).toBeGreaterThan(driver.filter((s) => s.z > 0.5).length);
+    for (const path of [driver, iron, wedge]) {
+      expect(flightApex(path)).toBeGreaterThan(20);
+      expect(flightApex(path)).toBeLessThan(36);
+    }
+    expect(hang(driver)).toBeGreaterThan(5);
+    expect(hang(driver)).toBeGreaterThan(hang(iron));
+    expect(hang(iron)).toBeGreaterThan(hang(wedge));
+    expect(descent(wedge)).toBeGreaterThan(descent(driver) + 0.2);
+  });
+
+  it("matches a club's authored carry, apex and hang on a flat, windless shot", () => {
+    const club = clubById("iron7");
+    const profile = flightProfile(club, 1);
+    const path = sampleFlightPath({ x: 0, y: 0 }, { aim: 0, power: 1, accuracy: 0, club, lie: "fairway", wind: { speed: 0, dir: 0 } }, {
+      ...HARBOR_DUNES.holes[0],
+      trees: [],
+    });
+    const land = path[path.length - 1];
+    expect(Math.abs((path.length - 1) / 60 - profile.hang)).toBeLessThan(0.15);
+    expect(Math.abs(flightApex(path) - profile.apex)).toBeLessThan(1.5);
+    expect(Math.abs(Math.hypot(land.pos.x, land.pos.y) - club.carry)).toBeLessThan(6);
   });
 
   it("curves a draw left of a straight shot", () => {
@@ -118,9 +129,11 @@ describe("shot physics", () => {
     const straight = sampleFlightPath(from, { ...shot, shape: 0 }, hole);
     const draw = sampleFlightPath(from, { ...shot, shape: 1 }, hole);
     const fade = sampleFlightPath(from, { ...shot, shape: -1 }, hole);
-    const mid = (path: typeof straight) => path[Math.floor(path.length * 0.6)];
-    expect(mid(draw).pos.y).toBeGreaterThan(mid(straight).pos.y + 8);
-    expect(mid(fade).pos.y).toBeLessThan(mid(straight).pos.y - 8);
+    const end = (path: typeof straight) => path[path.length - 1];
+    expect(end(draw).pos.y).toBeGreaterThan(end(straight).pos.y + 5);
+    expect(end(fade).pos.y).toBeLessThan(end(straight).pos.y - 5);
+    // A shaped iron bends, it does not hook into the next fairway.
+    expect(end(draw).pos.y - end(straight).pos.y).toBeLessThan(20);
   });
 
   it("lips a fast putt once, then holes the tap-in", () => {
@@ -326,8 +339,8 @@ describe("shot physics", () => {
     expect(travel).toBeLessThan(55);
     expect(flightApex(path)).toBeLessThan(18);
     expect(flightApex(path)).toBeGreaterThan(2);
-    expect(flightHangTime(29, 56, 0.38)).toBeLessThan(2.2);
-    expect(flightHangTime(86, 56, 1)).toBeGreaterThan(3.2);
+    expect(flightProfile(clubById("sw"), 0.38, 0.88).hang).toBeLessThan(2.2);
+    expect(flightProfile(clubById("sw"), 1).hang).toBeGreaterThan(3.2);
   });
 
   it("samples a flight path without jumping to a raw vertex", () => {

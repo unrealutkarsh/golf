@@ -190,3 +190,28 @@ export function createBallContactShadows(): { shadow: THREE.Mesh; softShadow: TH
   softShadow.rotation.x = -Math.PI / 2;
   return { shadow, softShadow };
 }
+
+/** Additive glow sprite for the ball in flight. */
+export function createBallGlow(): THREE.Sprite {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.18, "rgba(255,250,230,0.9)");
+    g.addColorStop(0.45, "rgba(255,230,170,0.28)");
+    g.addColorStop(1, "rgba(255,220,150,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, color: 0xfff4d6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+  );
+  sprite.visible = false;
+  return sprite;
+}

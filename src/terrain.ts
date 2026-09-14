@@ -62,6 +62,53 @@ export function addressLookDistance(leftover: number, lookAhead: number): number
   return clamp(leftover * lookAhead + 10, 12, 38);
 }
 
+export type ShotCamStage = "launch" | "chase" | "landing";
+
+/** Broadcast-style sequence for a full shot: watch it leave, chase it, then cut to where it lands. */
+export function shotCamStage(flightTime: number, landingTime: number, touchedDown: boolean): ShotCamStage {
+  // Chips and punch shots are over too quickly for a cut to read.
+  const cutsToLanding = landingTime > 2.2;
+  if (cutsToLanding && (touchedDown || flightTime >= landingTime - 1.7)) return "landing";
+  return flightTime < 0.75 ? "launch" : "chase";
+}
+
+/** Ground spot for the landing camera: ahead of or beside the touchdown, clear of trees, hazards and OB. */
+export function landingCamSpot(hole: Hole, landing: Vec2, heading: number, rollYards = 0): Vec2 {
+  const fx = Math.cos(heading);
+  const fy = Math.sin(heading);
+  const options = [
+    // Stay near the line of play: decorative woods crowd the corridor edges.
+    { ahead: 30, side: 7 },
+    { ahead: 30, side: -7 },
+    { ahead: 38, side: 0 },
+    { ahead: 22, side: 10 },
+    { ahead: 22, side: -10 },
+    // Beside the landing, for approaches: galleries of trees stand behind greens.
+    { ahead: 8, side: 16 },
+    { ahead: 8, side: -16 },
+  ];
+  let best = landing;
+  let bestScore = -Infinity;
+  for (const [i, o] of options.entries()) {
+    // Sit beyond the expected roll-out so the ball finishes in front of the lens, not under it.
+    const ahead = o.ahead + rollYards;
+    const p = { x: landing.x + fx * ahead - fy * o.side, y: landing.y + fy * ahead + fx * o.side };
+    let clearance = 40;
+    for (const tree of hole.trees) clearance = Math.min(clearance, dist(p, tree) - tree.r);
+    const lie = lieAt(hole, p);
+    const hazard = lie === "ob" || inWater(hole, p) ? 30 : 0;
+    // Short grass sits inside the tree lines, so the view down the hole is open.
+    const open = lie === "fairway" || lie === "green" ? 14 : 0;
+    // Slight preference for the earlier (ahead-and-right) framings when everything is clear.
+    const score = Math.min(clearance, 24) + open - hazard - i * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  }
+  return best;
+}
+
 export function camLabel(view: ResolvedCam): string {
   if (view === "player") return "address";
   return view;
