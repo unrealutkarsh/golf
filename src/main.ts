@@ -197,6 +197,7 @@ if (qa === "round") {
   session.ball.vel = { x: 0, y: 0 };
   session.lie = "fairway";
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
+  session.visualAim = session.aim;
   session.camMode = "player";
 } else if (qa === "flight") {
   session.startTournament();
@@ -226,6 +227,7 @@ if (qa === "round") {
   session.refreshLie();
   session.autoClub();
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
+  session.visualAim = session.aim;
   session.power = session.suggestedPower();
   session.visualPower = session.power;
   session.camMode = "putt";
