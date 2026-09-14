@@ -257,6 +257,7 @@ describe("shot physics", () => {
     expect(drive.lipped).toBe(false);
     expect(createBall(from).lipped).toBe(false);
     expect(Math.hypot(putt.vel.x, putt.vel.y)).toBeCloseTo(puttSpeedForRoll(clubById("putter").roll * 0.2), 5);
+    expect(putt.spinning).toBeGreaterThan(Math.hypot(putt.vel.x, putt.vel.y) * 0.95);
   });
 
   it("starts a putt already rolling instead of sliding", () => {
