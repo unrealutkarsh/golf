@@ -183,7 +183,13 @@ export class GameSession {
     const puttFill = this.swingPhase === "power" ? this.meter : this.swingPhase === "aim" ? PUTT_HOLE_FILL : puttPowerToMeterFill(this.power, this.toPin());
     return {
       aim: this.aim,
-      power: this.swingPhase === "aim" || this.swingPhase === "power" ? this.visualPower : this.swingPhase === "accuracy" ? this.power : this.visualPower,
+      power: putting
+        ? scaledPuttPower(puttFill, this.toPin())
+        : this.swingPhase === "aim" || this.swingPhase === "power"
+          ? this.visualPower
+          : this.swingPhase === "accuracy"
+            ? this.power
+            : this.visualPower,
       accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
@@ -354,6 +360,7 @@ export class GameSession {
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     if (this.screen !== "play") return;
+    this.refreshLie();
     const target = this.previewTargetPower();
     const follow = this.swingPhase === "power" ? 0.018 : 0.00035;
     this.visualPower += (target - this.visualPower) * (1 - Math.pow(follow, Math.max(dt, 0.001)));
@@ -451,6 +458,11 @@ export class GameSession {
       this.shape = 0;
     }
     this.visualPower = this.suggestedPower();
+  }
+
+  refreshLie(): void {
+    if (this.ball.z > 0.55) return;
+    this.lie = lieAt(this.hole(), this.ball.pos);
   }
 
   isHoled(): boolean {

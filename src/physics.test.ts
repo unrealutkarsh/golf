@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
 import { applyGreenGrip, createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
-import { suggestedPuttPower } from "./terrain";
+import { scaledPuttPower, suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];
@@ -234,6 +234,30 @@ describe("shot physics", () => {
     expect(Math.hypot(ball.vel.x, ball.vel.y)).toBeLessThan(0.6);
   });
 
+  it("launches every stroke with lipped cleared", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const from = { x: hole.pin.x - 4, y: hole.pin.y };
+    const putt = launchBall(from, {
+      aim: 0,
+      power: 0.2,
+      accuracy: 0,
+      club: clubById("putter"),
+      lie: "green",
+      wind: { speed: 0, dir: 0 },
+    });
+    const drive = launchBall(hole.tee, {
+      aim: 0,
+      power: 0.9,
+      accuracy: 0,
+      club: clubById("driver"),
+      lie: "tee",
+      wind: { speed: 0, dir: 0 },
+    });
+    expect(putt.lipped).toBe(false);
+    expect(drive.lipped).toBe(false);
+    expect(createBall(from).lipped).toBe(false);
+  });
+
   it("starts a putt already rolling instead of sliding", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 6, y: hole.pin.y };
@@ -250,8 +274,8 @@ describe("shot physics", () => {
   });
 
   it("grabs a sliding ball on the green harder than a rolling one", () => {
-    const slide = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0 }, 1 / 60);
-    const roll = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 12, curve: 0 }, 1 / 60);
+    const slide = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 0, curve: 0, lipped: false }, 1 / 60);
+    const roll = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: 12, y: 0 }, z: 0, vz: 0, spinning: 12, curve: 0, lipped: false }, 1 / 60);
     expect(Math.hypot(slide.vel.x, slide.vel.y)).toBeLessThan(Math.hypot(roll.vel.x, roll.vel.y) - 0.4);
     expect(slide.spinning).toBeGreaterThan(0.4);
   });

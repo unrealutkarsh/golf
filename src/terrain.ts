@@ -5,6 +5,10 @@ import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
 
+export const PUTT_ROLL_YARDS = 42;
+/** Meter fill that should die at the hole. */
+export const PUTT_HOLE_FILL = 0.5;
+
 /** Launch-monitor / tour framing: ball + course, no character mesh to clear. */
 export interface CamFraming {
   /** Yards behind the ball along the aim or travel heading. */

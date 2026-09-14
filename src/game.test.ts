@@ -143,6 +143,49 @@ describe("tour session", () => {
     expect(game.putting()).toBe(true);
   });
 
+  it("labels the lie Green as soon as the ball is on the putting surface", () => {
+    const game = new GameSession(8);
+    game.startTournament();
+    expect(game.lie).toBe("tee");
+    const hole = game.hole();
+    game.ball.pos = { x: hole.green.cx, y: hole.green.cy };
+    game.ball.z = 0;
+    game.update(1 / 60);
+    expect(game.lie).toBe("green");
+    expect(game.putting()).toBe(true);
+  });
+
+  it("previews a leftover-relative putt instead of a full-meter smash", () => {
+    const game = new GameSession(11);
+    game.startTournament();
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 6, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    game.swingPhase = "aim";
+    const preview = game.previewFlight();
+    const travel = Math.hypot(preview[preview.length - 1].pos.x - game.ball.pos.x, preview[preview.length - 1].pos.y - game.ball.pos.y);
+    expect(travel).toBeGreaterThan(3);
+    expect(travel).toBeLessThan(10);
+  });
+
+  it("holes a mid-meter tap-in instead of blasting through the cup", () => {
+    const game = new GameSession(9);
+    game.startTournament();
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 1.15, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+    game.swingPhase = "power";
+    game.meter = 0.55;
+    game.tap();
+    game.meter = 0.5;
+    game.tap();
+    for (let i = 0; i < 300; i++) game.update(1 / 60);
+    expect(game.screen).toBe("holeEnd");
+  });
+
   it("lets the player set draw or fade except on the green", () => {
     const game = new GameSession(6);
     game.startTournament();
