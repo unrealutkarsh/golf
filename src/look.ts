@@ -19,6 +19,18 @@ export function fbm(x: number, y: number): number {
   );
 }
 
+/** Tangent-space-ish normal from four height samples. Y is up. */
+export function heightToNormal(hL: number, hR: number, hD: number, hU: number, scale = 1.6): [number, number, number] {
+  const nx = (hL - hR) * scale;
+  const nz = (hD - hU) * scale;
+  const len = Math.hypot(nx, 1, nz) || 1;
+  return [nx / len, 1 / len, nz / len];
+}
+
+export function packNormalRgb(nx: number, ny: number, nz: number): [number, number, number] {
+  return [nx * 0.5 + 0.5, ny * 0.5 + 0.5, nz * 0.5 + 0.5];
+}
+
 export function grassTile(seed: string, colors: string[], size = 128, specks = 2400): HTMLCanvasElement {
   const tile = document.createElement("canvas");
   tile.width = size;
@@ -26,20 +38,47 @@ export function grassTile(seed: string, colors: string[], size = 128, specks = 2
   const ctx = tile.getContext("2d");
   if (!ctx) throw new Error("Grass tile unavailable");
   const rng = mulberry32(hashString(seed));
-  ctx.fillStyle = colors[0];
-  ctx.fillRect(0, 0, size, size);
+  const img = ctx.createImageData(size, size);
+  const parsed = colors.map((hex) => {
+    const n = hex.startsWith("#") ? hex.slice(1) : hex;
+    return [parseInt(n.slice(0, 2), 16), parseInt(n.slice(2, 4), 16), parseInt(n.slice(4, 6), 16)];
+  });
+  const mix = (a: number[], b: number[], t: number) => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const n =
+        hashNoise(x * 0.07 + rng() * 0.01, y * 0.07) * 0.45 +
+        hashNoise(x * 0.19, y * 0.17) * 0.32 +
+        hashNoise(x * 0.41, y * 0.38) * 0.23;
+      const i0 = Math.floor(n * (parsed.length - 1));
+      const t = n * (parsed.length - 1) - i0;
+      const c = mix(parsed[i0], parsed[Math.min(parsed.length - 1, i0 + 1)], t);
+      const i = (y * size + x) * 4;
+      img.data[i] = c[0];
+      img.data[i + 1] = c[1];
+      img.data[i + 2] = c[2];
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
   for (let i = 0; i < specks; i++) {
     const px = rng() * size;
     const py = rng() * size;
     const tone = colors[1 + Math.floor(rng() * (colors.length - 1))];
-    ctx.globalAlpha = 0.1 + rng() * 0.42;
+    ctx.globalAlpha = 0.08 + rng() * 0.28;
     ctx.fillStyle = tone;
-    const w = 0.6 + rng() * 2.4;
-    const h = 1.1 + rng() * 3.4;
+    const w = 0.35 + rng() * 1.1;
+    const h = 1.4 + rng() * 3.4;
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate((rng() - 0.5) * 0.7);
-    ctx.fillRect(-w * 0.5, -h, w, h);
+    ctx.rotate(rng() * Math.PI * 2);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -50,4 +89,42 @@ export function patternFrom(ctx: CanvasRenderingContext2D, tile: HTMLCanvasEleme
   const pattern = ctx.createPattern(tile, "repeat");
   if (!pattern) throw new Error("Pattern unavailable");
   return pattern;
+}
+
+/** Tiled grass-blade normal from a height-speckle field. */
+export function grassNormalTile(seed: string, size = 128): HTMLCanvasElement {
+  const tile = document.createElement("canvas");
+  tile.width = size;
+  tile.height = size;
+  const ctx = tile.getContext("2d");
+  if (!ctx) throw new Error("Grass normal unavailable");
+  const rng = mulberry32(hashString(seed));
+  const height = new Float32Array(size * size);
+  const salt = rng() * 8;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      height[y * size + x] =
+        hashNoise(x * 0.21 + salt, y * 0.19) * 0.46 +
+        hashNoise(x * 0.73, y * 0.68) * 0.34 +
+        hashNoise(x * 1.9 + salt, y * 1.7) * 0.2;
+    }
+  }
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const hL = height[y * size + ((x + size - 1) % size)];
+      const hR = height[y * size + ((x + 1) % size)];
+      const hD = height[((y + size - 1) % size) * size + x];
+      const hU = height[((y + 1) % size) * size + x];
+      const [nx, ny, nz] = heightToNormal(hL, hR, hD, hU, 2.4);
+      const packed = packNormalRgb(nx, ny, nz);
+      const i = (y * size + x) * 4;
+      img.data[i] = Math.round(packed[0] * 255);
+      img.data[i + 1] = Math.round(packed[1] * 255);
+      img.data[i + 2] = Math.round(packed[2] * 255);
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return tile;
 }

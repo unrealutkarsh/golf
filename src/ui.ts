@@ -134,12 +134,12 @@ export class UI {
       <div class="panel help">
         <h2>How to play</h2>
         <ol>
-          <li><b>Aim</b> with the mouse or finger. Arrow keys or A / D nudge the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
+          <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line. On the green the line stays on the pin.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
-          <li><b>Camera</b> with V or View: auto, player, follow. On the green the view is always over the shoulder, looking at the pin.</li>
-          <li>G toggles the break grid. The gold line is the putt at the hole.</li>
+          <li><b>Camera</b> with V or View: auto, player, follow. On the green the view stays behind the ball, looking at the pin.</li>
+          <li>G toggles a faint break grid (off by default). The gold line is the putt at the hole.</li>
           <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
@@ -265,7 +265,7 @@ export class UI {
         <span>${hole.yards}</span>
         <span class="dot"></span>
         <span class="live">${Math.round(session.toPin())} yds</span>
-        <span>${surfaceLabel(session.lie)}</span>
+        <span class="lie-chip lie-${session.lie}">${surfaceLabel(session.lie)}</span>
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
         <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fbm, hashNoise } from "./look";
+import { fbm, hashNoise, heightToNormal, packNormalRgb } from "./look";
 
 describe("look noise", () => {
   it("stays in a usable 0-1 range", () => {
@@ -11,5 +11,15 @@ describe("look noise", () => {
       expect(f).toBeGreaterThanOrEqual(0);
       expect(f).toBeLessThan(1.2);
     }
+  });
+
+  it("turns height slopes into unit normals", () => {
+    const [nx, ny, nz] = heightToNormal(0.4, 0.1, 0.2, 0.2);
+    expect(nx).toBeGreaterThan(0);
+    expect(ny).toBeGreaterThan(0.5);
+    expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 5);
+    const [r, g, b] = packNormalRgb(0, 1, 0);
+    expect(g).toBeGreaterThan(r);
+    expect(g).toBeGreaterThan(b);
   });
 });
