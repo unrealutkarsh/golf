@@ -1,6 +1,6 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
-import { clamp, dist, ellipseRadial, type Vec2 } from "./math";
+import { clamp, dist, type Vec2 } from "./math";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -178,27 +178,6 @@ export function groundHeight(hole: Hole, x: number, y: number): number {
   if (lie === "rough") return 0.06 + n * 0.055 + n2 * 0.02;
   const dune = fbm(x * 0.028 + 9, y * 0.028);
   return 0.02 + dune * 0.32 + n * 0.1;
-}
-
-export function surfaceColor(hole: Hole, x: number, y: number): [number, number, number] {
-  const p = { x, y };
-  const n = fbm(x * 0.16, y * 0.16);
-  const grain = fbm(x * 1.1, y * 1.1);
-  const radial = ellipseRadial(p, hole.green.cx, hole.green.cy, hole.green.rx, hole.green.ry, hole.green.rotation);
-  if (inWater(hole, p)) return [0.07 + n * 0.03, 0.26 + n * 0.05, 0.36 + n * 0.06];
-  const lie = lieAt(hole, p);
-  if (lie === "bunker") return [0.82 + n * 0.08, 0.7 + n * 0.05, 0.46 + n * 0.04];
-  if (lie === "green" || onGreen(hole, p)) {
-    if (radial >= 0.88) return [0.2 + n * 0.014, 0.34 + n * 0.018, 0.14 + n * 0.01];
-    return [0.16 + n * 0.014 + grain * 0.01, 0.33 + n * 0.018 + grain * 0.01, 0.14 + n * 0.01];
-  }
-  if (radial < 1.3 && lie !== "ob") return [0.28 + n * 0.018, 0.36 + n * 0.016, 0.13 + n * 0.01];
-  if (lie === "tee") return [0.2 + n * 0.018, 0.38 + n * 0.02, 0.13 + n * 0.01];
-  if (lie === "fairway") {
-    return [0.2 + n * 0.02 + grain * 0.01, 0.38 + n * 0.02, 0.12 + n * 0.01];
-  }
-  if (lie === "rough") return [0.16 + n * 0.03, 0.28 + n * 0.024, 0.09 + n * 0.012];
-  return [0.26 + n * 0.06, 0.34 + n * 0.05, 0.16 + n * 0.03];
 }
 
 export function bladeHeight(lie: Lie): number {

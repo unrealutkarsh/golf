@@ -1,3 +1,4 @@
+import { renderPixelRatio } from "./art";
 import type { GameSession } from "./game";
 import { onGreen } from "./course";
 import { drawHud } from "./canvas-hud";
@@ -36,7 +37,7 @@ export class Renderer {
   }
 
   resize(): void {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = renderPixelRatio(window.devicePixelRatio);
     this.w = window.innerWidth;
     this.h = window.innerHeight;
     this.canvas.width = Math.floor(this.w * this.dpr);

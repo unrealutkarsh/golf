@@ -19,7 +19,6 @@ import {
   shapeLabel,
   scaledPuttPower,
   suggestedPuttPower,
-  surfaceColor,
   turfLush,
 } from "./terrain";
 
@@ -33,14 +32,6 @@ describe("course terrain", () => {
     expect(inWater(hole, pond)).toBe(true);
     expect(green).toBeGreaterThan(sand + 0.2);
     expect(green).toBeGreaterThan(groundHeight(hole, pond.x, pond.y) + 0.4);
-    const [r, g, b] = surfaceColor(hole, hole.green.cx, hole.green.cy);
-    expect(g).toBeGreaterThan(r);
-    expect(g).toBeGreaterThan(b);
-    const fringe = surfaceColor(hole, hole.green.cx + hole.green.rx * 1.14, hole.green.cy);
-    expect(fringe[0] / fringe[1]).toBeGreaterThan(r / g);
-    const fairway = surfaceColor(hole, hole.tee.x + 48, hole.tee.y);
-    expect(fairway[1]).toBeGreaterThan(0.28);
-    expect(fairway[1]).toBeLessThan(0.45);
   });
 
   it("picks player, follow, and putting cameras", () => {

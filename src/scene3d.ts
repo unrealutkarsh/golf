@@ -3,7 +3,7 @@ import { lieAt, nearOb } from "./course";
 import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
 import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
-import { dressStandard, loadArtKit } from "./kit";
+import { loadArtKit } from "./kit";
 import { SCENE_TONE } from "./look";
 import { fromAngle, lerp, type Vec2 } from "./math";
 import { samplePathPoint, type FlightSample } from "./physics";
@@ -11,7 +11,8 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh } from "./scene-ball";
+import { pinMarkerOpacity, renderPixelRatio, screenConstantScale } from "./art";
+import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
@@ -52,6 +53,8 @@ export class CourseScene implements CameraRig {
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
+  /** Screen-sized flag icon over the hole, so the target reads from the tee through trees and haze. */
+  private pinMarker: THREE.Sprite;
   private grid = new THREE.Group();
   private landing: THREE.Mesh;
   private flightMesh: THREE.Mesh | null = null;
@@ -141,7 +144,7 @@ export class CourseScene implements CameraRig {
     this.scene.add(this.shadow, this.softShadow);
 
     this.landing = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 1.05, 28),
+      new THREE.RingGeometry(0.62, 1.05, 40),
       new THREE.MeshBasicMaterial({
         color: SCENE_TONE.landCream,
         side: THREE.DoubleSide,
@@ -212,8 +215,10 @@ export class CourseScene implements CameraRig {
     this.aimRibbon.visible = false;
     this.scene.add(this.aimRibbon);
 
-    this.scene.add(this.pin, this.grid);
+    this.pinMarker = createPinMarker();
+    this.scene.add(this.pin, this.grid, this.pinMarker);
     this.resize();
+    watchPixelRatio(() => this.resize());
     if (!software) this.initComposer();
     window.addEventListener("resize", () => this.resize());
   }
@@ -222,35 +227,11 @@ export class CourseScene implements CameraRig {
     try {
       const kit = await loadArtKit(this.renderer, lite);
       bindFoliageArt(this.foliageKit, kit);
-      dressStandard(this.turfMat, kit.fairway, {
-        color: SCENE_TONE.fairwayTint,
-        roughness: SCENE_TONE.fairwayRoughness,
-        env: SCENE_TONE.fairwayEnv,
-        normalScale: 1.05,
-      });
-      dressStandard(this.greenMat, kit.green, {
-        color: SCENE_TONE.greenTint,
-        roughness: SCENE_TONE.greenRoughness,
-        env: SCENE_TONE.greenEnv,
-        normalScale: 0.72,
-      });
-      this.greenMat.clearcoat = 0.02;
-      this.greenMat.clearcoatRoughness = 0.72;
-      this.greenMat.sheen = SCENE_TONE.greenSheen;
-      this.greenMat.sheenColor.set(SCENE_TONE.greenSheenColor);
-      dressStandard(this.sandMat, kit.sand, { roughness: 0.95, env: 0.2, normalScale: 1.4 });
-      dressStandard(this.countryMat, kit.rough, { roughness: 0.92, env: 0.3, normalScale: 1.1 });
+      // Turf, green and sand stay on the flat stylized palette; the HDRI only lights reflective bits (ball, water).
       if (kit.env) {
         this.scene.environment = kit.env;
         this.waterMat.envMapIntensity = 1.05;
         (this.ball.material as THREE.MeshPhysicalMaterial).envMapIntensity = 1.55;
-      }
-      if (kit.background && !lite) {
-        this.scene.background = kit.background;
-        this.scene.backgroundBlurriness = SCENE_TONE.backgroundBlurriness;
-        this.scene.backgroundIntensity = SCENE_TONE.backgroundIntensity;
-        this.sky.visible = false;
-        this.scene.fog = new THREE.Fog(SCENE_TONE.fogColor, SCENE_TONE.fogNearHdr, SCENE_TONE.fogFarHdr);
       }
       this.pendingArtRebuild = true;
     } catch (err) {
@@ -279,6 +260,12 @@ export class CourseScene implements CameraRig {
   }
 
   resize(): void {
+    // Re-read the ratio every time: dragging to another display or zooming changes it without a size change.
+    const ratio = renderPixelRatio(window.devicePixelRatio);
+    if (this.renderer.getPixelRatio() !== ratio) {
+      this.renderer.setPixelRatio(ratio);
+      this.composer?.setPixelRatio(ratio);
+    }
     this.w = window.innerWidth;
     this.h = window.innerHeight;
     this.camera.aspect = this.w / Math.max(this.h, 1);
@@ -324,6 +311,7 @@ export class CourseScene implements CameraRig {
     this.updateGrid(session, putting);
     this.updatePuttAim(session, hole, putting);
     updateSceneCamera(this, session, hole, view, putting, dt);
+    this.updatePinMarker(session, putting);
     this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
     const play = session.screen === "play";
@@ -398,6 +386,18 @@ export class CourseScene implements CameraRig {
 
   private placePin(hole: Hole): void {
     this.pin.position.set(hole.pin.x, groundHeight(hole, hole.pin.x, hole.pin.y), hole.pin.y);
+  }
+
+  private updatePinMarker(session: GameSession, putting: boolean): void {
+    const d = this.camera.position.distanceTo(this.pin.position);
+    const opacity = session.screen === "play" && !putting ? pinMarkerOpacity(d) : 0;
+    this.pinMarker.visible = opacity > 0;
+    if (!this.pinMarker.visible) return;
+    const scale = screenConstantScale(d, 0.06, 2.2);
+    (this.pinMarker.material as THREE.SpriteMaterial).opacity = opacity;
+    this.pinMarker.scale.set(scale * 0.62, scale, 1);
+    // Anchor the icon's foot on the cup and lift it above the real stick.
+    this.pinMarker.position.set(this.pin.position.x, this.pin.position.y + 2.6 + scale * 0.5, this.pin.position.z);
   }
 
   private updatePath(session: GameSession, dt: number): void {
@@ -488,10 +488,12 @@ export class CourseScene implements CameraRig {
     this.landTarget.setHex(warn ? SCENE_TONE.landWarn : SCENE_TONE.landCream);
     this.landColor.lerp(this.landTarget, k);
     (this.landing.material as THREE.MeshBasicMaterial).color.copy(this.landColor);
-    (this.landing.material as THREE.MeshBasicMaterial).opacity = putting ? 0.24 : 0.36;
+    (this.landing.material as THREE.MeshBasicMaterial).opacity = putting ? 0.3 : 0.75;
     this.landPosTarget.set(lastX, groundHeight(hole, lastX, lastZ) + 0.05, lastZ);
     this.landPos.lerp(this.landPosTarget, k);
     this.landing.position.copy(this.landPos);
+    // The ring is ~2 yd wide in the world; grow it with distance so a 250-yard target is still a clear mark.
+    this.landing.scale.setScalar(putting ? 1 : screenConstantScale(this.camera.position.distanceTo(this.landPos), 0.03, 1));
   }
 
   private updateTrail(session: GameSession): void {
@@ -590,6 +592,23 @@ export class CourseScene implements CameraRig {
     attr.needsUpdate = true;
     this.puttAim.computeLineDistances();
   }
+}
+
+/** Calls `onChange` whenever devicePixelRatio changes (display switch, browser zoom). */
+function watchPixelRatio(onChange: () => void): void {
+  if (typeof window.matchMedia !== "function") return;
+  const listen = () => {
+    const query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    query.addEventListener(
+      "change",
+      () => {
+        onChange();
+        listen();
+      },
+      { once: true },
+    );
+  };
+  listen();
 }
 
 function makeLine(data: Float32Array, color: number): THREE.Line {

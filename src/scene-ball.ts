@@ -215,3 +215,51 @@ export function createBallGlow(): THREE.Sprite {
   sprite.visible = false;
   return sprite;
 }
+
+/** Flag icon billboard for the hole: white stick, red pennant, dark outline so it reads on sky or trees. */
+export function createPinMarker(): THREE.Sprite {
+  const w = 62;
+  const h = 100;
+  const canvas = document.createElement("canvas");
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.scale(2, 2);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    const pennant = () => {
+      ctx.beginPath();
+      ctx.moveTo(14, 10);
+      ctx.lineTo(56, 24);
+      ctx.lineTo(14, 38);
+      ctx.closePath();
+    };
+    ctx.strokeStyle = "rgba(10, 20, 12, 0.75)";
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(14, 8);
+    ctx.lineTo(14, 96);
+    ctx.stroke();
+    pennant();
+    ctx.stroke();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(14, 8);
+    ctx.lineTo(14, 96);
+    ctx.stroke();
+    pennant();
+    ctx.fillStyle = "#ff3b2f";
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    // Drawn over the scenery on purpose: it is a broadcast-style graphic, not a physical object.
+    new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, fog: false }),
+  );
+  sprite.renderOrder = 10;
+  sprite.visible = false;
+  return sprite;
+}

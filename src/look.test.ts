@@ -26,14 +26,16 @@ describe("look noise", () => {
 });
 
 describe("scene tone", () => {
-  it("keeps hardware lighting below the washed-out PBR merge", () => {
-    expect(SCENE_TONE.sunHardware).toBeLessThan(1.35);
-    expect(SCENE_TONE.exposureHardware).toBeLessThan(0.9);
-    expect(SCENE_TONE.hemiHardware).toBeLessThan(0.3);
+  it("lights a clear day without blowing out or glaring", () => {
+    // Exposure at or under 1 and near-zero bloom keep the bright palette from washing to white.
+    expect(SCENE_TONE.exposureHardware).toBeLessThanOrEqual(1);
     expect(SCENE_TONE.bloomStrength).toBeLessThan(0.1);
-    expect(SCENE_TONE.backgroundIntensity).toBeLessThan(0.75);
-    expect(SCENE_TONE.skyZenith[2]).toBeLessThan(0.55);
-    expect(SCENE_TONE.greenSheen).toBeLessThan(0.3);
+    expect(SCENE_TONE.bloomThreshold).toBeGreaterThan(0.9);
+    // A blue zenith above a pale horizon reads as daytime sky, not dusk.
+    expect(SCENE_TONE.skyZenith[2]).toBeGreaterThan(SCENE_TONE.skyZenith[0] * 2);
+    expect(SCENE_TONE.skyHorizon[1]).toBeGreaterThan(SCENE_TONE.skyZenith[1]);
+    // Haze only far out, so tree lines and the green stay crisp from the tee.
+    expect(SCENE_TONE.fogNear).toBeGreaterThan(200);
     expect(SCENE_TONE.sunSoftware).toBeGreaterThan(0.9);
     expect(SCENE_TONE.exposureSoftware).toBeGreaterThan(0.95);
   });
