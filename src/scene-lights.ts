@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { SCENE_TONE } from "./look";
 
 export function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
   try {
@@ -13,24 +14,33 @@ export function isSoftwareGL(renderer: THREE.WebGLRenderer): boolean {
 
 export function configureWebGLRenderer(renderer: THREE.WebGLRenderer, software: boolean): void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setClearColor(0x6aa0d4, 1);
+  renderer.setClearColor(SCENE_TONE.clearColor, 1);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = software ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = software ? 1.22 : 1.02;
+  renderer.toneMappingExposure = software ? SCENE_TONE.exposureSoftware : SCENE_TONE.exposureHardware;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 }
 
 export function addOutdoorLights(scene: THREE.Scene, software: boolean): THREE.DirectionalLight {
-  scene.add(new THREE.AmbientLight(software ? 0xc8d4c8 : 0xa8bdd0, software ? 0.7 : 0.12));
-  const hemi = new THREE.HemisphereLight(software ? 0xd8e8d4 : 0xd6ebff, software ? 0x3a6a28 : 0x243018, software ? 1.05 : 0.38);
+  scene.add(
+    new THREE.AmbientLight(
+      software ? SCENE_TONE.ambientSoftware : SCENE_TONE.ambientHardware,
+      software ? SCENE_TONE.ambientSoftwareInt : SCENE_TONE.ambientHardwareInt,
+    ),
+  );
+  const hemi = new THREE.HemisphereLight(
+    software ? SCENE_TONE.hemiSkySoftware : SCENE_TONE.hemiSkyHardware,
+    software ? SCENE_TONE.hemiGroundSoftware : SCENE_TONE.hemiGroundHardware,
+    software ? SCENE_TONE.hemiSoftware : SCENE_TONE.hemiHardware,
+  );
   scene.add(hemi);
   if (software) {
-    const fill = new THREE.DirectionalLight(0xc4d8b8, 0.28);
+    const fill = new THREE.DirectionalLight(SCENE_TONE.fillSoftware, SCENE_TONE.fillSoftwareInt);
     fill.position.set(-90, 48, 70);
     scene.add(fill);
   }
-  const sun = new THREE.DirectionalLight(0xffefc8, software ? 1.45 : 2.15);
+  const sun = new THREE.DirectionalLight(SCENE_TONE.sunColor, software ? SCENE_TONE.sunSoftware : SCENE_TONE.sunHardware);
   sun.castShadow = true;
   const map = software ? 1024 : 4096;
   sun.shadow.mapSize.set(map, map);

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { buildFringeBladeField, buildGreenBladeField } from "./blades";
 import { lieAt } from "./course";
 import { addCourseFoliage, type FoliageKit } from "./foliage";
-import { hashNoise } from "./look";
+import { hashNoise, SCENE_TONE } from "./look";
 import { groundHeight, surfaceColor } from "./terrain";
 import { buildGreenOverlay } from "./turf";
 import type { Hole } from "./types";
@@ -224,10 +224,11 @@ export function buildPlayableTerrain(hole: Hole, turfMat: THREE.MeshStandardMate
     const z = pos.getZ(i);
     const lie = lieAt(hole, { x, y: z });
     const [cr, cg, cb] = surfaceColor(hole, x, z);
-    const lift = lie === "rough" ? 0.4 : lie === "bunker" ? 0.5 : 0.58;
-    colors[i * 3] = lift + cr * 0.48;
-    colors[i * 3 + 1] = lift + cg * 0.48;
-    colors[i * 3 + 2] = lift + cb * 0.48;
+    const lift = lie === "rough" ? 0.2 : lie === "bunker" ? 0.34 : SCENE_TONE.vertexLift;
+    const scale = SCENE_TONE.vertexColorScale;
+    colors[i * 3] = lift + cr * scale;
+    colors[i * 3 + 1] = lift + cg * scale;
+    colors[i * 3 + 2] = lift + cb * scale;
   }
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();

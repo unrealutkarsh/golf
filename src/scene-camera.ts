@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { GameSession } from "./game";
 import { dist, fromAngle } from "./math";
-import { camFraming, groundHeight, type ResolvedCam } from "./terrain";
+import { addressLookDistance, cameraHeightAboveGround, groundHeight, playCamFraming, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
 export interface CameraRig {
@@ -32,7 +32,8 @@ export function updateSceneCamera(
   const bh = groundHeight(hole, ball.x, ball.y) + session.ball.z;
   const desired = new THREE.Vector3();
   const look = new THREE.Vector3();
-  const frame = camFraming(view);
+  const leftover = dist(ball, pin);
+  const frame = playCamFraming(view, leftover);
   let fov = frame.fov;
   if (session.screen !== "play") {
     const t = rig.time * 0.1;
@@ -60,9 +61,13 @@ export function updateSceneCamera(
     const back = fromAngle(aim + Math.PI, frame.back);
     const side = fromAngle(aim + Math.PI / 2, frame.side);
     desired.set(ball.x + back.x + side.x, bh + frame.height, ball.y + back.y + side.y);
-    const lookDist = Math.max(12, Math.min(38, dist(ball, pin) * frame.lookAhead + 10));
+    const lookDist = addressLookDistance(leftover, frame.lookAhead);
     const ahead = fromAngle(aim, lookDist);
     look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.42, ball.y + ahead.y);
+  }
+  if (session.screen === "play") {
+    const camGround = groundHeight(hole, desired.x, desired.z);
+    desired.y = cameraHeightAboveGround(camGround, desired.y, view === "putt" ? 1.45 : 1.85);
   }
   const catchup = rig.viewAge < 0.28 ? 0.55 : view === "follow" ? 0.36 : view === "putt" ? 0.18 : 0.14;
   const k = 1 - Math.exp(-catchup * 18 * Math.max(dt, 0.001));

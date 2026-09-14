@@ -3,7 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import physicsSrc from "./physics.ts?raw";
-import { AIM_RIBBON_SEGS, aimRibbonHalfWidth, dimpleIndent, golferMeshCount, makeGolfBallGeometry } from "./scene3d";
+import { AIM_RIBBON_SEGS, aimRibbonHalfWidth, dimpleIndent, makeGolfBallGeometry } from "./scene3d";
+import cameraSrc from "./scene-camera.ts?raw";
 import sceneSrc from "./scene3d.ts?raw";
 import terrainSrc from "./terrain.ts?raw";
 
@@ -76,8 +77,9 @@ describe("aim ribbon", () => {
     expect(sceneSrc).not.toMatch(/flightMat\.color\.set\(shape/);
     expect(sceneSrc).not.toMatch(/warn \? 0xc62828 : 0xf0d78a/);
     expect(sceneSrc).toMatch(/onPutt/);
-    expect(sceneSrc).toMatch(/playCamFraming/);
-    expect(sceneSrc).toMatch(/cameraHeightAboveGround/);
+    expect(sceneSrc).toMatch(/updateSceneCamera/);
+    expect(cameraSrc).toMatch(/playCamFraming/);
+    expect(cameraSrc).toMatch(/cameraHeightAboveGround/);
     expect(AIM_RIBBON_SEGS).toBeGreaterThanOrEqual(32);
     expect(aimRibbonHalfWidth(false, 0)).toBeGreaterThan(aimRibbonHalfWidth(false, 1));
     expect(aimRibbonHalfWidth(true, 0.5)).toBeLessThan(aimRibbonHalfWidth(false, 0.5));
