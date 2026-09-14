@@ -21,6 +21,7 @@ import {
   forwardFlightPath,
   stepBall,
   MAX_HOLE_STROKES,
+  SIM_DT,
   type FlightSample,
 } from "./physics";
 import { prizeMoney, scoreName } from "./scoring";
@@ -39,6 +40,16 @@ import type {
   Wind,
   CamMode,
 } from "./types";
+
+export type StrikeQuality = "perfect" | "good" | "miss";
+
+export interface ShotCallout {
+  /** Increments per callout so the UI can replay its entrance animation. */
+  id: number;
+  title: string;
+  detail: string;
+  tone: StrikeQuality | "info";
+}
 
 export interface Camera {
   x: number;
@@ -93,6 +104,24 @@ export class GameSession {
   visualPower = 0.3;
   /** Smoothed heading for the preview ribbon — live aim stays on the stick. */
   visualAim = 0;
+  /** Freeze-frame seconds left right after contact. */
+  hitStop = 0;
+  /** 0–1 impact punch that drives camera shake; decays after contact. */
+  impact = 0;
+  /** Seconds of simulated flight for the current shot. */
+  flightTime = 0;
+  /** Seconds from launch to first touchdown, and where, from the launch-time simulation. */
+  landingTime = 0;
+  landingPos: Vec2 | null = null;
+  /** Straight-line yards from the strike to the first bounce. */
+  shotCarry: number | null = null;
+  strike: StrikeQuality | null = null;
+  callout: ShotCallout | null = null;
+  calloutTime = 0;
+  /** Seconds to hold on a stopped full shot before returning to address. */
+  settleTime = 0;
+  private simAccumulator = 0;
+  private previewCache: { key: string; flight: FlightSample[] | null; landing: Vec2 | null } = { key: "", flight: null, landing: null };
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -202,11 +231,29 @@ export class GameSession {
 
   previewFlight(): FlightSample[] {
     const shot = this.previewShot();
-    return forwardFlightPath(sampleFlightPath(this.ball.pos, shot, this.hole()), shot.aim);
+    const cache = this.previewFor(shot);
+    cache.flight ??= forwardFlightPath(sampleFlightPath(this.ball.pos, shot, this.hole()), shot.aim);
+    return cache.flight;
   }
 
   previewLanding(): Vec2 {
-    return predictedLanding(this.ball.pos, this.previewShot(), this.hole());
+    const shot = this.previewShot();
+    const cache = this.previewFor(shot);
+    cache.landing ??= predictedLanding(this.ball.pos, shot, this.hole());
+    return cache.landing;
+  }
+
+  /** Previews run the full fixed-step sim, so reuse them while the inputs are unchanged. */
+  private previewFor(shot: ReturnType<GameSession["previewShot"]>) {
+    const p = this.ball.pos;
+    const key = `${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${shot.wind.speed}|${shot.wind.dir}|${shot.shape}`;
+    if (key !== this.previewCache.key) this.previewCache = { key, flight: null, landing: null };
+    return this.previewCache;
+  }
+
+  showCallout(title: string, detail: string, tone: ShotCallout["tone"], seconds = 2.2): void {
+    this.callout = { id: (this.callout?.id ?? 0) + 1, title, detail, tone };
+    this.calloutTime = seconds;
   }
 
   startTournament(): void {
@@ -250,6 +297,9 @@ export class GameSession {
     this.shape = 0;
     this.aimExplicit = false;
     this.shotArc = [];
+    this.landingPos = null;
+    this.hitStop = 0;
+    this.impact = 0;
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
   }
@@ -314,6 +364,7 @@ export class GameSession {
     if (this.swingPhase === "accuracy") {
       const raw = clamp(this.meter * 2 - 1, -1, 1);
       this.accuracy = Math.abs(raw) < 0.2 ? 0 : Math.sign(raw) * raw * raw;
+      this.strike = Math.abs(raw) < 0.2 ? "perfect" : Math.abs(raw) < 0.6 ? "good" : "miss";
       this.lockedAccuracy = true;
       this.fire();
     }
@@ -359,9 +410,22 @@ export class GameSession {
     } catch {
       this.shotArc = [{ pos: { ...this.ball.pos }, z: this.ball.z }];
     }
+    this.flightTime = 0;
+    this.simAccumulator = 0;
+    this.shotCarry = null;
+    const last = this.shotArc[this.shotArc.length - 1];
+    this.landingTime = (this.shotArc.length - 1) * SIM_DT;
+    this.landingPos = last ? { ...last.pos } : null;
+    const quality = this.strike ?? "good";
+    if (club.id !== "putter") {
+      this.hitStop = 0.06 + this.power * 0.05;
+      this.impact = (0.35 + 0.65 * this.power) * (quality === "perfect" ? 1 : quality === "good" ? 0.75 : 0.55);
+      if (quality === "perfect") this.showCallout("Pure strike", `${club.name} · ${Math.round(this.power * 100)}%`, "perfect", 1.6);
+      else if (quality === "miss") this.showCallout(this.accuracy > 0 ? "Pulled it" : "Pushed it", "Stop the marker in the green window", "miss", 1.6);
+    }
     try {
       if (club.id === "putter") this.audio.putt();
-      else this.audio.swing(this.power);
+      else this.audio.strike(this.power, quality);
     } catch {
       /* audio must never block the shot */
     }
@@ -370,6 +434,8 @@ export class GameSession {
   update(dt: number): void {
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
+    this.calloutTime = Math.max(0, this.calloutTime - dt);
+    this.impact = Math.max(0, this.impact - dt * 2.4);
     if (this.screen !== "play") return;
     this.refreshLie();
     const powerLife = this.swingPhase === "power" ? 0.08 : 0.11;
@@ -396,9 +462,29 @@ export class GameSession {
         this.meter = 0;
         this.meterDir = 1;
       }
-    } else if (this.swingPhase === "flight" || this.swingPhase === "settle") {
-      this.simulate(dt);
+    } else if (this.swingPhase === "settle") {
+      this.settleTime -= dt;
+      if (this.settleTime <= 0) this.finishShot(true);
+    } else if (this.swingPhase === "flight") {
+      if (this.hitStop > 0) {
+        this.hitStop = Math.max(0, this.hitStop - dt);
+        return;
+      }
+      // Fixed steps keep the live ball on exactly the path the preview promised.
+      this.simAccumulator += dt * this.timeScale();
+      while (this.simAccumulator >= SIM_DT - 1e-9 && this.swingPhase === "flight" && this.screen === "play") {
+        this.simAccumulator -= SIM_DT;
+        this.flightTime += SIM_DT;
+        this.simulate(SIM_DT);
+      }
     }
+  }
+
+  /** Slow the world down while an approach shot is rolling out close to the cup. */
+  timeScale(): number {
+    if (this.club().id === "putter" || this.ball.z > 0.3) return 1;
+    const speed = Math.hypot(this.ball.vel.x, this.ball.vel.y);
+    return this.toPin() < 5 && speed > 0.8 ? 0.45 : 1;
   }
 
   private simulate(dt: number): void {
@@ -408,6 +494,10 @@ export class GameSession {
     this.refreshLie();
 
     for (const ev of step.events) {
+      if (ev.type === "bounce" && this.shotCarry === null) {
+        this.shotCarry = dist(this.lastShotPos, ev.pos);
+        this.audio.land(lieAt(hole, ev.pos));
+      }
       if (ev.type === "splash") {
         this.audio.splash();
         this.flash("Water hazard · one-stroke penalty");
@@ -440,7 +530,16 @@ export class GameSession {
 
     if (!step.flying) {
       this.lie = step.lie;
-      this.finishShot(true);
+      if (this.club().id === "putter" || this.shotCarry === null) {
+        this.finishShot(true);
+        return;
+      }
+      // Hold on the landing camera for a beat so the result and yardage can land.
+      const total = dist(this.lastShotPos, this.ball.pos);
+      const roll = Math.max(0, total - this.shotCarry);
+      this.showCallout(`${Math.round(total)} yds`, `Carry ${Math.round(this.shotCarry)} · Roll ${Math.round(roll)} · ${Math.round(this.toPin())} to pin`, "info", 2.8);
+      this.swingPhase = "settle";
+      this.settleTime = 1.3;
     }
   }
 

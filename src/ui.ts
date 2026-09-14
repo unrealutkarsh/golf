@@ -13,13 +13,41 @@ export class UI {
   private lastScreen: ScreenId | "" = "";
   private lastHud = "";
   private lastOverlay = "";
+  /** Lives outside the HUD markup, which is rebuilt whenever a number changes, so its animation can play through. */
+  private callout: HTMLElement;
+  private calloutId = -1;
 
   constructor(overlay: HTMLElement, hud: HTMLElement) {
     this.overlay = overlay;
     this.hud = hud;
+    this.callout = document.createElement("div");
+    this.callout.className = "callout";
+    this.callout.hidden = true;
+    this.callout.setAttribute("aria-live", "polite");
+    hud.insertAdjacentElement("afterend", this.callout);
+  }
+
+  private syncCallout(session: GameSession): void {
+    const c = session.callout;
+    const show = Boolean(c) && session.calloutTime > 0 && session.screen === "play" && !session.helpOpen && !session.scorecardOpen;
+    if (!show || !c) {
+      this.callout.hidden = true;
+      return;
+    }
+    if (c.id !== this.calloutId) {
+      this.calloutId = c.id;
+      this.callout.className = `callout tone-${c.tone}`;
+      this.callout.innerHTML = `<b>${escapeHtml(c.title)}</b><span>${escapeHtml(c.detail)}</span>`;
+      // Restart the entrance animation for back-to-back callouts.
+      this.callout.hidden = true;
+      void this.callout.offsetWidth;
+    }
+    this.callout.hidden = false;
+    this.callout.classList.toggle("leaving", session.calloutTime < 0.35);
   }
 
   sync(session: GameSession, onAction: (action: string, payload?: string) => void): void {
+    this.syncCallout(session);
     const screen = session.helpOpen ? "help" : session.scorecardOpen && session.screen === "play" ? "scorecard" : session.screen;
     const overlay = this.renderOverlay(session, screen);
     if (overlay !== this.lastOverlay || screen !== this.lastScreen) {
@@ -61,6 +89,8 @@ export class UI {
     this.hud.querySelectorAll("[data-action]").forEach((el) => {
       el.addEventListener("click", (e) => {
         e.preventDefault();
+        // Space is the swing key; a focused HUD button would also fire on it.
+        (el as HTMLElement).blur();
         e.stopPropagation();
         onAction((el as HTMLElement).dataset.action ?? "", (el as HTMLElement).dataset.payload);
       });

@@ -125,6 +125,8 @@ window.addEventListener("keydown", (e) => {
   const key = e.key.toLowerCase();
   if (key === " " || e.code === "Space") {
     e.preventDefault();
+    // A held key auto-repeats; each swing stage needs its own press.
+    if (e.repeat) return;
     if (session.screen === "play" && !session.helpOpen && !session.scorecardOpen) session.tap();
     return;
   }
@@ -147,10 +149,7 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-let last = performance.now();
-function frame(now: number): void {
-  const dt = Math.min(0.033, (now - last) / 1000);
-  last = now;
+function step(dt: number): void {
   session.update(dt);
   if (scene3d) {
     scene3d.sync(session, dt);
@@ -158,8 +157,20 @@ function frame(now: number): void {
   }
   renderer.draw(session, dt, { hudOnly: Boolean(scene3d) });
   ui.sync(session, handleAction);
+}
+
+let last = performance.now();
+function frame(now: number): void {
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+  step(dt);
   requestAnimationFrame(frame);
 }
+
+/** QA hook: advance whole frames by hand, e.g. from automation while the tab is hidden and rAF is paused. */
+(window as unknown as { __ptgStep: (frames: number, dt?: number) => void }).__ptgStep = (frames, dt = 1 / 60) => {
+  for (let i = 0; i < frames; i++) step(dt);
+};
 
 requestAnimationFrame(frame);
 

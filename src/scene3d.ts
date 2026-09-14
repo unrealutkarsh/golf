@@ -11,20 +11,21 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createGolfBallMesh } from "./scene-ball";
+import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
 import { makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam } from "./terrain";
+import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam, type ShotCamStage } from "./terrain";
 import type { Hole } from "./types";
 
 export { ballRollAxis, ballRollRadians, dimpleIndent, makeGolfBallGeometry } from "./scene-ball";
 
 const MAX_PATH = 140;
-const TRAIL_LEN = 80;
+/** Enough points for a full driver flight at 60 fps, so the tracer draws the whole shot. */
+const TRAIL_LEN = 720;
 export const AIM_RIBBON_SEGS = 48;
 
 export function aimRibbonHalfWidth(putting: boolean, t: number): number {
@@ -42,8 +43,12 @@ export class CourseScene implements CameraRig {
   time = 0;
   camPos = new THREE.Vector3(80, 24, 80);
   camLook = new THREE.Vector3(200, 1, 140);
+  shotStage: ShotCamStage | "" = "";
+  landingSpot: { key: string; pos: Vec2 } | null = null;
   private holeGroup = new THREE.Group();
   private ball: THREE.Mesh;
+  /** Soft glow that keeps a tiny ball readable against sky and turf while it flies. */
+  private ballGlow: THREE.Sprite;
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
@@ -128,7 +133,8 @@ export class CourseScene implements CameraRig {
     this.scene.add(this.puttAim);
 
     this.ball = createGolfBallMesh();
-    this.scene.add(this.ball);
+    this.ballGlow = createBallGlow();
+    this.scene.add(this.ball, this.ballGlow);
     const shadows = createBallContactShadows();
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
@@ -307,7 +313,9 @@ export class CourseScene implements CameraRig {
     }
     if (this.builtHole !== session.holeIndex) this.rebuildHole(hole, session.holeIndex);
 
-    const putting = isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
+    // An approach that rolls onto the green stays on the shot camera until it stops.
+    const fullShotInAir = flying && session.club().id !== "putter";
+    const putting = !fullShotInAir && isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
     this.placePin(hole);
@@ -375,6 +383,12 @@ export class CourseScene implements CameraRig {
     const air = Math.max(0.1, 0.26 - session.ball.z * 0.01);
     this.shadow.scale.setScalar(air);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = session.ball.z > 8 ? 0.12 : 0.36;
+    const inFlight = session.swingPhase === "flight" && session.ball.z > 0.4;
+    this.ballGlow.visible = inFlight;
+    if (inFlight) {
+      this.ballGlow.position.copy(this.ball.position);
+      this.ballGlow.scale.setScalar(Math.max(0.7, this.camera.position.distanceTo(this.ball.position) * 0.05));
+    }
     const speed = Math.hypot(session.ball.vel.x, session.ball.vel.y);
     const axis = ballRollAxis(session.ball.vel.x, session.ball.vel.y);
     if (axis) {
@@ -482,12 +496,18 @@ export class CourseScene implements CameraRig {
 
   private updateTrail(session: GameSession): void {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
-    const show = session.screen === "play" && flying && session.ball.z > 0.2;
+    const inAir = session.ball.z > 0.2;
+    // Keep the tracer for the whole shot, including the roll-out, so you can read the flight you just hit.
+    const show = session.screen === "play" && flying && (inAir || this.trailCount > 1);
     this.trail.visible = show;
     this.trailGlow.visible = show;
     if (!show) {
       this.trailCount = 0;
       this.ribbon.visible = false;
+      return;
+    }
+    if (!inAir) {
+      this.updateRibbon();
       return;
     }
     const hole = session.hole();
@@ -514,26 +534,26 @@ export class CourseScene implements CameraRig {
     this.ribbon.visible = n > 2;
     if (n < 3) return;
     const pos = this.ribbonGeo.getAttribute("position") as THREE.BufferAttribute;
-    const half = 0.16;
+    const cam = this.camera.position;
+    const tangent = new THREE.Vector3();
+    const toCam = new THREE.Vector3();
+    const side = new THREE.Vector3();
     for (let i = 0; i < n; i++) {
       const x = this.trailPos[i * 3];
       const y = this.trailPos[i * 3 + 1];
       const z = this.trailPos[i * 3 + 2];
-      let dx = 0;
-      let dz = 1;
-      if (i < n - 1) {
-        dx = this.trailPos[(i + 1) * 3] - x;
-        dz = this.trailPos[(i + 1) * 3 + 2] - z;
-      } else {
-        dx = x - this.trailPos[(i - 1) * 3];
-        dz = z - this.trailPos[(i - 1) * 3 + 2];
-      }
-      const len = Math.hypot(dx, dz) || 1;
-      const px = (-dz / len) * half;
-      const pz = (dx / len) * half;
-      const fade = 0.45 + 0.55 * (i / Math.max(n - 1, 1));
-      pos.setXYZ(i * 2, x - px, y, z - pz);
-      pos.setXYZ(i * 2 + 1, x + px * fade, y + 0.02, z + pz * fade);
+      const a = Math.max(0, i - 1);
+      const b = Math.min(n - 1, i + 1);
+      tangent.set(this.trailPos[b * 3] - this.trailPos[a * 3], this.trailPos[b * 3 + 1] - this.trailPos[a * 3 + 1], this.trailPos[b * 3 + 2] - this.trailPos[a * 3 + 2]);
+      toCam.set(cam.x - x, cam.y - y, cam.z - z);
+      // Face the camera and widen with distance so the tracer stays a readable stroke far downrange.
+      const camDist = toCam.length();
+      side.crossVectors(tangent, toCam).normalize();
+      if (!Number.isFinite(side.x)) side.set(1, 0, 0);
+      const age = i / Math.max(n - 1, 1);
+      const half = Math.max(0.05, camDist * 0.0032) * (0.55 + 0.45 * age);
+      pos.setXYZ(i * 2, x - side.x * half, y - side.y * half, z - side.z * half);
+      pos.setXYZ(i * 2 + 1, x + side.x * half, y + side.y * half, z + side.z * half);
     }
     pos.needsUpdate = true;
     this.ribbonGeo.setDrawRange(0, Math.max(0, n - 1) * 6);

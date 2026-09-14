@@ -556,3 +556,72 @@ td.empty {
     right: 14px;
   }
 }
+
+.callout {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 22px 12px;
+  border-radius: 14px;
+  background: rgba(8, 18, 13, 0.62);
+  backdrop-filter: blur(6px);
+  color: var(--ink);
+  text-align: center;
+  pointer-events: none;
+  animation: callout-in 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 5;
+}
+
+.callout[hidden] {
+  display: none;
+}
+
+.callout b {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(26px, 5vw, 44px);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+
+.callout span {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.callout.tone-perfect b {
+  color: #ffd766;
+  text-shadow: 0 0 22px rgba(255, 200, 60, 0.55);
+}
+
+.callout.tone-miss b {
+  color: #ff9c8a;
+}
+
+.callout.leaving {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+}
+
+@keyframes callout-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .callout {
+    animation: none;
+  }
+}
