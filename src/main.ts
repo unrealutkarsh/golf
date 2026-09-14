@@ -216,6 +216,7 @@ if (qa === "round") {
   session.autoClub();
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
   session.power = session.suggestedPower();
+  session.visualPower = session.power;
   session.camMode = "putt";
   session.puttGrid = true;
 }

@@ -2,7 +2,7 @@ import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
 import { surfaceLabel, windLabel } from "./physics";
-import { shapeLabel } from "./terrain";
+import { camLabel, shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
 import { PLAYER_CARD } from "./tour";
 import type { ScreenId } from "./types";
@@ -138,7 +138,7 @@ export class UI {
           <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
-          <li><b>Camera</b> with V or View: auto, player, follow. On the green the view is always over the shoulder, looking at the pin.</li>
+          <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
           <li>G toggles the break grid. The gold line is the putt at the hole.</li>
           <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
@@ -269,7 +269,7 @@ export class UI {
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
         <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>
-        <span>${session.resolvedCam()}</span>
+        <span>${camLabel(session.resolvedCam())}</span>
         <span class="grow"></span>
         <span>${escapeHtml(session.profile.name)}</span>
         <span>Str ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
@@ -293,7 +293,7 @@ export class UI {
         </div>
         <div class="tools">
           <span class="phase">${phase}</span>
-          <button data-action="camera">View · ${session.camMode}</button>
+          <button data-action="camera">View · ${session.camMode === "player" ? "address" : session.camMode}</button>
           <button class="${session.puttGrid ? "on" : ""}" data-action="grid">Grid</button>
           <button data-action="scorecard">Card</button>
           <button data-action="help">Help</button>

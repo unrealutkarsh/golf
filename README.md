@@ -2,7 +2,7 @@
 
 A single-player, browser-based tour golf game. Play a nine-hole stroke-play round at **Harbor Dunes Club** with aim, a three-click swing meter, clubs, wind, and a scorecard — no account and no server required.
 
-The course is rendered in **WebGL** (Three.js): 3D turf with instanced grass blades, player/follow cameras, and a golfer’s-eye putting view on the green. The presentation is original (Crown Circuit, Harbor Dunes Invitational). It is not affiliated with any real tour. A machine with a GPU (or a browser WebGL fallback) is enough — no extra run steps beyond `npm run dev`.
+The course is rendered in **WebGL** (Three.js): 3D turf with instanced grass blades, an over-the-ball address camera, a ball-follow flight camera, and an over-the-ball putting view. There is no player mesh — presentation is ball, course, and cameras, in the spirit of a launch-monitor sim. Art and names are original (Crown Circuit, Harbor Dunes Invitational). It is not affiliated with any real tour or licensed golf game. A machine with a GPU (or a browser WebGL fallback) is enough — no extra run steps beyond `npm run dev`.
 
 ## Play locally
 
@@ -48,13 +48,13 @@ npm test
 | Cancel swing | Esc |
 | Clubs | Q E, [ ], wheel, tray |
 | Shape (draw / fade) | Z fade, X draw, or **Fade / Straight / Draw** |
-| Camera | V or **View** — auto, player, follow, putt |
+| Camera | V or **View** — auto, address (over the ball), follow, putt |
 | Putting grid | G or **Grid** |
 | Scorecard | C or **Card** |
 | Help | H or **Help** |
 | Mute | M or **Sound** |
 
-On the **green**, the camera locks to a third-person over-the-shoulder view behind the ball, looking at the pin. Tee and fairway shots use the normal player/follow cameras. Slight misses stay in the rough instead of going out of bounds.
+On the **green**, the camera sits over the ball looking at the pin. Tee and fairway shots use an over-the-ball address camera, then follow the ball in flight. Slight misses stay in the rough instead of going out of bounds.
 
 ### Shot shape
 
@@ -84,7 +84,7 @@ src/
   course.ts        Harbor Dunes hole data
   clubs.ts         bag
   renderer.ts      HUD meters + 2D fallback
-  scene3d.ts       WebGL course, grass, cameras
+  scene3d.ts       WebGL course, grass, cameras (no player mesh)
   terrain.ts       height, turf color, camera helpers
   ui.ts            tour tent, HUD, scorecard
   scoring.ts       names and totals

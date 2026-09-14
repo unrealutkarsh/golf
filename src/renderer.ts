@@ -683,9 +683,9 @@ export class Renderer {
     const preview = session.previewLanding();
     const path = session.previewFlight();
     ctx.save();
-    ctx.strokeStyle = "rgba(244, 241, 232, 0.45)";
+    ctx.strokeStyle = "rgba(244, 241, 232, 0.28)";
     ctx.setLineDash([2.2, 1.6]);
-    ctx.lineWidth = 0.45;
+    ctx.lineWidth = 0.32;
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(from.x + dir.x * 28, from.y + dir.y * 28);
@@ -693,12 +693,12 @@ export class Renderer {
     ctx.setLineDash([]);
 
     if (path.length > 1 && session.club().id !== "putter") {
-      this.drawRibbon(ctx, path, 0.14);
-      this.strokeFlight(ctx, path, "rgba(0,0,0,0.2)", true, 1.1);
-      this.strokeFlight(ctx, path, "rgba(255, 228, 130, 0.95)", false, 1.2);
+      this.drawRibbon(ctx, path, 0.08);
+      this.strokeFlight(ctx, path, "rgba(0,0,0,0.12)", true, 0.9);
+      this.strokeFlight(ctx, path, "rgba(230, 212, 160, 0.55)", false, 0.95);
     } else {
-      ctx.strokeStyle = "rgba(212, 175, 55, 0.85)";
-      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = "rgba(212, 175, 55, 0.38)";
+      ctx.lineWidth = 0.42;
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(preview.x, preview.y);
@@ -723,9 +723,9 @@ export class Renderer {
     if (session.swingPhase !== "flight" && session.swingPhase !== "settle") return;
     if (session.shotArc.length < 2) return;
     ctx.save();
-    this.drawRibbon(ctx, session.shotArc, 0.28);
-    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.24)", true, 1.3);
-    this.strokeFlight(ctx, session.shotArc, "rgba(255, 228, 130, 0.96)", false, 1.7);
+    this.drawRibbon(ctx, session.shotArc, 0.16);
+    this.strokeFlight(ctx, session.shotArc, "rgba(0,0,0,0.14)", true, 1.05);
+    this.strokeFlight(ctx, session.shotArc, "rgba(230, 212, 160, 0.58)", false, 1.2);
     const apex = session.shotArc.reduce((best, s) => (s.z > best.z ? s : best), session.shotArc[0]);
     if (apex.z > 3) {
       const ap = airbornePos(apex.pos, apex.z);
