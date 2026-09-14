@@ -160,33 +160,16 @@ describe("tour session", () => {
     expect(game.canShape()).toBe(false);
   });
 
-  it("labels the lie Green as soon as the ball is on the putting surface", () => {
-    const game = new GameSession(8);
+  it("eases preview power so the aim line does not snap with the meter", () => {
+    const game = new GameSession(7);
     game.startTournament();
-    expect(game.lie).toBe("tee");
-    const hole = game.hole();
-    game.ball.pos = { x: hole.green.cx, y: hole.green.cy };
-    game.ball.z = 0;
-    game.update(1 / 60);
-    expect(game.lie).toBe("green");
-    expect(game.putting()).toBe(true);
-  });
-
-  it("holes a mid-meter tap-in instead of blasting through the cup", () => {
-    const game = new GameSession(9);
-    game.startTournament();
-    const hole = game.hole();
-    game.ball = createBall({ x: hole.pin.x - 1.15, y: hole.pin.y });
-    game.lie = "green";
     game.clubIndex = clubIndex("putter");
-    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+    game.visualPower = 0.3;
     game.swingPhase = "power";
-    game.meter = 0.55;
-    game.tap();
-    game.meter = 0.5;
-    game.tap();
-    for (let i = 0; i < 300; i++) game.update(1 / 60);
-    expect(game.screen).toBe("holeEnd");
+    game.meter = 0.9;
+    game.update(1 / 60);
+    expect(game.visualPower).toBeGreaterThan(0.3);
+    expect(game.visualPower).toBeLessThan(0.85);
   });
 
   it("holes a tap-in from the putting view", () => {

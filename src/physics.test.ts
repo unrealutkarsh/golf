@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { clubById } from "./clubs";
 import { HARBOR_DUNES, lieAt } from "./course";
-import { createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
-import { scaledPuttPower } from "./terrain";
+import { applyGreenGrip, createBall, flightApex, launchBall, sampleFlightPath, stepBall } from "./physics";
+import { suggestedPuttPower } from "./terrain";
 
 function settle(from = HARBOR_DUNES.holes[0].tee, clubId = "driver", power = 1, accuracy = 0) {
   const hole = HARBOR_DUNES.holes[0];

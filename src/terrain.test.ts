@@ -6,6 +6,8 @@ import {
   bladeWidth,
   grassBudget,
   groundHeight,
+  camFraming,
+  camLabel,
   resolveCamView,
   shapeLabel,
   scaledPuttPower,
@@ -40,6 +42,20 @@ describe("course terrain", () => {
     expect(resolveCamView("auto", "flight", false)).toBe("follow");
     expect(resolveCamView("auto", "aim", false)).toBe("player");
     expect(resolveCamView("follow", "aim", true)).toBe("follow");
+    expect(camLabel("player")).toBe("address");
+    expect(camLabel("follow")).toBe("follow");
+    expect(camLabel("putt")).toBe("putt");
+    const address = camFraming("player");
+    const putt = camFraming("putt");
+    const follow = camFraming("follow");
+    expect(address.back).toBeLessThan(8);
+    expect(address.height).toBeGreaterThan(2.4);
+    expect(address.side).toBeLessThan(0.25);
+    expect(putt.side).toBeLessThan(0.28);
+    expect(putt.back).toBeLessThan(address.back);
+    expect(putt.lookAhead).toBeGreaterThan(0.7);
+    expect(follow.lookAhead).toBe(0);
+    expect(follow.back).toBeGreaterThan(address.back);
     expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);
     expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
     expect(bladeWidth("green")).toBeLessThan(bladeWidth("fairway"));
