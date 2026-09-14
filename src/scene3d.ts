@@ -395,7 +395,7 @@ export class CourseScene {
 
     const putting = isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
-    this.placeBall(session);
+    this.placeBall(session, dt);
     this.placePin(hole);
     this.placeGolfer(session, view);
     this.updatePath(session);
@@ -676,7 +676,7 @@ export class CourseScene {
     this.golfer.add(buildAddressGolfer());
   }
 
-  private placeBall(session: GameSession): void {
+  private placeBall(session: GameSession, dt: number): void {
     const p = session.ball.pos;
     const gh = groundHeight(session.hole(), p.x, p.y);
     const air = Math.max(session.ball.z, 0);
@@ -734,6 +734,7 @@ export class CourseScene {
     this.landing.visible = show && aiming && session.club().id !== "putter";
     if (this.flightMesh) this.flightMesh.visible = false;
     if (!show) return;
+    const puttingLine = session.club().id === "putter" || session.lie === "green";
     const shape = session.swingPhase === "flight" || session.swingPhase === "settle" ? Math.sign(session.ball.curve) : session.shape;
     this.flightMat.color.set(shape > 0.2 ? 0x7ec8ff : shape < -0.2 ? 0xff9a4a : 0xffe27a);
     const hole = session.hole();
@@ -846,6 +847,7 @@ export class CourseScene {
     attr.setXYZ(0, from.x, groundHeight(hole, from.x, from.y) + 0.08, from.y);
     attr.setXYZ(1, to.x, groundHeight(hole, to.x, to.y) + 0.08, to.y);
     attr.needsUpdate = true;
+    this.puttAim.computeLineDistances();
   }
 
   private updateCamera(session: GameSession, hole: Hole, view: ResolvedCam, putting: boolean, dt: number): void {

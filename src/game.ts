@@ -88,6 +88,8 @@ export class GameSession {
   seed = 2026;
   audio = new AudioBus();
   shotArc: FlightSample[] = [];
+  /** Smoothed power used only for aim/power preview lines — HUD meter stays live. */
+  visualPower = 0.3;
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -169,6 +171,12 @@ export class GameSession {
     this.shape = clamp(value, -1, 1);
   }
 
+  private previewTargetPower(): number {
+    if (this.swingPhase === "aim") return this.suggestedPower();
+    if (this.swingPhase === "power") return Math.max(this.meter, 0.2);
+    return this.power;
+  }
+
   private previewShot() {
     const putting = this.club().id === "putter";
     const puttFill = this.swingPhase === "power" ? this.meter : this.swingPhase === "aim" ? PUTT_HOLE_FILL : puttPowerToMeterFill(this.power, this.toPin());
@@ -229,6 +237,7 @@ export class GameSession {
     this.gir = false;
     this.wind = this.windForHole(index);
     this.autoClub();
+    this.visualPower = this.suggestedPower();
     this.cam.x = (hole.tee.x + hole.pin.x) / 2;
     this.cam.y = (hole.tee.y + hole.pin.y) / 2;
     this.cam.zoom = 2.8;
@@ -444,6 +453,7 @@ export class GameSession {
       this.power = suggestedPuttPower(this.toPin());
       this.shape = 0;
     }
+    this.visualPower = this.suggestedPower();
   }
 
   /** Current surface under the ball. Airborne shots keep the launch lie. */
