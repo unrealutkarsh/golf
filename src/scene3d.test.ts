@@ -1,9 +1,13 @@
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { golferMeshCount as addressGolferMeshCount } from "./golfer";
 import physicsSrc from "./physics.ts?raw";
-import { dimpleIndent, golferMeshCount, makeGolfBallGeometry } from "./scene3d";
+import { dimpleIndent, makeGolfBallGeometry } from "./scene3d";
 import sceneSrc from "./scene3d.ts?raw";
 import terrainSrc from "./terrain.ts?raw";
+
+const srcDir = dirname(fileURLToPath(import.meta.url));
 
 describe("golf ball dimples", () => {
   it("indents vertices that sit on a dimple center", () => {
@@ -33,11 +37,6 @@ describe("golf ball dimples", () => {
     expect(geo.getAttribute("color")).toBeTruthy();
     geo.dispose();
   });
-
-  it("builds a multi-part golfer instead of a three-mesh stick figure", () => {
-    expect(golferMeshCount()).toBeGreaterThanOrEqual(12);
-    expect(golferMeshCount()).toBe(addressGolferMeshCount());
-  });
 });
 
 describe("merge leftovers", () => {
@@ -59,6 +58,9 @@ describe("merge leftovers", () => {
     expect(sceneSrc).not.toMatch(/private golfer\s*=/);
     expect(sceneSrc).not.toMatch(/this\.golfer/);
     expect(sceneSrc).not.toMatch(/buildAddressGolfer\s*\(/);
+    expect(sceneSrc).not.toMatch(/golferMeshCount/);
+    expect(sceneSrc).not.toMatch(/from ["']\.\/golfer["']/);
+    expect(existsSync(resolve(srcDir, "golfer.ts"))).toBe(false);
   });
 
   it("exports leftover-relative putt constants used by the session", () => {
