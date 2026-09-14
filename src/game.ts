@@ -453,7 +453,12 @@ export class GameSession {
     this.visualPower = this.suggestedPower();
   }
 
-  isHoled(): boolean {
+  refreshLie(): void {
+    if (this.ball.z > 0.55) return;
+    this.lie = lieAt(this.hole(), this.ball.pos);
+  }
+
+    isHoled(): boolean {
     return dist(this.ball.pos, this.hole().pin) < 0.2 && this.swingPhase !== "flight";
   }
 

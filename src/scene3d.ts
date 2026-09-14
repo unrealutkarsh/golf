@@ -13,15 +13,14 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { buildGreenOverlay, createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { groundHeight, isPuttingSituation, resolveCamView, surfaceColor, type ResolvedCam } from "./terrain";
 import {
   bladeHeight,
   bladeKeepChance,
   bladeWidth,
+  camFraming,
   grassBudget,
   groundHeight,
   isPuttingSituation,
-  camFraming,
   resolveCamView,
   surfaceColor,
   turfLush,
