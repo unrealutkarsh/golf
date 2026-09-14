@@ -134,8 +134,8 @@ export class UI {
       <div class="panel help">
         <h2>How to play</h2>
         <ol>
-          <li><b>Aim</b> with the mouse or finger. Arrow keys or A / D nudge the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window.</li>
+          <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line. On the green the line stays on the pin.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
@@ -265,7 +265,7 @@ export class UI {
         <span>${hole.yards}</span>
         <span class="dot"></span>
         <span class="live">${Math.round(session.toPin())} yds</span>
-        <span>${surfaceLabel(session.lie)}</span>
+        <span class="lie-chip lie-${session.lie}">${surfaceLabel(session.lie)}</span>
         <span>${wind.mph} ${wind.arrow}</span>
         <span class="club-chip">${club.shortName}</span>
         <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>

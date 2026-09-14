@@ -23,6 +23,16 @@ describe("Harbor Dunes", () => {
     }
   });
 
+  it("treats the green collar as green so the HUD matches the painted surface", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    expect(lieAt(hole, { x: hole.green.cx, y: hole.green.cy })).toBe("green");
+    const edge = {
+      x: hole.green.cx + hole.green.rx + 0.45,
+      y: hole.green.cy,
+    };
+    expect(lieAt(hole, edge)).toBe("green");
+  });
+
   it("keeps slight misses and tree lies in play instead of OB", () => {
     const hole = HARBOR_DUNES.holes[0];
     expect(lieAt(hole, { x: hole.tee.x, y: hole.tee.y - 48 })).not.toBe("ob");

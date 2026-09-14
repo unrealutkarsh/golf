@@ -10,6 +10,7 @@ import {
   camLabel,
   resolveCamView,
   shapeLabel,
+  scaledPuttPower,
   suggestedPuttPower,
   surfaceColor,
   turfLush,
@@ -28,6 +29,10 @@ describe("course terrain", () => {
     const [r, g, b] = surfaceColor(hole, hole.green.cx, hole.green.cy);
     expect(g).toBeGreaterThan(r);
     expect(g).toBeGreaterThan(b);
+    const fringe = surfaceColor(hole, hole.green.cx + hole.green.rx * 1.14, hole.green.cy);
+    expect(fringe[0] / fringe[1]).toBeGreaterThan(r / g);
+    const fairway = surfaceColor(hole, hole.tee.x + 48, hole.tee.y);
+    expect(fairway[1]).toBeGreaterThan(0.35);
   });
 
   it("picks player, follow, and putting cameras", () => {
@@ -62,8 +67,11 @@ describe("course terrain", () => {
 
   it("scales putt power with leftover distance", () => {
     expect(suggestedPuttPower(6)).toBeLessThan(suggestedPuttPower(18));
-    expect(suggestedPuttPower(6)).toBeGreaterThan(0.13);
+    expect(suggestedPuttPower(6)).toBeGreaterThan(0.08);
     expect(suggestedPuttPower(80)).toBeLessThanOrEqual(0.64);
+    expect(scaledPuttPower(0.5, 1.2)).toBeLessThan(0.12);
+    expect(scaledPuttPower(0.5, 1.2)).toBeGreaterThan(0.02);
+    expect(scaledPuttPower(1, 8)).toBeGreaterThan(scaledPuttPower(0.4, 8));
     expect(shapeLabel(0.8)).toBe("Draw");
     expect(shapeLabel(-0.8)).toBe("Fade");
   });

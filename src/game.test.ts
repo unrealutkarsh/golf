@@ -1,10 +1,91 @@
 import { describe, expect, it } from "vitest";
-import { clubIndex } from "./clubs";
+import { clubById, clubIndex, recommendClub, suggestedShotPower } from "./clubs";
 import { GameSession } from "./game";
 import { createBall } from "./physics";
+import { scaledPuttPower } from "./terrain";
 import { toPar, totalStrokes } from "./scoring";
 
 describe("tour session", () => {
+  it("picks a club and swing fill that match leftover yards", () => {
+    expect(recommendClub(270, "tee").id).toBe("driver");
+    expect(recommendClub(230, "tee").id).toBe("wood3");
+    expect(recommendClub(155, "fairway").id).toBe("iron7");
+    expect(recommendClub(20, "fairway").id).toBe("putter");
+    const pw = clubById("pw");
+    const fill = suggestedShotPower(80, pw, "fairway");
+    expect(fill).toBeGreaterThan(0.55);
+    expect(fill).toBeLessThan(0.85);
+    expect(suggestedShotPower(110, pw, "fairway")).toBeGreaterThan(0.85);
+    expect(suggestedShotPower(1, clubById("putter"), "green")).toBeCloseTo(0.5, 2);
+    expect(suggestedShotPower(12, clubById("putter"), "green")).toBeCloseTo(0.5, 2);
+  });
+
+  it("ignores a click next to the ball so a swing tap cannot aim off the hole", () => {
+    const game = new GameSession(2026);
+    game.startTournament();
+    const pinAim = game.aim;
+    game.aimAt({ x: game.ball.pos.x + 3, y: game.ball.pos.y + 2 });
+    expect(game.aim).toBeCloseTo(pinAim, 5);
+    expect(game.aimExplicit).toBe(false);
+    game.aim = pinAim + 1.2;
+    game.power = game.suggestedPower();
+    game.accuracy = 0;
+    game.swingPhase = "accuracy";
+    game.meter = 0.5;
+    game.tap();
+    expect(game.aim).toBeCloseTo(pinAim, 5);
+    for (let i = 0; i < 900; i++) game.update(1 / 60);
+    expect(game.screen).toBe("play");
+    expect(game.penalties).toBe(0);
+    expect(game.lie === "fairway" || game.lie === "rough" || game.lie === "green").toBe(true);
+    const travel = Math.hypot(game.ball.pos.x - game.hole().tee.x, game.ball.pos.y - game.hole().tee.y);
+    expect(travel).toBeGreaterThan(200);
+    expect(travel).toBeLessThan(310);
+  });
+
+  it("holes a 1-yard and a 2-yard mid-meter putt instead of running past", () => {
+    const playPutt = (offset: number) => {
+      const game = new GameSession(9);
+      game.startTournament();
+      const hole = game.hole();
+      game.ball = createBall({ x: hole.pin.x - offset, y: hole.pin.y });
+      game.lie = "green";
+      game.clubIndex = clubIndex("putter");
+      game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+      game.aimExplicit = false;
+      game.aimAt({ x: game.ball.pos.x + 0.4, y: game.ball.pos.y + 0.8 });
+      expect(game.aimExplicit).toBe(false);
+      game.swingPhase = "power";
+      game.meter = 0.5;
+      game.tap();
+      game.meter = 0.5;
+      game.tap();
+      for (let i = 0; i < 360; i++) game.update(1 / 60);
+      return game;
+    };
+    const one = playPutt(1);
+    expect(one.screen).toBe("holeEnd");
+    expect(one.results[0]?.putts).toBeGreaterThanOrEqual(1);
+    const two = playPutt(2);
+    expect(two.screen).toBe("holeEnd");
+  });
+
+  it("shows leftover-relative putt fill and numeric yardage", () => {
+    const game = new GameSession(9);
+    game.startTournament();
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 1.15, y: hole.pin.y });
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    expect(game.meterFill()).toBeCloseTo(0.5, 2);
+    expect(game.meterPercent()).toBe(50);
+    expect(game.meterYards()).toBeGreaterThan(0.8);
+    expect(game.meterYards()).toBeLessThan(1.6);
+    game.startTournament();
+    expect(game.meterPercent()).toBeGreaterThan(80);
+    expect(game.meterYards()).toBeGreaterThan(200);
+  });
+
   it("can sign a complete nine-hole card", () => {
     const game = new GameSession(1);
     game.startTournament();
@@ -99,7 +180,7 @@ describe("tour session", () => {
     game.lie = "green";
     game.clubIndex = clubIndex("putter");
     game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
-    game.power = 0.14;
+    game.power = scaledPuttPower(0.55, 0.7);
     game.accuracy = 0;
     game.swingPhase = "accuracy";
     game.meter = 0.5;

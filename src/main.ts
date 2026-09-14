@@ -15,6 +15,7 @@ const renderer = new Renderer(canvas);
 const scene3d = glCanvas ? createCourseScene(glCanvas) : null;
 const ui = new UI(overlay, hud);
 if (scene3d) document.body.classList.add("has-3d");
+(window as unknown as { __ptg3d?: boolean }).__ptg3d = Boolean(scene3d);
 
 function handleAction(action: string, payload?: string): void {
   session.audio.unlock();
@@ -73,36 +74,45 @@ function worldFromPointer(x: number, y: number) {
 }
 
 let pointerDown: { x: number; y: number; t: number } | null = null;
+let pointerDragged = false;
 
 window.addEventListener("pointerdown", (e) => {
   if (session.screen !== "play" || session.helpOpen || session.scorecardOpen) return;
   const target = e.target as HTMLElement;
   if (target.closest("button, input, a, .panel")) return;
   pointerDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+  pointerDragged = false;
   if (session.swingPhase !== "aim") session.tap();
 });
 
 window.addEventListener("pointermove", (e) => {
-  if (session.screen !== "play" || session.swingPhase !== "aim") return;
+  if (session.screen !== "play" || session.swingPhase !== "aim" || !pointerDown) return;
   const target = e.target as HTMLElement;
   if (target.closest("button, input, .panel")) return;
+  const moved = Math.hypot(e.clientX - pointerDown.x, e.clientY - pointerDown.y);
+  if (moved < 16) return;
+  pointerDragged = true;
   session.aimAt(worldFromPointer(e.clientX, e.clientY));
 });
 
 window.addEventListener("pointerup", (e) => {
   if (!pointerDown || session.screen !== "play" || session.helpOpen || session.scorecardOpen) {
     pointerDown = null;
+    pointerDragged = false;
     return;
   }
   const target = e.target as HTMLElement;
   if (target.closest("button, input, a, .panel")) {
     pointerDown = null;
+    pointerDragged = false;
     return;
   }
   const moved = Math.hypot(e.clientX - pointerDown.x, e.clientY - pointerDown.y);
   const quick = performance.now() - pointerDown.t < 450;
+  const dragged = pointerDragged;
   pointerDown = null;
-  if (session.swingPhase === "aim" && moved < 14 && quick) session.tap();
+  pointerDragged = false;
+  if (session.swingPhase === "aim" && !dragged && moved < 14 && quick) session.tap();
 });
 
 window.addEventListener("wheel", (e) => {
@@ -205,20 +215,21 @@ if (qa === "round") {
   session.update = () => undefined;
 } else if (qa === "shape" || qa === "fade") {
   poseShapedShot(session, qa === "fade" ? -1 : 1);
-} else if (qa === "green") {
+} else if (qa === "green" || qa === "greenShort" || qa === "greenLie") {
   session.startTournament();
   session.tipVisible = false;
   const hole = session.hole();
-  session.ball.pos = { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
+  const offset = qa === "greenShort" ? { x: hole.pin.x - 1.15, y: hole.pin.y } : { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
+  session.ball.pos = offset;
   session.ball.vel = { x: 0, y: 0 };
   session.ball.z = 0;
-  session.lie = "green";
+  session.refreshLie();
   session.autoClub();
   session.aim = Math.atan2(hole.pin.y - session.ball.pos.y, hole.pin.x - session.ball.pos.x);
   session.power = session.suggestedPower();
   session.visualPower = session.power;
   session.camMode = "putt";
-  session.puttGrid = true;
+  session.puttGrid = qa === "green";
 }
 
 (window as unknown as { __ptg: GameSession }).__ptg = session;
