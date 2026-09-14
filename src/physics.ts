@@ -101,7 +101,7 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
-    const speed = roll * 1.62;
+    const speed = puttSpeedForRoll(roll);
     // Putts start rolling, not sliding — unmatched spin is what makes the ball skate.
     return { pos: clone(from), vel: fromAngle(aim, speed), z: 0, vz: 0, spinning: speed, curve: 0, lipped: false };
   }
