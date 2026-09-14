@@ -48,7 +48,7 @@ export class UI {
 
   sync(session: GameSession, onAction: (action: string, payload?: string) => void): void {
     this.syncCallout(session);
-    const screen = session.helpOpen ? "help" : session.scorecardOpen && session.screen === "play" ? "scorecard" : session.screen;
+    const screen = overlayScreen(session.screen, session.helpOpen, session.scorecardOpen);
     const overlay = this.renderOverlay(session, screen);
     if (overlay !== this.lastOverlay || screen !== this.lastScreen) {
       this.overlay.innerHTML = overlay;
@@ -313,7 +313,7 @@ export class UI {
           <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
           <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
           <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
-          <span class="shape-hint">${session.club().id === "putter" || session.lie === "green" ? "Off on the green" : "Z fade · X draw"}</span>
+          <span class="shape-hint">${session.club().id === "putter" || session.lie === "green" ? "Read the break · ← → or drag to aim" : "Z fade · X draw"}</span>
         </div>
         <div class="clubs">
           ${CLUBS.map(
@@ -339,6 +339,13 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+/** Which overlay to draw. The scorecard can open over play and over the hole / round summaries. */
+export function overlayScreen(screen: ScreenId, helpOpen: boolean, scorecardOpen: boolean): ScreenId | "scorecard" {
+  if (helpOpen) return "help";
+  if (scorecardOpen && (screen === "play" || screen === "holeEnd" || screen === "roundEnd")) return "scorecard";
+  return screen;
 }
 
 function escapeHtml(s: string): string {

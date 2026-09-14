@@ -231,9 +231,10 @@ describe("soft preview line", () => {
     expect(overlays).toMatch(/rgba\(230, 212, 160, 0\.55\)/);
   });
 
-  it("keeps the 3D aim ribbon cream and the pin line faded", () => {
+  it("keeps the 3D aim ribbon cream and draws the putt as a dotted breaking line", () => {
     const scene = readSrc("scene3d.ts");
-    expect(scene).toMatch(/LineDashedMaterial/);
+    expect(scene).toMatch(/writePuttLine/);
+    expect(scene).toMatch(/previewPutt\(\)/);
     expect(scene).toMatch(/writeAimRibbon/);
     expect(scene).toMatch(/aimRibbonGeo/);
     expect(scene).not.toMatch(/putter" \? 0\.02 : 0\.09/);

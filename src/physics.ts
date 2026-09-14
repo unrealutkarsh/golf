@@ -67,6 +67,10 @@ const GREEN_SLIDE_FRICTION = 0.9;
 const GREEN_DIE_FRICTION = 0.93;
 const GREEN_DIE_SPEED = 2.4;
 const GREEN_CATCH = 0.55;
+/** A rolling ball on the green comes to rest below this speed, yd/s. */
+const GREEN_REST_SPEED = 0.78;
+/** Sideways pull of a green's slope, yd/s² per unit of `greenBreak`. At the old 2.4 a 9-yard putt broke only a few inches; 4.5 gives roughly 1–4 ft over 9 yards across these greens. */
+const GREEN_BREAK_ACCEL = 4.5;
 
 const RESTITUTION: Record<Lie, number> = {
   tee: 0.36,
@@ -136,12 +140,45 @@ export function flightProfile(club: Club, power: number, lieMul = 1): { hang: nu
   return { hang, apex, drag: club.drag, rise: 0.58 - (club.loft - 11) * 0.0007 };
 }
 
-/** Launch speed that rolls about `yards` on a flat green. */
+/** Launch speed that rolls `yards` on a flat green before stopping. */
 export function puttSpeedForRoll(yards: number): number {
+  const table = rollTable();
   const y = Math.max(0.2, yards);
-  // Short tap-ins need a floor so green die-off cannot stall them short of the cup.
-  if (y < 3.5) return y * 2.4 + 1.1;
-  return y * 1.62;
+  let i = 1;
+  while (i < table.length - 1 && table[i].yards < y) i++;
+  const a = table[i - 1];
+  const b = table[i];
+  const t = b.yards === a.yards ? 0 : (y - a.yards) / (b.yards - a.yards);
+  return a.speed + (b.speed - a.speed) * t;
+}
+
+/** Flat-green roll for a putt launched at `speed`, integrated with the same grip and stop rules as stepBall. */
+export function flatRollDistance(speed: number): number {
+  let vel = speed;
+  let spinning = speed;
+  let yards = 0;
+  for (let i = 0; i < 4000; i++) {
+    yards += vel * SIM_DT;
+    const next = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: vel, y: 0 }, z: 0, vz: 0, spinning, curve: 0, lipped: false }, SIM_DT);
+    vel = next.vel.x;
+    spinning = next.spinning;
+    if (vel < GREEN_REST_SPEED) break;
+  }
+  return yards;
+}
+
+let rollTableCache: { speed: number; yards: number }[] | null = null;
+
+/**
+ * Speed → distance samples, built once. Inverting the real friction model keeps "mid-meter dies at the hole"
+ * true at every length; the old hand-fit line left 5–10 yard putts 30–45% short.
+ */
+function rollTable(): { speed: number; yards: number }[] {
+  if (!rollTableCache) {
+    rollTableCache = [{ speed: 0, yards: 0 }];
+    for (let speed = 0.25; speed <= 70; speed += 0.25) rollTableCache.push({ speed, yards: flatRollDistance(speed) });
+  }
+  return rollTableCache;
 }
 
 /** Grass grab on the putting surface: sliding friction bites harder than rolling. */
@@ -257,7 +294,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
         // Break only while the ball is still rolling. Applying it at rest
         // kept putts creeping forever and blocked the next stroke.
         if (len(next.vel) > STOP_SPEED * 1.2) {
-          next.vel = add(next.vel, scale(hole.greenBreak, dt * 2.4));
+          next.vel = add(next.vel, scale(hole.greenBreak, dt * GREEN_BREAK_ACCEL));
         }
       } else {
         next.vel = scale(next.vel, Math.pow(FRICTION[lie], dt * 60));
@@ -299,7 +336,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     }
   }
 
-  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < 0.78 && pinDist > CUP_RADIUS;
+  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < GREEN_REST_SPEED && pinDist > CUP_RADIUS;
   const flying = !holed && !dyingOnGreen && (next.z > 0.05 || speed > STOP_SPEED);
   if (!flying && !holed) {
     next.vel = { x: 0, y: 0 };

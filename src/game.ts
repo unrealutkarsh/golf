@@ -51,6 +51,19 @@ export interface ShotCallout {
   tone: StrikeQuality | "info";
 }
 
+export interface PuttPreview {
+  /** Rolling path on the green, bending with the slope, until the ball stops or drops. */
+  path: FlightSample[];
+  holed: boolean;
+}
+
+interface PreviewCache {
+  key: string;
+  flight: FlightSample[] | null;
+  landing: Vec2 | null;
+  putt: PuttPreview | null;
+}
+
 export interface Camera {
   x: number;
   y: number;
@@ -121,7 +134,7 @@ export class GameSession {
   /** Seconds to hold on a stopped full shot before returning to address. */
   settleTime = 0;
   private simAccumulator = 0;
-  private previewCache: { key: string; flight: FlightSample[] | null; landing: Vec2 | null } = { key: "", flight: null, landing: null };
+  private previewCache: PreviewCache = { key: "", flight: null, landing: null, putt: null };
 
   constructor(seed = 2026) {
     this.seed = seed;
@@ -243,11 +256,24 @@ export class GameSession {
     return cache.landing;
   }
 
+  /** The putt as set up right now, simulated with the same break the real stroke will get. */
+  previewPutt(): PuttPreview {
+    const shot = this.previewShot();
+    const cache = this.previewFor(shot);
+    if (!cache.putt) {
+      const hole = this.hole();
+      const path = sampleFlightPath(this.ball.pos, shot, hole);
+      const last = path[path.length - 1];
+      cache.putt = { path, holed: dist(last.pos, hole.pin) < 0.05 };
+    }
+    return cache.putt;
+  }
+
   /** Previews run the full fixed-step sim, so reuse them while the inputs are unchanged. */
   private previewFor(shot: ReturnType<GameSession["previewShot"]>) {
     const p = this.ball.pos;
     const key = `${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${shot.wind.speed}|${shot.wind.dir}|${shot.shape}`;
-    if (key !== this.previewCache.key) this.previewCache = { key, flight: null, landing: null };
+    if (key !== this.previewCache.key) this.previewCache = { key, flight: null, landing: null, putt: null };
     return this.previewCache;
   }
 
@@ -336,8 +362,9 @@ export class GameSession {
 
   aimAt(world: Vec2): void {
     if (this.swingPhase !== "aim") return;
-    if (this.putting() || this.lie === "green" || onGreen(this.hole(), this.ball.pos)) return;
-    if (dist(world, this.ball.pos) < 22) return;
+    const onPuttingSurface = this.putting() || this.lie === "green" || onGreen(this.hole(), this.ball.pos);
+    // Drag well past the ball to aim; a stray hover near it must not swing the line off the hole.
+    if (dist(world, this.ball.pos) < (onPuttingSurface ? 1.5 : 22)) return;
     this.aim = Math.atan2(world.y - this.ball.pos.y, world.x - this.ball.pos.x);
     this.aimExplicit = true;
   }
@@ -607,6 +634,8 @@ export class GameSession {
   }
 
   nextAfterHole(): void {
+    // A scorecard opened from the hole summary must not follow the player onto the next tee.
+    this.scorecardOpen = false;
     if (this.holeIndex >= this.course.holes.length - 1) {
       this.endRound();
       return;
