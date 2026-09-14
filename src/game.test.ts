@@ -197,6 +197,35 @@ describe("tour session", () => {
     expect(travel).toBeLessThan(10);
   });
 
+  it("previews a hole-2 SW chip as a short forward shot, not a loop", () => {
+    const game = new GameSession(2);
+    game.startTournament();
+    game.holeIndex = 1;
+    game.resetHole(1, false);
+    const hole = game.hole();
+    game.ball = createBall({ x: hole.pin.x - 27, y: hole.pin.y + 8 });
+    game.lie = "rough";
+    game.clubIndex = clubIndex("sw");
+    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x);
+    game.visualAim = game.aim;
+    game.visualPower = 0.38;
+    game.swingPhase = "accuracy";
+    const path = game.previewFlight();
+    const last = path[path.length - 1];
+    const travel = Math.hypot(last.pos.x - game.ball.pos.x, last.pos.y - game.ball.pos.y);
+    const dirx = Math.cos(game.aim);
+    const diry = Math.sin(game.aim);
+    let prev = -0.01;
+    for (const sample of path) {
+      const along = (sample.pos.x - game.ball.pos.x) * dirx + (sample.pos.y - game.ball.pos.y) * diry;
+      expect(along).toBeGreaterThanOrEqual(prev);
+      prev = along;
+    }
+    expect(travel).toBeGreaterThan(10);
+    expect(travel).toBeLessThan(50);
+    expect(Math.max(...path.map((s) => s.z))).toBeLessThan(18);
+  });
+
   it("holes a mid-meter tap-in instead of blasting through the cup", () => {
     const game = new GameSession(9);
     game.startTournament();
@@ -240,7 +269,32 @@ describe("tour session", () => {
     game.meter = 0.9;
     game.update(1 / 60);
     expect(game.visualPower).toBeGreaterThan(0.3);
-    expect(game.visualPower).toBeLessThan(0.85);
+    expect(game.visualPower).toBeLessThan(0.55);
+    const after = game.visualPower;
+    game.update(1 / 60);
+    expect(game.visualPower).toBeGreaterThan(after);
+    expect(game.visualPower).toBeLessThan(0.7);
+  });
+
+  it("eases preview aim and drive distance through a three-click swing", () => {
+    const game = new GameSession(7);
+    game.startTournament();
+    const startAim = game.aim;
+    game.visualAim = startAim;
+    game.nudgeAim(0.45);
+    game.update(1 / 60);
+    expect(Math.abs(game.visualAim - game.aim)).toBeGreaterThan(0.15);
+    expect(Math.abs(game.visualAim - startAim)).toBeGreaterThan(0.02);
+    game.visualPower = 0.28;
+    game.swingPhase = "power";
+    game.meter = 0.95;
+    const mid = game.previewLanding();
+    const midLen = Math.hypot(mid.x - game.ball.pos.x, mid.y - game.ball.pos.y);
+    game.update(1 / 60);
+    const eased = game.previewLanding();
+    const easedLen = Math.hypot(eased.x - game.ball.pos.x, eased.y - game.ball.pos.y);
+    expect(easedLen).toBeGreaterThan(midLen);
+    expect(easedLen).toBeLessThan(midLen + 50);
   });
 
   it("holes a tap-in from the putting view", () => {

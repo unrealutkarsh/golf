@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { lieAt, onGreen } from "./course";
-import { fbm, grassNormalTile, grassTile, hashNoise, heightToNormal, packNormalRgb } from "./look";
+import { fbm, grassNormalTile, grassTile, GRASS_TILE_COLORS, hashNoise, heightToNormal, packNormalRgb } from "./look";
 import { ellipseRadial } from "./math";
 import { groundHeight } from "./terrain";
 import type { Hole } from "./types";
@@ -68,37 +68,37 @@ export function turfAlbedoRgb(band: TurfBand, x: number, z: number, napX: number
   const nap = napShade(band, x, z, napX, napZ);
   if (band === "green") {
     return [
-      (0.13 + micro * 0.018 + n * 0.012) * nap,
-      (0.44 + micro * 0.028 + n * 0.022) * nap,
-      (0.16 + micro * 0.014) * nap,
+      (0.16 + micro * 0.016 + n * 0.01) * nap,
+      (0.32 + micro * 0.02 + n * 0.016) * nap,
+      (0.14 + micro * 0.012) * nap,
     ];
   }
   if (band === "collar") {
     return [
-      (0.18 + micro * 0.02) * nap,
-      (0.40 + n * 0.022) * nap,
-      (0.16 + micro * 0.012) * nap,
+      (0.2 + micro * 0.018) * nap,
+      (0.34 + n * 0.018) * nap,
+      (0.14 + micro * 0.01) * nap,
     ];
   }
   if (band === "fringe") {
     return [
-      (0.30 + micro * 0.03 + clump * 0.025) * nap,
-      (0.40 + n * 0.022 + micro * 0.018) * nap,
-      (0.14 + micro * 0.012) * nap,
+      (0.28 + micro * 0.026 + clump * 0.02) * nap,
+      (0.36 + n * 0.02 + micro * 0.014) * nap,
+      (0.13 + micro * 0.01) * nap,
     ];
   }
   if (band === "fairway") {
     return [
-      (0.22 + micro * 0.03 + n * 0.02 + clump * 0.02) * nap,
-      (0.52 + micro * 0.03 + n * 0.028) * nap,
+      (0.2 + micro * 0.024 + n * 0.016 + clump * 0.016) * nap,
+      (0.4 + micro * 0.024 + n * 0.02) * nap,
       (0.11 + micro * 0.01) * nap,
     ];
   }
   if (band === "tee") {
-    return [0.22 + n * 0.025 + micro * 0.02, 0.44 + n * 0.028, 0.14 + micro * 0.012];
+    return [0.2 + n * 0.02 + micro * 0.016, 0.38 + n * 0.022, 0.13 + micro * 0.01];
   }
   if (band === "rough") {
-    return [0.18 + n * 0.04 + clump * 0.03, 0.32 + n * 0.035, 0.10 + n * 0.016];
+    return [0.16 + n * 0.035 + clump * 0.025, 0.28 + n * 0.03, 0.09 + n * 0.014];
   }
   if (band === "bunker") {
     return [0.74 + n * 0.1 + micro * 0.08, 0.6 + n * 0.07, 0.34 + n * 0.03];
@@ -180,10 +180,10 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
       const micro = hashNoise(x * 7.2, z * 7.2);
       const [r, g, b] = turfAlbedoRgb(band, x, z, napX, napZ);
       let rk = 0.92;
-      if (band === "green") rk = 0.16 + wet * 0.14 + micro * 0.07;
-      else if (band === "collar") rk = 0.36 + wet * 0.16 + micro * 0.08;
-      else if (band === "fringe") rk = 0.54 + wet * 0.14 + micro * 0.1;
-      else if (band === "fairway" || band === "tee") rk = 0.5 + wet * 0.22 + micro * 0.12;
+      if (band === "green") rk = 0.42 + wet * 0.12 + micro * 0.08;
+      else if (band === "collar") rk = 0.5 + wet * 0.14 + micro * 0.08;
+      else if (band === "fringe") rk = 0.62 + wet * 0.12 + micro * 0.1;
+      else if (band === "fairway" || band === "tee") rk = 0.58 + wet * 0.18 + micro * 0.1;
       else if (band === "rough") rk = 0.82 + wet * 0.08 + micro * 0.1;
       else if (band === "bunker") rk = 0.78 + micro * 0.14 + wet * 0.06;
       else if (band === "water") rk = 0.08;
@@ -226,7 +226,7 @@ export function bakeTurfMaps(hole: Hole, ox: number, oz: number, tw: number, th:
 }
 
 export function makeGrassDetailTex(): THREE.CanvasTexture {
-  const tile = grassTile("ptg-grass-detail", ["#2f5c28", "#3d7040", "#245022", "#4a7c38", "#326434", "#3a6830", "#2a5424"], 256, 6400);
+  const tile = grassTile("ptg-grass-detail", [...GRASS_TILE_COLORS], 256, 6400);
   const tex = new THREE.CanvasTexture(tile);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -247,9 +247,9 @@ export function createTurfMaterial(): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
     map: makeGrassDetailTex(),
     normalMap: makeGrassDetailNormal(),
-    roughness: 0.82,
+    roughness: 0.88,
     metalness: 0,
-    envMapIntensity: 0.4,
+    envMapIntensity: 0.22,
     vertexColors: true,
   });
   attachWorldUv(mat, 0.038);
@@ -284,14 +284,14 @@ export function createGreenMaterial(): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({
     map: makeGrassDetailTex(),
     normalMap: makeGrassDetailNormal(),
-    roughness: 0.3,
+    roughness: 0.62,
     metalness: 0,
-    envMapIntensity: 0.72,
-    sheen: 0.48,
-    sheenColor: new THREE.Color(0x6a9a52),
-    sheenRoughness: 0.42,
-    clearcoat: 0.08,
-    clearcoatRoughness: 0.52,
+    envMapIntensity: 0.28,
+    sheen: 0.16,
+    sheenColor: new THREE.Color(0x5a6840),
+    sheenRoughness: 0.62,
+    clearcoat: 0.02,
+    clearcoatRoughness: 0.72,
     ior: 1.33,
     polygonOffset: true,
     polygonOffsetFactor: -1,

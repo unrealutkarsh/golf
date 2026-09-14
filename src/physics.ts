@@ -107,11 +107,21 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   }
 
   const carry = shot.club.carry * power * lieMul;
-  const loftRad = (shot.club.loft * Math.PI) / 180;
-  const flightTime = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
+  const flightTime = flightHangTime(carry, shot.club.loft, power);
   const horiz = carry / flightTime;
   const vz = (flightTime * GRAVITY) / 2;
   return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve, lipped: false };
+}
+
+/** Hang time from loft, capped on short chips so a 30y SW is not a 50y moon-ball loop. */
+export function flightHangTime(carry: number, loftDeg: number, power: number): number {
+  const loftRad = (loftDeg * Math.PI) / 180;
+  const raw = 1.48 + loftRad * 2.68 + (power - 0.5) * 0.28;
+  if (carry >= 80) return raw;
+  const maxApex = 3.2 + Math.max(0, carry) * 0.24;
+  const rawApex = (raw * raw * GRAVITY) / 8;
+  if (rawApex <= maxApex) return raw;
+  return Math.sqrt((8 * maxApex) / GRAVITY);
 }
 
 /** Launch speed that rolls about `yards` on a flat green. */
@@ -287,6 +297,38 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     holed,
     penaltyDrop: null,
     penaltyKind: null,
+  };
+}
+
+/** Drop samples that fold back toward the ball so the preview cannot close a loop. */
+export function forwardFlightPath(path: FlightSample[], aim: number): FlightSample[] {
+  if (path.length < 2) return path;
+  const dirx = Math.cos(aim);
+  const diry = Math.sin(aim);
+  const origin = path[0].pos;
+  const out: FlightSample[] = [{ pos: clone(path[0].pos), z: path[0].z }];
+  let last = 0;
+  for (let i = 1; i < path.length; i++) {
+    const along = (path[i].pos.x - origin.x) * dirx + (path[i].pos.y - origin.y) * diry;
+    if (along < last - 0.08) break;
+    if (along < last + 0.01) continue;
+    out.push({ pos: clone(path[i].pos), z: path[i].z });
+    last = along;
+  }
+  return out.length >= 2 ? out : path.slice(0, 2);
+}
+
+export function samplePathPoint(path: FlightSample[], t: number): FlightSample {
+  if (path.length === 0) return { pos: { x: 0, y: 0 }, z: 0 };
+  if (path.length === 1) return { pos: clone(path[0].pos), z: path[0].z };
+  const x = clamp(t, 0, 1) * (path.length - 1);
+  const i = Math.min(Math.floor(x), path.length - 2);
+  const f = x - i;
+  const a = path[i];
+  const b = path[i + 1];
+  return {
+    pos: { x: a.pos.x + (b.pos.x - a.pos.x) * f, y: a.pos.y + (b.pos.y - a.pos.y) * f },
+    z: a.z + (b.z - a.z) * f,
   };
 }
 

@@ -5,6 +5,62 @@ export const SUN = {
   y: 0.38,
 };
 
+/** Outdoor presentation after the PBR merge: dusk-adjacent, not washed-out noon. */
+export const SCENE_TONE = {
+  clearColor: 0x3d5a70,
+  fogColor: 0x5e7584,
+  fogNear: 1400,
+  fogFar: 5000,
+  fogNearHdr: 1700,
+  fogFarHdr: 5100,
+  exposureHardware: 0.74,
+  exposureSoftware: 1.05,
+  sunColor: 0xeddeb8,
+  sunHardware: 1.08,
+  sunSoftware: 1.16,
+  hemiSkyHardware: 0xa8c0d4,
+  hemiGroundHardware: 0x1a2212,
+  hemiHardware: 0.2,
+  hemiSkySoftware: 0xc0d2bc,
+  hemiGroundSoftware: 0x28401c,
+  hemiSoftware: 0.76,
+  ambientHardware: 0x7e94a4,
+  ambientHardwareInt: 0.06,
+  ambientSoftware: 0xa8b8a8,
+  ambientSoftwareInt: 0.46,
+  fillSoftware: 0xadc2a2,
+  fillSoftwareInt: 0.2,
+  bloomStrength: 0.05,
+  bloomRadius: 0.52,
+  bloomThreshold: 0.9,
+  backgroundIntensity: 0.55,
+  backgroundBlurriness: 0.09,
+  skyZenith: [0.055, 0.16, 0.36] as const,
+  skyMid: [0.18, 0.32, 0.52] as const,
+  skyHorizon: [0.38, 0.48, 0.58] as const,
+  skyGround: [0.09, 0.14, 0.12] as const,
+  skyHaze: [0.46, 0.56, 0.64] as const,
+  sunGlow: 0.28,
+  sunWash: 0.06,
+  cloudMix: 0.26,
+  greenTint: 0xb2b892,
+  fairwayTint: 0x96a672,
+  greenEnv: 0.28,
+  fairwayEnv: 0.16,
+  greenRoughness: 0.62,
+  fairwayRoughness: 0.9,
+  greenSheen: 0.16,
+  greenSheenColor: 0x5a6840,
+  vertexLift: 0.32,
+  vertexColorScale: 0.4,
+  aimRibbon: 0xfff2d4,
+  aimRibbonOpacity: 0.68,
+  landCream: 0xe4d09a,
+  landWarn: 0x7a4e3c,
+} as const;
+
+export const GRASS_TILE_COLORS = ["#2a4a28", "#355434", "#243c22", "#3c5830", "#2c482c", "#334c2a", "#263e22"];
+
 export function hashNoise(x: number, y: number): number {
   const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
   return n - Math.floor(n);

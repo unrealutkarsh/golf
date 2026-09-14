@@ -72,7 +72,7 @@ export function bindFoliageArt(kit: FoliageKit, art: ArtKit): void {
   kit.leaf.map = art.leaf.map;
   kit.leaf.alphaMap = art.leaf.alpha;
   kit.leaf.normalMap = art.leaf.normal;
-  kit.leaf.color.set(0x8aaa58);
+  kit.leaf.color.set(0x6a8844);
   kit.leaf.alphaTest = 0.32;
   kit.leaf.depthWrite = true;
   kit.leaf.needsUpdate = true;

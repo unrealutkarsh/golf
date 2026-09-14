@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import physicsSrc from "./physics.ts?raw";
-import { dimpleIndent, makeGolfBallGeometry } from "./scene3d";
+import { AIM_RIBBON_SEGS, aimRibbonHalfWidth, dimpleIndent, golferMeshCount, makeGolfBallGeometry } from "./scene3d";
 import sceneSrc from "./scene3d.ts?raw";
 import terrainSrc from "./terrain.ts?raw";
 
@@ -66,5 +66,20 @@ describe("merge leftovers", () => {
   it("exports leftover-relative putt constants used by the session", () => {
     expect(terrainSrc).toMatch(/export const PUTT_ROLL_YARDS = 42/);
     expect(terrainSrc).toMatch(/export const PUTT_HOLE_FILL = 0\.5/);
+  });
+});
+
+describe("aim ribbon", () => {
+  it("keeps a fixed cream strip instead of rebuilding a tube while aiming", () => {
+    expect(sceneSrc).toMatch(/writeAimRibbon/);
+    expect(sceneSrc).toMatch(/aimRibbonGeo/);
+    expect(sceneSrc).not.toMatch(/flightMat\.color\.set\(shape/);
+    expect(sceneSrc).not.toMatch(/warn \? 0xc62828 : 0xf0d78a/);
+    expect(sceneSrc).toMatch(/onPutt/);
+    expect(sceneSrc).toMatch(/playCamFraming/);
+    expect(sceneSrc).toMatch(/cameraHeightAboveGround/);
+    expect(AIM_RIBBON_SEGS).toBeGreaterThanOrEqual(32);
+    expect(aimRibbonHalfWidth(false, 0)).toBeGreaterThan(aimRibbonHalfWidth(false, 1));
+    expect(aimRibbonHalfWidth(true, 0.5)).toBeLessThan(aimRibbonHalfWidth(false, 0.5));
   });
 });

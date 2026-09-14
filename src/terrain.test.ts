@@ -6,7 +6,10 @@ import {
   bladeWidth,
   grassBudget,
   groundHeight,
+  addressLookDistance,
+  cameraHeightAboveGround,
   camFraming,
+  playCamFraming,
   camLabel,
   PUTT_HOLE_FILL,
   PUTT_ROLL_YARDS,
@@ -36,7 +39,8 @@ describe("course terrain", () => {
     const fringe = surfaceColor(hole, hole.green.cx + hole.green.rx * 1.14, hole.green.cy);
     expect(fringe[0] / fringe[1]).toBeGreaterThan(r / g);
     const fairway = surfaceColor(hole, hole.tee.x + 48, hole.tee.y);
-    expect(fairway[1]).toBeGreaterThan(0.35);
+    expect(fairway[1]).toBeGreaterThan(0.28);
+    expect(fairway[1]).toBeLessThan(0.45);
   });
 
   it("picks player, follow, and putting cameras", () => {
@@ -62,6 +66,12 @@ describe("course terrain", () => {
     expect(putt.lookAhead).toBeGreaterThan(0.7);
     expect(follow.lookAhead).toBe(0);
     expect(follow.back).toBeGreaterThan(address.back);
+    const short = playCamFraming("player", 29);
+    expect(short.height).toBeGreaterThan(address.height + 0.8);
+    expect(short.back).toBeGreaterThan(address.back);
+    expect(cameraHeightAboveGround(0.4, 0.2, 1.7)).toBeGreaterThanOrEqual(2.1);
+    expect(addressLookDistance(29, 0.38)).toBeLessThan(29);
+    expect(addressLookDistance(29, 0.38)).toBeGreaterThan(8);
     expect(bladeHeight("green")).toBeLessThan(bladeHeight("fairway") * 0.25);
     expect(bladeHeight("fairway")).toBeLessThan(bladeHeight("rough"));
     expect(bladeWidth("green")).toBeLessThan(bladeWidth("fairway"));
