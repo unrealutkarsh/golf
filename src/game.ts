@@ -1,7 +1,7 @@
 import { AudioBus } from "./audio";
 import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubIndex, meterYardage, recommendClub, suggestedShotPower } from "./clubs";
-import { HARBOR_DUNES, lieAt, onGreen } from "./course";
+import { courseById, HARBOR_DUNES, lieAt, onGreen } from "./course";
 import { angleApproach, expApproach, hashString, mulberry32, clamp, dist, wrapAngle, type Vec2 } from "./math";
 import {
   isPuttingSituation,
@@ -25,7 +25,7 @@ import {
   type FlightSample,
 } from "./physics";
 import { prizeMoney, scoreName } from "./scoring";
-import { TOURNAMENTS } from "./tour";
+import { TOURNAMENTS, tournamentById } from "./tour";
 import type {
   Ball,
   Club,
@@ -272,7 +272,7 @@ export class GameSession {
   /** Previews run the full fixed-step sim, so reuse them while the inputs are unchanged. */
   private previewFor(shot: ReturnType<GameSession["previewShot"]>) {
     const p = this.ball.pos;
-    const key = `${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${shot.wind.speed}|${shot.wind.dir}|${shot.shape}`;
+    const key = `${this.course.id}|${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${shot.wind.speed}|${shot.wind.dir}|${shot.shape}`;
     if (key !== this.previewCache.key) this.previewCache = { key, flight: null, landing: null, putt: null };
     return this.previewCache;
   }
@@ -282,7 +282,12 @@ export class GameSession {
     this.calloutTime = seconds;
   }
 
-  startTournament(): void {
+  /** Start a round. With an id, switches to that tournament and its course first. */
+  startTournament(tournamentId?: string): void {
+    if (tournamentId) {
+      this.tournament = tournamentById(tournamentId);
+      this.course = courseById(this.tournament.courseId);
+    }
     this.results = [];
     this.holeIndex = 0;
     this.lastMoney = 0;

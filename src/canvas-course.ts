@@ -8,7 +8,8 @@ import type { Ellipse, Hole, Tree } from "./types";
 export class CoursePainter {
   private staticCanvas: HTMLCanvasElement;
   private staticCtx: CanvasRenderingContext2D;
-  private staticHole = -1;
+  /** Compared by identity: hole numbers repeat across courses. */
+  private staticHole: Hole | null = null;
   private grainCache = new Map<string, CanvasPattern>();
 
   constructor() {
@@ -19,7 +20,7 @@ export class CoursePainter {
   }
 
   resetCache(): void {
-    this.staticHole = -1;
+    this.staticHole = null;
     this.grainCache.clear();
   }
 
@@ -120,8 +121,8 @@ export class CoursePainter {
   }
 
   private ensureStatic(hole: Hole): void {
-    if (this.staticHole === hole.number) return;
-    this.staticHole = hole.number;
+    if (this.staticHole === hole) return;
+    this.staticHole = hole;
     const pad = 8;
     const scale = hole.bounds.w < 280 ? 9 : hole.bounds.w < 420 ? 7.5 : 6.4;
     this.staticCanvas.width = Math.max(64, Math.ceil(hole.bounds.w * scale));

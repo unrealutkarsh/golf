@@ -3,11 +3,14 @@ import {
   clone,
   closestPointOnPolygon,
   dist,
+  distToPolyline,
   offsetCorridor,
   pointInEllipse,
   pointInPolygon,
   type Vec2,
 } from "./math";
+import fogBeltLinksData from "./courses/fog-belt-links.json";
+import { placeholderBreak, polygonCentroid, type CourseData, type HoleData } from "./osm-course";
 import type { Course, Ellipse, Hole, Lie, Tree } from "./types";
 
 /** Extra yards beyond painted rough that still play as rough, not OB. */
@@ -383,7 +386,102 @@ export const HARBOR_DUNES: Course = {
   holes: [hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9],
 };
 
-export const COURSES: Course[] = [HARBOR_DUNES];
+/** Fairway half-width used when a mapped hole has no fairway polygon. */
+const IMPORTED_FAIRWAY_HALF = 17;
+
+/** Turn an imported course (see scripts/import-osm-course.ts) into playable holes. */
+export function buildImportedCourse(data: CourseData): Course {
+  const holes = data.holes.map((h) => buildImportedHole(data.id, h));
+  return {
+    id: data.id,
+    name: data.name,
+    club: data.club,
+    location: data.location,
+    par: holes.reduce((s, h) => s + h.par, 0),
+    holes,
+  };
+}
+
+function buildImportedHole(courseId: string, h: HoleData): Hole {
+  const fairway = h.fairways.length ? h.fairways : [offsetCorridor(h.centerline, IMPORTED_FAIRWAY_HALF)];
+  // Rough covers the line of play out to the furthest mapped feature, so real bunkers and greens sit in play.
+  let reach = IMPORTED_FAIRWAY_HALF + 12;
+  for (const poly of [...h.fairways, h.green, ...h.bunkers]) {
+    for (const p of poly) reach = Math.max(reach, distToPolyline(p, h.centerline) + 10);
+  }
+  const rough = [offsetCorridor(h.centerline, Math.min(reach, 70))];
+  const bunkers = h.bunkers.map(fitEllipse);
+  const extras: Vec2[] = [h.tee, h.pin, ...h.centerline, ...h.green, ...h.bunkers.flat()];
+  for (const t of h.trees) extras.push({ x: t.x + t.r, y: t.y + t.r }, { x: t.x - t.r, y: t.y - t.r });
+  return {
+    number: h.number,
+    name: h.name,
+    par: h.par,
+    yards: Math.round(h.centerline.slice(1).reduce((s, p, i) => s + dist(h.centerline[i], p), 0)),
+    tee: clone(h.tee),
+    pin: clone(h.pin),
+    fairway,
+    rough,
+    green: fitEllipse(h.green),
+    greenBreak: placeholderBreak(courseId, h.number),
+    bunkers,
+    water: h.water,
+    trees: h.trees,
+    bounds: aabb([...fairway, ...rough, ...h.water], extras, 44),
+    greenShape: h.green,
+    bunkerShapes: h.bunkers,
+    centerline: h.centerline,
+  };
+}
+
+/**
+ * Ellipse with the same area centroid, orientation and second moments as an outline.
+ * For a filled ellipse the variance along an axis is r²/4, so each radius is 2·√(principal variance).
+ */
+export function fitEllipse(poly: readonly Vec2[]): Ellipse {
+  let area = 0;
+  let cx = 0;
+  let cy = 0;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const cross = p.x * q.y - q.x * p.y;
+    area += cross;
+    cx += (p.x + q.x) * cross;
+    cy += (p.y + q.y) * cross;
+    sxx += (p.x * p.x + p.x * q.x + q.x * q.x) * cross;
+    syy += (p.y * p.y + p.y * q.y + q.y * q.y) * cross;
+    sxy += (p.x * q.y + 2 * p.x * p.y + 2 * q.x * q.y + q.x * p.y) * cross;
+  }
+  area /= 2;
+  if (Math.abs(area) < 1e-6) {
+    const c = polygonCentroid(poly);
+    return { cx: c.x, cy: c.y, rx: 1.5, ry: 1.5, rotation: 0 };
+  }
+  cx /= 6 * area;
+  cy /= 6 * area;
+  // Second moments about the centroid, per unit area.
+  const vxx = sxx / (12 * area) - cx * cx;
+  const vyy = syy / (12 * area) - cy * cy;
+  const vxy = sxy / (24 * area) - cx * cy;
+  const tr = (vxx + vyy) / 2;
+  const det = Math.sqrt(Math.max(0, ((vxx - vyy) / 2) ** 2 + vxy * vxy));
+  return {
+    cx,
+    cy,
+    rx: Math.max(1.5, 2 * Math.sqrt(tr + det)),
+    ry: Math.max(1.5, 2 * Math.sqrt(Math.max(tr - det, 0))),
+    rotation: 0.5 * Math.atan2(2 * vxy, vxx - vyy),
+  };
+}
+
+/** Front nine of a public San Francisco course, from OpenStreetMap (ODbL), played under an original name. */
+export const FOG_BELT_LINKS: Course = buildImportedCourse(fogBeltLinksData as CourseData);
+
+export const COURSES: Course[] = [HARBOR_DUNES, FOG_BELT_LINKS];
 
 export function courseById(id: string): Course {
   const course = COURSES.find((c) => c.id === id);
@@ -395,8 +493,12 @@ function lieAtStrict(hole: Hole, p: Vec2): Lie {
   for (const water of hole.water) {
     if (pointInPolygon(p, water)) return "water";
   }
-  for (const bunker of hole.bunkers) {
-    if (pointInEllipse(p, bunker.cx, bunker.cy, bunker.rx, bunker.ry, bunker.rotation)) return "bunker";
+  if (hole.bunkerShapes) {
+    for (const shape of hole.bunkerShapes) if (pointInPolygon(p, shape)) return "bunker";
+  } else {
+    for (const bunker of hole.bunkers) {
+      if (pointInEllipse(p, bunker.cx, bunker.cy, bunker.rx, bunker.ry, bunker.rotation)) return "bunker";
+    }
   }
   if (inGreen(hole, p)) {
     return "green";
@@ -446,6 +548,9 @@ export function nearOb(hole: Hole, p: Vec2): boolean {
 }
 
 export function inGreen(hole: Hole, p: Vec2, pad = GREEN_COLLAR): boolean {
+  if (hole.greenShape) {
+    return pointInPolygon(p, hole.greenShape) || dist(p, closestPointOnPolygon(p, hole.greenShape)) <= pad;
+  }
   return pointInEllipse(
     p,
     hole.green.cx,

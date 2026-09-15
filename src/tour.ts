@@ -13,6 +13,14 @@ export const TOURNAMENTS: Tournament[] = [
     courseId: "harbor-dunes",
     blurb: "Nine signature holes along the dunes and inlet. Stroke play, one round.",
   },
+  {
+    id: "fog-belt-open",
+    name: "Fog Belt Open",
+    purse: 1_400_000,
+    courseId: "fog-belt-links",
+    blurb: "A real routing: nine tree-lined holes traced from a public course on the San Francisco headlands. Stroke play, one round.",
+    credit: "Course layout © OpenStreetMap contributors (ODbL)",
+  },
 ];
 
 export function tournamentById(id: string): Tournament {

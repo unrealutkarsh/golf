@@ -138,7 +138,7 @@ function shotCamera(rig: CameraRig, session: GameSession, hole: Hole, desired: T
     return { stage: "chase", fov: 52 };
   }
   const land = session.landingPos;
-  const key = `${session.holeIndex}:${land.x.toFixed(1)}:${land.y.toFixed(1)}`;
+  const key = `${session.course.id}:${session.holeIndex}:${land.x.toFixed(1)}:${land.y.toFixed(1)}`;
   if (rig.landingSpot?.key !== key) {
     const heading = Math.atan2(land.y - session.lastShotPos.y, land.x - session.lastShotPos.x);
     rig.landingSpot = { key, pos: landingCamSpot(hole, land, heading, session.club().roll * session.power) };

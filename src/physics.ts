@@ -5,6 +5,7 @@ import {
   clamp,
   clone,
   dist,
+  distToSegment,
   fromAngle,
   len,
   scale,
@@ -412,7 +413,25 @@ export function flightApex(samples: FlightSample[]): number {
   return samples.reduce((max, sample) => Math.max(max, sample.z), 0);
 }
 
+/** Beyond this, a shot can't reach the green, so aim down the line of play instead of straight at the pin. */
+const LAYUP_AIM_YARDS = 230;
+
 export function defaultAim(from: Vec2, hole: Hole): number {
+  const line = hole.centerline;
+  if (!line || line.length < 3 || dist(from, hole.pin) < LAYUP_AIM_YARDS) return angleTo(from, hole.pin);
+  // Find where the ball sits along the line of play, then aim at the next corner that is meaningfully ahead.
+  let segment = 0;
+  let best = Infinity;
+  for (let i = 0; i < line.length - 1; i++) {
+    const d = distToSegment(from, line[i], line[i + 1]);
+    if (d < best) {
+      best = d;
+      segment = i;
+    }
+  }
+  for (let i = segment + 1; i < line.length - 1; i++) {
+    if (dist(from, line[i]) > 60) return angleTo(from, line[i]);
+  }
   return angleTo(from, hole.pin);
 }
 

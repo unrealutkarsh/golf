@@ -188,3 +188,17 @@ export function hashString(s: string): number {
 export function yardsLabel(n: number): string {
   return `${Math.round(n)}`;
 }
+
+/** Shortest distance from `p` to a polyline. */
+export function distToPolyline(p: Vec2, line: readonly Vec2[]): number {
+  let best = Infinity;
+  for (let i = 0; i < line.length - 1; i++) best = Math.min(best, distToSegment(p, line[i], line[i + 1]));
+  return line.length === 1 ? dist(p, line[0]) : best;
+}
+
+export function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+}

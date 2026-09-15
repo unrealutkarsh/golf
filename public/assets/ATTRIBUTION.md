@@ -13,6 +13,10 @@ Turf, greens and bunkers use an original flat palette painted in code (`src/art.
 
 - **kloofendal_43d_clear_puresky** 2K — [Poly Haven](https://polyhaven.com/a/kloofendal_43d_clear_puresky), CC0 (reflections on the ball and water only; the sky is drawn in code)
 
+## Course data
+
+- **Fog Belt Links** layout — © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, available under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/). Source: https://www.openstreetmap.org/way/16650363. Played under an original name; not affiliated with the course.
+
 ## Models
 
 - Tree meshes from **Quaternius Ultimate Nature Pack** — [quaternius.com](https://quaternius.com/packs/ultimatenature.html) / [OpenGameArt](https://opengameart.org/content/low-poly-nature-pack-1), CC0

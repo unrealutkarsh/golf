@@ -31,7 +31,7 @@ function handleAction(action: string, payload?: string): void {
       session.scorecardOpen = false;
       break;
     case "play":
-      session.startTournament();
+      session.startTournament(payload);
       break;
     case "help":
       session.helpOpen = true;

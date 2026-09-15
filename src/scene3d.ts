@@ -75,7 +75,8 @@ export class CourseScene implements CameraRig {
   private waterMat: THREE.MeshPhysicalMaterial;
   private raycaster = new THREE.Raycaster();
   private terrain: THREE.Mesh | null = null;
-  private builtHole = -1;
+  /** The hole the scene was built for. Compared by identity: hole indexes repeat across courses. */
+  private builtHole: Hole | null = null;
   private pathKey = "";
   private sun: THREE.DirectionalLight;
   private sky: THREE.Mesh;
@@ -288,9 +289,9 @@ export class CourseScene implements CameraRig {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     if (this.pendingArtRebuild && !flying) {
       this.pendingArtRebuild = false;
-      this.builtHole = -1;
+      this.builtHole = null;
     }
-    if (this.builtHole !== session.holeIndex) this.rebuildHole(hole, session.holeIndex);
+    if (this.builtHole !== hole) this.rebuildHole(hole);
 
     // An approach that rolls onto the green stays on the shot camera until it stops.
     const fullShotInAir = flying && session.club().id !== "putter";
@@ -322,8 +323,8 @@ export class CourseScene implements CameraRig {
     }
   }
 
-  private rebuildHole(hole: Hole, index: number): void {
-    this.builtHole = index;
+  private rebuildHole(hole: Hole): void {
+    this.builtHole = hole;
     // Free the previous hole's GPU buffers; only the materials and tree templates reused by every hole survive.
     const kit = this.foliageKit;
     const shared = collectShared(kit.trees, [
