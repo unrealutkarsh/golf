@@ -21,24 +21,30 @@ export function clubById(id: ClubId): Club {
   return club;
 }
 
-export function liePowerMul(lie: string): number {
-  if (lie === "rough") return 0.88;
-  if (lie === "bunker") return 0.7;
+/**
+ * Distance kept from a lie. Rough grabs the club; sand is fine for a wedge but brutal for anything longer.
+ * One table for the flight model and the club/power suggestions, so they cannot drift apart.
+ */
+export function liePowerMul(lie: string, clubId?: ClubId): number {
+  if (lie === "rough") return 0.8;
+  if (lie === "bunker") return clubId === undefined || clubId === "sw" || clubId === "pw" ? 0.78 : 0.5;
   if (lie === "water") return 0.4;
+  if (lie === "ob") return 0.7;
   return 1;
 }
 
 /** Typical total distance at a committed swing, including a bit of roll. */
 export function clubReach(club: Club, lie: string): number {
   if (club.id === "putter") return club.roll;
-  return (club.carry + club.roll * 0.45) * liePowerMul(lie);
+  return (club.carry + club.roll * 0.45) * liePowerMul(lie, club.id);
 }
 
 /** Swing-meter fill that should finish near `distanceYards` with this club. */
 export function suggestedShotPower(distanceYards: number, club: Club, lie: string): number {
   if (club.id === "putter") return 0.5;
   const reach = clubReach(club, lie);
-  return Math.max(0.36, Math.min(1, distanceYards / Math.max(reach, 1)));
+  // Low floor so a chosen long club can still suggest a short chip.
+  return Math.max(0.12, Math.min(1, distanceYards / Math.max(reach, 1)));
 }
 
 /** Estimated finish yards for a meter fill (putt: roll; else carry+roll). */

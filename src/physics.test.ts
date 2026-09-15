@@ -130,10 +130,11 @@ describe("shot physics", () => {
     const draw = sampleFlightPath(from, { ...shot, shape: 1 }, hole);
     const fade = sampleFlightPath(from, { ...shot, shape: -1 }, hole);
     const end = (path: typeof straight) => path[path.length - 1];
-    expect(end(draw).pos.y).toBeGreaterThan(end(straight).pos.y + 5);
-    expect(end(fade).pos.y).toBeLessThan(end(straight).pos.y - 5);
+    // Aim 0 faces +x (east). +y is south, which is the player's right, so a draw ends at smaller y.
+    expect(end(draw).pos.y).toBeLessThan(end(straight).pos.y - 5);
+    expect(end(fade).pos.y).toBeGreaterThan(end(straight).pos.y + 5);
     // A shaped iron bends, it does not hook into the next fairway.
-    expect(end(draw).pos.y - end(straight).pos.y).toBeLessThan(20);
+    expect(end(straight).pos.y - end(draw).pos.y).toBeLessThan(20);
   });
 
   it("lips a fast putt once, then holes the tap-in", () => {

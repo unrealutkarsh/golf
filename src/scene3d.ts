@@ -404,7 +404,7 @@ export class CourseScene implements CameraRig {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     const play = session.screen === "play";
     if (aiming && play) {
-      const onPutt = session.club().id === "putter" || session.lie === "green";
+      const onPutt = session.club().id === "putter";
       const path = session.previewFlight();
       const show = path.length > 1 && !onPutt;
       this.aimRibbon.visible = show;

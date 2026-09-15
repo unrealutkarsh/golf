@@ -72,7 +72,7 @@ Stroke play versus par. Harbor Dunes is a par-36 nine (two par 3s, five par 4s, 
 - Running total is shown as `E`, `-3`, `+2`, and so on.
 - Career money, events, and best round stay in `localStorage` on this machine.
 
-Lies change the shot: fairway and tee are full strength, rough and bunkers sap distance, greens take break, and wind moves the ball in the air.
+Lies change the shot: fairway and tee are full strength. Rough smothers a landing ball and costs about 20% distance plus accuracy on the next shot; bunkers stop the ball dead and only wedges come out near full distance. Greens take break, and wind moves the ball in the air. Any club can be played from any lie.
 
 ## Real course layouts (OpenStreetMap)
 
