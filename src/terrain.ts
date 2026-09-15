@@ -139,8 +139,9 @@ export function puttMeterYards(meter: number, yardsToPin: number): number {
   return PUTT_ROLL_YARDS * scaledPuttPower(meter, yardsToPin);
 }
 
+/** Putting view and putt line only when the player is actually holding the putter; a wedge off the green is a normal shot. */
 export function isPuttingSituation(lie: Lie, pinDist: number, clubId: string, hole: Hole, pos: Vec2): boolean {
-  return lie === "green" || onGreen(hole, pos) || (pinDist < 24 && clubId === "putter");
+  return clubId === "putter" && (lie === "green" || onGreen(hole, pos) || pinDist < 24);
 }
 
 export function resolveCamView(

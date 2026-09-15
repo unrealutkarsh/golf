@@ -227,7 +227,7 @@ export class GameSession {
   }
 
   canShape(): boolean {
-    return this.club().id !== "putter" && this.lie !== "green" && (this.swingPhase === "aim" || this.swingPhase === "power");
+    return this.club().id !== "putter" && (this.swingPhase === "aim" || this.swingPhase === "power");
   }
 
   nudgeShape(delta: number): void {
@@ -237,7 +237,7 @@ export class GameSession {
   }
 
   setShape(value: number): void {
-    if (this.club().id === "putter" || this.lie === "green") {
+    if (this.club().id === "putter") {
       this.shape = 0;
       return;
     }
@@ -395,9 +395,10 @@ export class GameSession {
 
   aimAt(world: Vec2): void {
     if (this.swingPhase !== "aim") return;
-    const onPuttingSurface = this.putting() || this.lie === "green" || onGreen(this.hole(), this.ball.pos);
     // Drag well past the ball to aim; a stray hover near it must not swing the line off the hole.
-    if (dist(world, this.ball.pos) < (onPuttingSurface ? 1.5 : 22)) return;
+    // Putts and short chips need a much shorter drag than a full shot.
+    const minDrag = this.putting() ? 1.5 : Math.min(22, Math.max(4, this.toPin() * 0.45));
+    if (dist(world, this.ball.pos) < minDrag) return;
     this.aim = Math.atan2(world.y - this.ball.pos.y, world.x - this.ball.pos.x);
     this.aimExplicit = true;
   }

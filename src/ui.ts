@@ -175,10 +175,10 @@ export class UI {
           <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line.</li>
           <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
-          <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
+          <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. The game suggests a club after each shot, but any club can be played from anywhere — including a wedge off the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
           <li><b>Putting</b>: the dotted line follows the slope of the green to where the ball will stop, and turns gold when the putt drops. Read the break with ← → or by dragging. G toggles the break grid.</li>
-          <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
+          <li>Wind moves the ball in the air. Rough grabs a landing ball and costs you distance and accuracy on the next shot; sand stops the ball dead, and only a wedge gets out cleanly. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
         <button class="btn primary" data-action="close-help">Got it</button>
@@ -321,7 +321,7 @@ export class UI {
           <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
           <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
           <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
-          <span class="shape-hint">${session.club().id === "putter" || session.lie === "green" ? "Read the break · ← → or drag to aim" : "Z fade · X draw"}</span>
+          <span class="shape-hint">${session.club().id === "putter" ? "Read the break · ← → or drag to aim" : "Z fade · X draw"}</span>
         </div>
         <div class="clubs">
           ${CLUBS.map(

@@ -64,7 +64,8 @@ export function updateSceneCamera(
     const heading = Math.hypot(v.x, v.y) > 0.4 ? Math.atan2(v.y, v.x) : session.aim;
     const back = fromAngle(heading + Math.PI, frame.back);
     const curve = session.ball.curve || session.shape * 24;
-    const side = fromAngle(heading + Math.PI / 2, -Math.max(-1, Math.min(1, curve / 24)) * 7.5);
+    // Sit on the outside of the bend (a draw bends left, so the camera drifts right) to watch it curve.
+    const side = fromAngle(heading + Math.PI / 2, Math.max(-1, Math.min(1, curve / 24)) * 7.5);
     desired.set(ball.x + back.x + side.x, bh + frame.height + session.ball.z * 0.16, ball.y + back.y + side.y);
     look.set(ball.x, bh + 0.7, ball.y);
   } else {

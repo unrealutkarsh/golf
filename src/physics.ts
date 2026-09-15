@@ -11,6 +11,7 @@ import {
   scale,
   type Vec2,
 } from "./math";
+import { liePowerMul } from "./clubs";
 import type { Ball, Club, Hole, Lie, Wind } from "./types";
 
 export const CUP_RADIUS = 0.5;
@@ -78,21 +79,36 @@ const GREEN_BREAK_ACCEL = 4.5;
 const RESTITUTION: Record<Lie, number> = {
   tee: 0.36,
   fairway: 0.34,
-  rough: 0.2,
+  rough: 0.1,
   green: 0.16,
-  bunker: 0.08,
+  bunker: 0.02,
   water: 0,
-  ob: 0.22,
+  ob: 0.18,
 };
 
-const LIE_POWER: Record<Lie, number> = {
+/**
+ * Share of forward speed a landing ball keeps on its first bounce. Fairways release it; long grass smothers it,
+ * so a miss stays in the rough instead of skipping back out; sand swallows it.
+ */
+const LANDING_GRAB: Record<Lie, number> = {
   tee: 1,
   fairway: 1,
-  rough: 0.88,
+  rough: 0.35,
+  green: 0.8,
+  bunker: 0.06,
+  water: 0,
+  ob: 0.6,
+};
+
+/** How much wider a mistimed strike sprays from a bad lie. */
+const LIE_SPRAY: Record<Lie, number> = {
+  tee: 1,
+  fairway: 1,
+  rough: 1.6,
   green: 1,
-  bunker: 0.7,
-  water: 0.4,
-  ob: 0.7,
+  bunker: 1.4,
+  water: 1,
+  ob: 1.2,
 };
 
 export function createBall(pos: Vec2): Ball {
@@ -100,14 +116,14 @@ export function createBall(pos: Vec2): Ball {
 }
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
-  const lieMul = LIE_POWER[shot.lie];
+  const lieMul = liePowerMul(shot.lie, shot.club.id);
   const power = clamp(shot.power, shot.club.id === "putter" ? 0.005 : 0.08, shot.club.id === "putter" ? MAX_PUTT_POWER : 1.05);
   const acc = clamp(shot.accuracy, -1, 1);
-  const spray = (1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016;
+  const spray = ((1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016) * LIE_SPRAY[shot.lie];
   const aim = shot.aim + spray;
   const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
   // Lateral curve distance at full swing ≈ curve / 2 yards; divided by hang² at launch to become an acceleration.
-  const curve = shape * (1.1 - shot.club.loft / 80) * (0.55 + power * 0.7) * 26;
+  const curve = shape * (1.1 - shot.club.loft / 80) * (0.55 + power * 0.7) * 34;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
@@ -230,8 +246,9 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
   if (next.z > 0.35 && Math.abs(ball.curve) > 0.01) {
     const speed = len(next.vel) || 1;
     next.vel = {
-      x: next.vel.x + (-next.vel.y / speed) * ball.curve * dt,
-      y: next.vel.y + (next.vel.x / speed) * ball.curve * dt,
+      // Positive curve bends left of travel. +y is south, i.e. to the player's right when facing +x, so rotate toward -y.
+      x: next.vel.x + (next.vel.y / speed) * ball.curve * dt,
+      y: next.vel.y + (-next.vel.x / speed) * ball.curve * dt,
     };
   }
 
@@ -285,7 +302,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
     if (Math.abs(ball.vz) > 2.2) {
       next.vz = -ball.vz * RESTITUTION[lie] * (0.64 + clubBounce * 0.42);
-      const rollKeep = 0.22 + Math.min(0.42, (ball.spinning / 28) * 0.45);
+      const rollKeep = (0.22 + Math.min(0.42, (ball.spinning / 28) * 0.45)) * LANDING_GRAB[lie];
       next.vel = scale(next.vel, rollKeep);
       next.spinning *= 0.35;
       events.push({ type: "bounce", pos: clone(next.pos) });

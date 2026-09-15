@@ -180,6 +180,9 @@ describe("tour session", () => {
     game.ball.z = 0;
     game.update(1 / 60);
     expect(game.lie).toBe("green");
+    // Still holding the driver: any club can be played from anywhere, so this is not a putt yet.
+    expect(game.putting()).toBe(false);
+    game.clubIndex = clubIndex("putter");
     expect(game.putting()).toBe(true);
   });
 
