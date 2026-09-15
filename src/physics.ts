@@ -22,6 +22,8 @@ export const MAX_HOLE_STROKES = 10;
 export const GRAVITY = 28;
 /** Fixed simulation step. The live game and every preview integrate at this rate so they agree. */
 export const SIM_DT = 1 / 60;
+/** Strongest putt the meter can call for, in putter power (fractions of the putter's 42-yard green roll): ~100 yards. */
+export const MAX_PUTT_POWER = 2.4;
 
 export interface FlightSample {
   pos: Vec2;
@@ -99,7 +101,7 @@ export function createBall(pos: Vec2): Ball {
 
 export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const lieMul = LIE_POWER[shot.lie];
-  const power = clamp(shot.power, shot.club.id === "putter" ? 0.005 : 0.08, 1.05);
+  const power = clamp(shot.power, shot.club.id === "putter" ? 0.005 : 0.08, shot.club.id === "putter" ? MAX_PUTT_POWER : 1.05);
   const acc = clamp(shot.accuracy, -1, 1);
   const spray = (1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016;
   const aim = shot.aim + spray;
@@ -177,7 +179,8 @@ let rollTableCache: { speed: number; yards: number }[] | null = null;
 function rollTable(): { speed: number; yards: number }[] {
   if (!rollTableCache) {
     rollTableCache = [{ speed: 0, yards: 0 }];
-    for (let speed = 0.25; speed <= 70; speed += 0.25) rollTableCache.push({ speed, yards: flatRollDistance(speed) });
+    // Fine steps where short putts live, coarser once the roll is long; covers the longest putt the meter allows.
+    for (let speed = 0.25; speed <= 260; speed += speed < 20 ? 0.25 : 1) rollTableCache.push({ speed, yards: flatRollDistance(speed) });
   }
   return rollTableCache;
 }
@@ -386,6 +389,55 @@ export function samplePathPoint(path: FlightSample[], t: number): FlightSample {
     pos: { x: a.pos.x + (b.pos.x - a.pos.x) * f, y: a.pos.y + (b.pos.y - a.pos.y) * f },
     z: a.z + (b.z - a.z) * f,
   };
+}
+
+export interface PacePoint {
+  power: number;
+  yards: number;
+}
+
+/**
+ * How far putts of increasing power roll from `from` along `aim` over the real surfaces — green, fringe, fairway —
+ * with the cup taken out so it cannot stop the measurement. Distances are kept non-decreasing.
+ */
+export function measurePuttPace(from: Vec2, aim: number, hole: Hole, lie: Lie, club: Club, samples = 22): PacePoint[] {
+  const noCup: Hole = { ...hole, pin: { x: 1e7, y: 1e7 } };
+  const points: PacePoint[] = [{ power: 0, yards: 0 }];
+  const low = 0.004;
+  let longest = 0;
+  for (let i = 0; i < samples; i++) {
+    const power = low * Math.pow(MAX_PUTT_POWER / low, i / (samples - 1));
+    const path = sampleFlightPath(from, { aim, power, accuracy: 0, club, lie, wind: { speed: 0, dir: 0 } }, noCup, true);
+    longest = Math.max(longest, dist(from, path[path.length - 1].pos));
+    points.push({ power, yards: longest });
+  }
+  return points;
+}
+
+/** Putter power that rolls `yards` according to a pace table (capped at the table's strongest putt). */
+export function powerForYards(pace: readonly PacePoint[], yards: number): number {
+  for (let i = 1; i < pace.length; i++) {
+    if (pace[i].yards >= yards) {
+      const a = pace[i - 1];
+      const b = pace[i];
+      const t = b.yards === a.yards ? 0 : (yards - a.yards) / (b.yards - a.yards);
+      return a.power + (b.power - a.power) * t;
+    }
+  }
+  return pace[pace.length - 1].power;
+}
+
+/** Inverse of powerForYards. */
+export function yardsForPower(pace: readonly PacePoint[], power: number): number {
+  for (let i = 1; i < pace.length; i++) {
+    if (pace[i].power >= power) {
+      const a = pace[i - 1];
+      const b = pace[i];
+      const t = b.power === a.power ? 0 : (power - a.power) / (b.power - a.power);
+      return a.yards + (b.yards - a.yards) * t;
+    }
+  }
+  return pace[pace.length - 1].yards;
 }
 
 export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilRest = false): FlightSample[] {

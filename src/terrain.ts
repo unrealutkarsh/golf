@@ -1,6 +1,7 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
 import { clamp, dist, type Vec2 } from "./math";
+import { MAX_PUTT_POWER } from "./physics";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -115,7 +116,7 @@ export function camLabel(view: ResolvedCam): string {
 }
 
 export function suggestedPuttPower(yardsToPin: number): number {
-  return Math.min(0.64, scaledPuttPower(PUTT_HOLE_FILL, yardsToPin));
+  return scaledPuttPower(PUTT_HOLE_FILL, yardsToPin);
 }
 
 /** Mid-meter should die at the hole; a full smash only runs about 1.5× leftover. */
@@ -123,7 +124,7 @@ export function scaledPuttPower(meter: number, yardsToPin: number): number {
   const fill = Math.max(0.05, Math.min(1, meter));
   const leftover = Math.max(0.2, yardsToPin);
   const factor = 0.38 + fill * 1.24;
-  return Math.max(0.006, Math.min(0.95, (leftover * factor) / PUTT_ROLL_YARDS));
+  return Math.max(0.006, Math.min(MAX_PUTT_POWER, (leftover * factor) / PUTT_ROLL_YARDS));
 }
 
 /** Inverse of scaledPuttPower for drawing the meter after a stroke is locked. */

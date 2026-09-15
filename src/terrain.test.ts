@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HARBOR_DUNES, inWater } from "./course";
+import { MAX_PUTT_POWER } from "./physics";
 import {
   bladeHeight,
   bladeKeepChance,
@@ -77,7 +78,9 @@ describe("course terrain", () => {
     expect(PUTT_HOLE_FILL).toBe(0.5);
     expect(suggestedPuttPower(6)).toBeLessThan(suggestedPuttPower(18));
     expect(suggestedPuttPower(6)).toBeGreaterThan(0.08);
-    expect(suggestedPuttPower(80)).toBeLessThanOrEqual(0.64);
+    // Long putts are not capped short of the hole: 60 yards needs more than 40 does.
+    expect(suggestedPuttPower(60)).toBeGreaterThan(suggestedPuttPower(40));
+    expect(suggestedPuttPower(80)).toBeLessThanOrEqual(MAX_PUTT_POWER);
     expect(suggestedPuttPower(8)).toBeCloseTo(scaledPuttPower(PUTT_HOLE_FILL, 8), 8);
     expect(scaledPuttPower(0.5, 1.2)).toBeLessThan(0.12);
     expect(scaledPuttPower(0.5, 1.2)).toBeGreaterThan(0.02);
