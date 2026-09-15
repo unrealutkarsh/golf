@@ -46,8 +46,9 @@ describe("putt preview line", () => {
     const br = game.hole().greenBreak;
     const aimDir = { x: Math.cos(game.aim), y: Math.sin(game.aim) };
     const breakSide = -aimDir.y * br.x + aimDir.x * br.y;
-    const end = preview.path[preview.path.length - 1].pos;
-    expect(Math.sign(sideOfAim(game, end))).toBe(Math.sign(breakSide));
+    // Judge the side at the widest point of the curve: a putt that drops finishes back on the line.
+    const widest = preview.path.reduce((a, s) => (Math.abs(sideOfAim(game, s.pos)) > Math.abs(sideOfAim(game, a.pos)) ? s : a));
+    expect(Math.sign(sideOfAim(game, widest.pos))).toBe(Math.sign(breakSide));
   });
 
   it("predicts exactly where the real putt finishes", () => {
@@ -123,6 +124,55 @@ describe("putt pace", () => {
     game.tap();
     for (let i = 0; i < 900 && game.screen === "play"; i++) game.update(1 / 60);
     expect(game.screen).toBe("holeEnd");
+  });
+});
+
+describe("long and off-green putts", () => {
+  /** Distance a putt at `fill` rolls from `back` yards out along the tee line, with the break and cup out of the way. */
+  function paceFrom(courseEvent: string, holeIndex: number, back: number, fill: number) {
+    const game = new GameSession(46);
+    game.startTournament(courseEvent);
+    game.audio.muted = true;
+    game.resetHole(holeIndex, false);
+    const hole = game.hole();
+    const flat = { ...hole, greenBreak: { x: 0, y: 0 } };
+    (game.course.holes as typeof game.course.holes)[holeIndex] = flat;
+    const len = Math.hypot(hole.tee.x - hole.pin.x, hole.tee.y - hole.pin.y);
+    const from = { x: hole.pin.x + ((hole.tee.x - hole.pin.x) / len) * back, y: hole.pin.y + ((hole.tee.y - hole.pin.y) / len) * back };
+    game.ball = createBall(from);
+    game.refreshLie();
+    game.clubIndex = clubIndex("putter");
+    // Aimed a touch off the cup so it measures pace, not whether it drops.
+    game.aim = Math.atan2(hole.pin.y - from.y, hole.pin.x - from.x) + 0.12;
+    game.visualAim = game.aim;
+    game.aimExplicit = true;
+    game.swingPhase = "power";
+    game.visualPower = fill;
+    const path = game.previewPutt().path;
+    const end = path[path.length - 1].pos;
+    return { lie: game.lie, rolled: Math.hypot(end.x - from.x, end.y - from.y) };
+  }
+
+  it("reaches the hole from 45 and 55 yards at mid-meter, well past the old 40-yard ceiling", () => {
+    for (const back of [45, 55]) {
+      const { rolled } = paceFrom("fog-belt-open", 8, back, PUTT_HOLE_FILL);
+      expect(rolled, `${back}y`).toBeGreaterThan(back - 1.5);
+      expect(rolled, `${back}y`).toBeLessThan(back + 1.5);
+    }
+  });
+
+  it("keeps mid-meter pace honest from the fairway, where putts used to come up a third short", () => {
+    for (const [holeIndex, back] of [[0, 20], [5, 30]] as const) {
+      const { lie, rolled } = paceFrom("fog-belt-open", holeIndex, back, PUTT_HOLE_FILL);
+      expect(lie).not.toBe("green");
+      expect(rolled, `hole ${holeIndex + 1} ${back}y`).toBeGreaterThan(back - 1);
+      expect(rolled, `hole ${holeIndex + 1} ${back}y`).toBeLessThan(back + 1);
+    }
+  });
+
+  it("runs a full-meter putt well past the hole", () => {
+    const { rolled } = paceFrom("harbor-invitational", 0, 30, 1);
+    expect(rolled).toBeGreaterThan(30 * 1.45);
   });
 });
 
