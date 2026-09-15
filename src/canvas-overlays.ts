@@ -53,7 +53,7 @@ export class PlayOverlays {
   }
 
   trackFlight(session: GameSession, dt: number): void {
-    const key = `${session.holeIndex}-${session.strokes}`;
+    const key = `${session.course.id}-${session.holeIndex}-${session.strokes}`;
     if (key !== this.trailShot) {
       this.trail = [];
       this.trailShot = key;

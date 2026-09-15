@@ -74,6 +74,23 @@ Stroke play versus par. Harbor Dunes is a par-36 nine (two par 3s, five par 4s, 
 
 Lies change the shot: fairway and tee are full strength, rough and bunkers sap distance, greens take break, and wind moves the ball in the air.
 
+## Real course layouts (OpenStreetMap)
+
+Courses can be imported from [OpenStreetMap](https://www.openstreetmap.org/) golf mapping (`golf=hole`, `green`, `fairway`, `bunker`, `water_hazard`, `pin`, trees):
+
+```bash
+npm run import:course -- --osm way/16650363 --id fog-belt-links --name "Fog Belt Links" \
+  --club "Fog Belt" --location "Bay Headlands" --holes 1-9
+```
+
+This queries the Overpass API and writes `src/courses/<id>.json` in yards. Register it in `src/course.ts` with `buildImportedCourse` and add a tournament in `src/tour.ts`. Holes use the mapped greens, bunkers and fairways; where a hole has no fairway polygon, a corridor along the hole line stands in. Green slopes are placeholders until elevation data is added.
+
+- **Credit is required.** OSM data is © OpenStreetMap contributors under the [ODbL](https://opendatacommons.org/licenses/odbl/). Keep the `source` block in the JSON, the tournament `credit`, and the line in `public/assets/ATTRIBUTION.md`.
+- **Use original course names.** Real course names and branding are trademarks; the layouts ship under invented names.
+- **Pick well-mapped courses.** Every hole needs a `golf=hole` line and a green; the importer stops with an error rather than guess.
+
+`Fog Belt Links` is the front nine of a public San Francisco course, imported this way.
+
 ## Project layout
 
 ```
@@ -81,7 +98,9 @@ src/
   main.ts            boot + input
   game.ts            round / swing state
   physics.ts         flight, bounce, hazards, hole-out
-  course.ts          Harbor Dunes hole data
+  course.ts          Harbor Dunes hole data, imported-course builder, lies
+  osm-course.ts      OpenStreetMap → course data converter
+  courses/*.json     imported course layouts (ODbL)
   clubs.ts           bag
   renderer.ts        2D fallback orchestration + HUD
   canvas-hud.ts      power / accuracy meters + minimap

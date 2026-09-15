@@ -64,6 +64,12 @@ export interface Hole {
   water: Vec2[][];
   trees: Tree[];
   bounds: { x: number; y: number; w: number; h: number };
+  /** Real putting-surface outline (imported courses). `green` stays as its fitted ellipse for rendering. */
+  greenShape?: Vec2[];
+  /** Tee → green line of play (imported courses), used to aim down doglegs instead of across them. */
+  centerline?: Vec2[];
+  /** Real bunker outlines (imported courses), index-aligned with the fitted `bunkers` ellipses. */
+  bunkerShapes?: Vec2[][];
 }
 
 export interface Course {
@@ -127,4 +133,6 @@ export interface Tournament {
   purse: number;
   courseId: string;
   blurb: string;
+  /** Required credit for imported layout data, shown on the event card. */
+  credit?: string;
 }

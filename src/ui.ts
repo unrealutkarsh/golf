@@ -4,7 +4,8 @@ import type { GameSession } from "./game";
 import { surfaceLabel, windLabel } from "./physics";
 import { camLabel, shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
-import { PLAYER_CARD } from "./tour";
+import { courseById } from "./course";
+import { PLAYER_CARD, TOURNAMENTS } from "./tour";
 import type { ScreenId } from "./types";
 
 export class UI {
@@ -148,13 +149,20 @@ export class UI {
               <div><dt>Best round</dt><dd>${p.bestToPar === null ? "—" : formatToPar(p.bestToPar)}</dd></div>
             </dl>
           </section>
-          <section class="event-card">
-            <p class="kicker">This week</p>
-            <h3>${escapeHtml(t.name)}</h3>
-            <p>${escapeHtml(t.blurb)}</p>
-            <p class="meta">${escapeHtml(session.course.name)} · ${session.course.holes.length} holes · Par ${session.course.par} · Purse ${formatMoney(t.purse)}</p>
-            <button class="btn primary" data-action="play">Tee it up</button>
-          </section>
+          <div class="events">
+            ${TOURNAMENTS.map((event) => {
+              const course = courseById(event.courseId);
+              return `
+            <section class="event-card">
+              <p class="kicker">${p.eventsPlayed > 0 && event.id === t.id ? "Last played" : "On the schedule"}</p>
+              <h3>${escapeHtml(event.name)}</h3>
+              <p>${escapeHtml(event.blurb)}</p>
+              <p class="meta">${escapeHtml(course.name)} · ${course.holes.length} holes · Par ${course.par} · Purse ${formatMoney(event.purse)}</p>
+              ${event.credit ? `<p class="credit">${escapeHtml(event.credit)}</p>` : ""}
+              <button class="btn primary" data-action="play" data-payload="${escapeHtml(event.id)}">Tee it up</button>
+            </section>`;
+            }).join("")}
+          </div>
         </div>
       </div>`;
   }
@@ -164,12 +172,12 @@ export class UI {
       <div class="panel help">
         <h2>How to play</h2>
         <ol>
-          <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line. On the green the line stays on the pin.</li>
+          <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line.</li>
           <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. Putter kicks in on the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
-          <li>G toggles the break grid. The gold line is the putt at the hole.</li>
+          <li><b>Putting</b>: the dotted line follows the slope of the green to where the ball will stop, and turns gold when the putt drops. Read the break with ← → or by dragging. G toggles the break grid.</li>
           <li>Wind moves the ball in the air. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>

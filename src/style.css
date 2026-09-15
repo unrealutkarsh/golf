@@ -146,6 +146,18 @@ body.has-3d #view {
   margin-top: 18px;
 }
 
+.events {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.event-card .credit {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+
 .player-card,
 .event-card {
   border: 1px solid var(--line);

@@ -7,7 +7,8 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
-    "test": "vitest run"
+    "test": "vitest run",
+    "import:course": "vite-node scripts/import-osm-course.ts --"
   },
   "devDependencies": {
     "@types/three": "^0.185.4",
