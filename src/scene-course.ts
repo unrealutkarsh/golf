@@ -162,6 +162,23 @@ export function rebuildPin(pin: THREE.Group): void {
   pin.add(pole, ferrule, flag, well, liner);
 }
 
+/** Downhill tick: shaft plus a small head, so the grid reads as fall and not a scratch. */
+function pushFallArrow(pts: number[], from: { x: number; y: number; z: number }, tip: { x: number; y: number; z: number }): void {
+  const y = 0.012;
+  pts.push(from.x, from.y + y, from.z, tip.x, tip.y + y, tip.z);
+  const dx = tip.x - from.x;
+  const dz = tip.z - from.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const ux = dx / len;
+  const uz = dz / len;
+  const hx = tip.x - ux * 0.38;
+  const hz = tip.z - uz * 0.38;
+  const px = -uz * 0.18;
+  const pz = ux * 0.18;
+  pts.push(tip.x, tip.y + y, tip.z, hx + px, tip.y + y, hz + pz);
+  pts.push(tip.x, tip.y + y, tip.z, hx - px, tip.y + y, hz - pz);
+}
+
 export function rebuildPuttGrid(grid: THREE.Group, hole: Hole): void {
   disposeChildren(grid);
   const g = hole.green;
@@ -188,16 +205,17 @@ export function rebuildPuttGrid(grid: THREE.Group, hole: Hole): void {
   }
   const br = hole.greenBreak;
   const bl = Math.hypot(br.x, br.y) || 1;
+  // Ticks point downhill — the same direction the ball is pulled.
   for (let i = -2; i <= 2; i++) {
     for (let j = -2; j <= 2; j++) {
       const o = toWorld((i / 2) * g.rx * 0.55, (j / 2) * g.ry * 0.55);
-      const tip = toWorld((i / 2) * g.rx * 0.55 + (br.x / bl) * 1.4, (j / 2) * g.ry * 0.55 + (br.y / bl) * 1.4);
-      pts.push(o.x, o.y + 0.01, o.z, tip.x, tip.y + 0.01, tip.z);
+      const tip = toWorld((i / 2) * g.rx * 0.55 + (br.x / bl) * 1.7, (j / 2) * g.ry * 0.55 + (br.y / bl) * 1.7);
+      pushFallArrow(pts, o, tip);
     }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-  grid.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xdce8d0, transparent: true, opacity: 0.2 })));
+  grid.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xe7f0dc, transparent: true, opacity: 0.32 })));
 }
 
 export function buildPlayableTerrain(hole: Hole, turfMat: THREE.MeshStandardMaterial): THREE.Mesh {

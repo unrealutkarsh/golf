@@ -73,7 +73,16 @@ const GREEN_DIE_SPEED = 2.4;
 const GREEN_CATCH = 0.55;
 /** A rolling ball on the green comes to rest below this speed, yd/s. */
 const GREEN_REST_SPEED = 0.78;
-/** Sideways pull of a green's slope, yd/s² per unit of `greenBreak`. At the old 2.4 a 9-yard putt broke only a few inches; 4.5 gives roughly 1–4 ft over 9 yards across these greens. */
+/**
+ * Drop of the putting surface, yards per yard, for one unit of `greenBreak`.
+ * The mesh uses this same fall, and +greenBreak is downhill — the way the ball is pulled.
+ */
+export const GREEN_FALL = 0.016;
+/**
+ * Downhill pull, yd/s² per unit of `greenBreak`. One vector does the side break and the
+ * uphill/downhill pace, so the line cannot bend a different way than the slope.
+ * About 1–4 ft of break on a 9-yard putt across these greens.
+ */
 const GREEN_BREAK_ACCEL = 4.5;
 
 const RESTITUTION: Record<Lie, number> = {
@@ -403,8 +412,8 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
         const gripped = applyGreenGrip(next, dt);
         next.vel = gripped.vel;
         next.spinning = gripped.spinning;
-        // Break only while the ball is still rolling. Applying it at rest
-        // kept putts creeping forever and blocked the next stroke.
+        // Pull downhill (+greenBreak, the same fall the mesh uses) only while the ball
+        // is still rolling. Applying it at rest kept putts creeping and blocked the next stroke.
         if (len(next.vel) > STOP_SPEED * 1.2) {
           next.vel = add(next.vel, scale(hole.greenBreak, dt * GREEN_BREAK_ACCEL));
         }
@@ -419,17 +428,19 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
   const speed = len(next.vel);
   const lie = lieAt(hole, next.pos);
-  const pinDist = dist(next.pos, hole.pin);
+  const endDist = dist(next.pos, hole.pin);
+  // A fast step can jump the cup. The closest point on this step is what the hole actually saw.
+  const cupDist = Math.min(endDist, distToSegment(hole.pin, ball.pos, next.pos));
   let holed = false;
 
-  if (onGreen(hole, next.pos) && next.z <= 0.05) {
-    if (pinDist < CUP_RADIUS) {
+  if (next.z <= 0.05 && (onGreen(hole, next.pos) || cupDist < CUP_RADIUS)) {
+    if (cupDist < CUP_RADIUS) {
       if (!ball.lipped && speed < CAPTURE_SPEED) {
         holed = true;
       } else if (speed >= LIP_SPEED && !ball.lipped) {
         next.lipped = true;
         const away = angleTo(hole.pin, next.pos);
-        next.pos = add(next.pos, fromAngle(away, CUP_RADIUS + 0.14));
+        next.pos = add(hole.pin, fromAngle(away, CUP_RADIUS + 0.14));
         next.vel = fromAngle(away, Math.min(speed * 0.2, 2.1));
         events.push({ type: "lip", pos: clone(next.pos) });
       } else if (!ball.lipped) {
@@ -437,7 +448,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
         next.vel = add(next.vel, fromAngle(toward, dt * 2.8));
         next.vel = scale(next.vel, Math.pow(0.93, dt * 60));
       }
-    } else if (!ball.lipped && pinDist < GIMME_RADIUS && speed < STOP_SPEED) {
+    } else if (!ball.lipped && endDist < GIMME_RADIUS && speed < STOP_SPEED) {
       holed = true;
     }
     if (holed) {
@@ -448,7 +459,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     }
   }
 
-  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < GREEN_REST_SPEED && pinDist > CUP_RADIUS;
+  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < GREEN_REST_SPEED && endDist > CUP_RADIUS;
   const flying = !holed && !dyingOnGreen && (next.z > 0.05 || speed > STOP_SPEED);
   if (!flying && !holed) {
     next.vel = { x: 0, y: 0 };
@@ -552,7 +563,7 @@ export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilR
   let ball = launchBall(from, shot);
   const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
   let airborne = ball.z > 0.05;
-  for (let i = 0; i < 900; i++) {
+  for (let i = 0; i < 1800; i++) {
     const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce);
     samples.push({ pos: clone(step.ball.pos), z: step.ball.z });
     if (step.penaltyKind || step.holed) break;

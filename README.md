@@ -54,7 +54,9 @@ npm test
 | Help | H or **Help** |
 | Mute | M or **Sound** |
 
-On the **green**, the camera sits over the ball looking at the pin. Tee and fairway shots use an over-the-ball address camera, then follow the ball in flight. Slight misses stay in the rough instead of going out of bounds.
+On the **green**, the camera sits over the ball looking at the pin. The dotted line is the putt you are about to hit: it bends with the slope and turns gold when that pace will drop. The white tick on the meter is flat hole-pace — uphill finishes short of it, downhill runs past, and the line shows which. A soft meter dies short; a firm one runs long. **G** shows the fall of the green. Tee and fairway shots use an over-the-ball address camera, then follow the ball in flight. Slight misses stay in the rough instead of going out of bounds.
+
+Sound is on by default and stays in the browser (no download): a whoosh and a different contact for driver, iron, wedge, and putter, plus a quiet wind that softens on the green. **M** or **Sound** mutes it.
 
 ### Shot shape
 

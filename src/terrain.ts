@@ -1,7 +1,7 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
 import { clamp, dist, fromAngle, type Vec2 } from "./math";
-import { MAX_PUTT_POWER } from "./physics";
+import { GREEN_FALL, MAX_PUTT_POWER } from "./physics";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -283,7 +283,8 @@ export function groundHeight(hole: Hole, x: number, y: number): number {
   if (lie === "bunker") return -0.1 + n * 0.03;
   if (lie === "green" || onGreen(hole, p)) {
     const br = hole.greenBreak;
-    return 0.16 + (x - hole.green.cx) * br.x * 0.012 + (y - hole.green.cy) * br.y * 0.012 + n * 0.008;
+    // +greenBreak is downhill, the same direction the putt is pulled.
+    return 0.22 - (x - hole.green.cx) * br.x * GREEN_FALL - (y - hole.green.cy) * br.y * GREEN_FALL + n * 0.008;
   }
   if (lie === "tee") return 0.11 + n * 0.012;
   if (lie === "fairway") return 0.08 + n * 0.028 + n2 * 0.012;
