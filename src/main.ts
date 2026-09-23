@@ -166,10 +166,12 @@ function frame(now: number): void {
   const elapsed = Math.max(0, (now - last) / 1000);
   last = now;
   // The swing meter stays on a short step so a hitch cannot skip the accuracy window.
-  // Flight integrates in fixed 1/60 steps inside that budget. Capping flight at 33ms
-  // turns a slow frame into slow motion, and a drive then sits on "Ball in air" for
-  // tens of seconds. 120ms keeps the ball on wall-clock time down to about 8 fps.
-  const cap = session.swingPhase === "flight" ? 0.12 : 0.033;
+  // Flight integrates in fixed 1/60 steps inside that budget. Capping it at 33ms
+  // turns a slow frame into slow motion, and on a software GPU a drive then sits
+  // on "Ball in air" for tens of seconds. A one-second cap keeps the ball on
+  // wall-clock time down to about 1 fps; settle uses it too so the landing hold
+  // does not stall after the ball is already down.
+  const cap = session.swingPhase === "flight" || session.swingPhase === "settle" ? 1 : 0.033;
   step(Math.min(cap, elapsed));
   requestAnimationFrame(frame);
 }
