@@ -4,7 +4,7 @@ import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, u
 import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { loadArtKit } from "./kit";
-import { SCENE_TONE } from "./look";
+import { atmosphereForCourse, SCENE_TONE } from "./look";
 import { lerp, type Vec2 } from "./math";
 import { samplePathPoint, type FlightSample } from "./physics";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -18,7 +18,7 @@ import { populateHoleGroup } from "./scene-course";
 import { collectShared, disposeChildren } from "./scene-dispose";
 import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
-import { makeSky } from "./scene-sky";
+import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam, type ShotCamStage } from "./terrain";
@@ -102,10 +102,13 @@ export class CourseScene implements CameraRig {
   private h = 1;
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
+  private software = false;
+  private atmoId = "";
 
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     const software = isSoftwareGL(this.renderer);
+    this.software = software;
     configureWebGLRenderer(this.renderer, software);
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(SCENE_TONE.fogColor, SCENE_TONE.fogNear, SCENE_TONE.fogFar);
@@ -285,6 +288,7 @@ export class CourseScene implements CameraRig {
 
   sync(session: GameSession, dt: number): void {
     this.time += dt;
+    this.applyCourseAtmosphere(session.course.id);
     const hole = session.hole();
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     if (this.pendingArtRebuild && !flying) {
@@ -321,6 +325,22 @@ export class CourseScene implements CameraRig {
       this.composer = null;
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  private applyCourseAtmosphere(courseId: string): void {
+    if (this.atmoId === courseId) return;
+    this.atmoId = courseId;
+    const atmo = atmosphereForCourse(courseId);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.setHex(atmo.fogColor);
+    fog.near = atmo.fogNear;
+    fog.far = atmo.fogFar;
+    this.renderer.setClearColor(atmo.clearColor, 1);
+    applySkyAtmosphere(this.sky, atmo);
+    const baseSun = this.software ? SCENE_TONE.sunSoftware : SCENE_TONE.sunHardware;
+    this.sun.intensity = baseSun * atmo.sunScale;
+    const baseExposure = this.software ? SCENE_TONE.exposureSoftware : SCENE_TONE.exposureHardware;
+    this.renderer.toneMappingExposure = baseExposure * atmo.exposureScale;
   }
 
   private rebuildHole(hole: Hole): void {

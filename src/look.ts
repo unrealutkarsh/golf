@@ -45,6 +45,74 @@ export const SCENE_TONE = {
   landWarn: 0xe0553a,
 } as const;
 
+export interface CourseAtmosphere {
+  clearColor: number;
+  fogColor: number;
+  fogNear: number;
+  fogFar: number;
+  skyZenith: readonly [number, number, number];
+  skyMid: readonly [number, number, number];
+  skyHorizon: readonly [number, number, number];
+  skyGround: readonly [number, number, number];
+  skyHaze: readonly [number, number, number];
+  sunGlow: number;
+  sunWash: number;
+  cloudMix: number;
+  sunScale: number;
+  exposureScale: number;
+}
+
+/** Gray marine layer. Near turf stays readable; the tree line and horizon wash out. */
+const FOG_BELT_ATMOSPHERE: CourseAtmosphere = {
+  clearColor: 0xc5ced4,
+  fogColor: 0xd5dee4,
+  fogNear: 52,
+  fogFar: 470,
+  skyZenith: [0.58, 0.66, 0.72],
+  skyMid: [0.72, 0.78, 0.82],
+  skyHorizon: [0.84, 0.87, 0.89],
+  skyGround: [0.68, 0.74, 0.72],
+  skyHaze: [0.88, 0.9, 0.91],
+  sunGlow: 0.08,
+  sunWash: 0.03,
+  cloudMix: 0.18,
+  sunScale: 0.78,
+  exposureScale: 0.94,
+};
+
+function harborAtmosphere(): CourseAtmosphere {
+  const tone = SCENE_TONE;
+  return {
+    clearColor: tone.clearColor,
+    fogColor: tone.fogColor,
+    fogNear: tone.fogNear,
+    fogFar: tone.fogFar,
+    skyZenith: tone.skyZenith,
+    skyMid: tone.skyMid,
+    skyHorizon: tone.skyHorizon,
+    skyGround: tone.skyGround,
+    skyHaze: tone.skyHaze,
+    sunGlow: tone.sunGlow,
+    sunWash: tone.sunWash,
+    cloudMix: tone.cloudMix,
+    sunScale: 1,
+    exposureScale: 1,
+  };
+}
+
+/** Fog Belt is the only course that plays inside a marine layer. Everywhere else stays a clear day. */
+export function atmosphereForCourse(courseId: string): CourseAtmosphere {
+  if (courseId === "fog-belt-links") return FOG_BELT_ATMOSPHERE;
+  return harborAtmosphere();
+}
+
+/** How much of a surface THREE.Fog leaves visible at `yards` (1 clear, 0 gone). */
+export function fogRemain(atmo: CourseAtmosphere, yards: number): number {
+  if (yards <= atmo.fogNear) return 1;
+  if (yards >= atmo.fogFar) return 0;
+  return (atmo.fogFar - yards) / (atmo.fogFar - atmo.fogNear);
+}
+
 /** Near-white speckle that breaks up flat vertex color without tinting it. */
 export const NEUTRAL_DETAIL_COLORS = ["#f4f4f0", "#e9eae4", "#dfe0d9", "#ffffff", "#e4e5de"];
 

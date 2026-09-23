@@ -534,11 +534,17 @@ export class GameSession {
     }
   }
 
-  /** Slow the world down while an approach shot is rolling out close to the cup. */
+  /**
+   * Playback rate for the fixed flight steps. Full swings are simulated at a real
+   * hang (~6s) so carry stays honest, then played back faster so a drive settles
+   * in a few seconds. Putts and the last few yards into the cup stay real-time or slower.
+   */
   timeScale(): number {
-    if (this.club().id === "putter" || this.ball.z > 0.3) return 1;
+    if (this.club().id === "putter") return 1;
     const speed = Math.hypot(this.ball.vel.x, this.ball.vel.y);
-    return this.toPin() < 5 && speed > 0.8 ? 0.45 : 1;
+    if (this.ball.z <= 0.3 && this.toPin() < 5 && speed > 0.8) return 0.45;
+    if (this.swingPhase === "flight" && this.landingTime > 3.2) return Math.min(2.15, this.landingTime / 2.8);
+    return 1;
   }
 
   private simulate(dt: number): void {

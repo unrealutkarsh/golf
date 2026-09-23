@@ -1,6 +1,6 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
-import { clamp, dist, type Vec2 } from "./math";
+import { clamp, dist, fromAngle, type Vec2 } from "./math";
 import { MAX_PUTT_POWER } from "./physics";
 import type { CamMode, Hole, Lie } from "./types";
 
@@ -64,6 +64,90 @@ export function addressLookDistance(leftover: number, lookAhead: number): number
 }
 
 export type ShotCamStage = "launch" | "chase" | "landing";
+
+export interface FlightCamPose {
+  /** World position. y is up; z is the course's horizontal y. */
+  x: number;
+  y: number;
+  z: number;
+  lookX: number;
+  lookY: number;
+  lookZ: number;
+  fov: number;
+}
+
+/**
+ * Broadcast follow for an airborne shot.
+ * The lens sits above the ball and aims below it, so the fairway and landing
+ * area fill the frame. A camera at ball height looking down the line turns the
+ * course into a thin horizon band with the skybox showing underneath.
+ */
+export function flightCamPose(
+  hole: Hole,
+  ball: Vec2,
+  ballZ: number,
+  heading: number,
+  stage: ShotCamStage,
+  anchor: Vec2,
+): FlightCamPose {
+  const zBall = Math.max(0, ballZ);
+  const ballGround = groundHeight(hole, ball.x, ball.y);
+  const bh = ballGround + zBall;
+  if (stage === "launch") {
+    // Far enough behind the tee that the ball and the fairway fit in one lens.
+    // A camera in the turf looking up turns the hole into a dark horizon band.
+    const back = fromAngle(heading + Math.PI, 18);
+    const side = fromAngle(heading + Math.PI / 2, 2.4);
+    const x = anchor.x + back.x + side.x;
+    const z = anchor.y + back.y + side.y;
+    const y = groundHeight(hole, x, z) + 8.2;
+    const ahead = fromAngle(heading, 72);
+    const lookX = (anchor.x + ahead.x) * 0.55 + ball.x * 0.45;
+    const lookZ = (anchor.y + ahead.y) * 0.55 + ball.y * 0.45;
+    const groundAhead = groundHeight(hole, anchor.x + ahead.x, anchor.y + ahead.y);
+    const lookY = bh * 0.42 + (groundAhead + 1.5) * 0.58;
+    return { x, y, z, lookX, lookY, lookZ, fov: 50 };
+  }
+
+  const landing = stage === "landing";
+  let x: number;
+  let z: number;
+  if (landing) {
+    x = anchor.x;
+    z = anchor.y;
+  } else {
+    const backDist = 16 + Math.min(zBall, 18) * 0.12;
+    const back = fromAngle(heading + Math.PI, backDist);
+    const side = fromAngle(heading + Math.PI / 2, 3.4);
+    x = ball.x + back.x + side.x;
+    z = ball.y + back.y + side.y;
+  }
+  const camGround = groundHeight(hole, x, z);
+  // Above the ball on the chase and on the way down, so the lens looks down onto the shot.
+  const y = landing ? Math.max(camGround + 8, bh + 3.4) : Math.max(camGround + 5, bh + 4.6);
+  const dx = ball.x - x;
+  const dz = ball.y - z;
+  const horiz = Math.hypot(dx, dz) || 1;
+  const ballPitch = Math.atan2(bh - y, horiz);
+  const fov = landing ? 50 : 52;
+  const half = ((fov * Math.PI) / 180) * 0.5;
+  const lookDown = landing ? (zBall > 4 ? 0.22 : 0.3) : 0.1 + Math.min(zBall, 22) * 0.006;
+  let lookPitch = ballPitch - lookDown;
+  const maxSep = half * 0.68;
+  if (ballPitch - lookPitch > maxSep) lookPitch = ballPitch - maxSep;
+  // Past straight down, tan() flips and the lens aims at the sky.
+  lookPitch = Math.max(-1.05, Math.min(0.45, lookPitch));
+  const dist = Math.max(26, horiz + 18);
+  return {
+    x,
+    y,
+    z,
+    lookX: x + (dx / horiz) * dist,
+    lookY: y + Math.tan(lookPitch) * dist,
+    lookZ: z + (dz / horiz) * dist,
+    fov,
+  };
+}
 
 /** Broadcast-style sequence for a full shot: watch it leave, chase it, then cut to where it lands. */
 export function shotCamStage(flightTime: number, landingTime: number, touchedDown: boolean): ShotCamStage {

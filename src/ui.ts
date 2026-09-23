@@ -292,7 +292,9 @@ export class UI {
         : session.swingPhase === "accuracy"
           ? "Time it"
           : session.swingPhase === "flight"
-            ? "Ball in air"
+            ? session.ball.z > 0.45
+              ? "Ball in air"
+              : "Rolling"
             : "Aim and swing";
     return `
       <div class="ticker">
