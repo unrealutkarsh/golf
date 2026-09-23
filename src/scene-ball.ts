@@ -216,6 +216,30 @@ export function createBallGlow(): THREE.Sprite {
   return sprite;
 }
 
+/** Soft disc for a strike or landing puff. Color and size are set per lie. */
+export function createTurfBurst(): THREE.Sprite {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 1, size / 2, size / 2, size / 2);
+    g.addColorStop(0, "rgba(255,255,255,0.85)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.35)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, color: 0x6ea84a, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }),
+  );
+  sprite.visible = false;
+  return sprite;
+}
+
 /** Flag icon billboard for the hole: white stick, red pennant, dark outline so it reads on sky or trees. */
 export function createPinMarker(): THREE.Sprite {
   const w = 62;

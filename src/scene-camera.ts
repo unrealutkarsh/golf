@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { GameSession } from "./game";
 import { dist, fromAngle, type Vec2 } from "./math";
-import { addressLookDistance, cameraHeightAboveGround, flightCamPose, groundHeight, landingCamSpot, playCamFraming, shotCamStage, type ResolvedCam, type ShotCamStage } from "./terrain";
+import { addressLookDistance, broadcastCamStage, cameraHeightAboveGround, flightCamPose, groundHeight, landingCamSpot, playCamFraming, type BroadcastCamStage, type ResolvedCam, type ShotCamStage } from "./terrain";
 import type { Hole } from "./types";
 
 export interface CameraRig {
@@ -11,7 +11,7 @@ export interface CameraRig {
   camPos: THREE.Vector3;
   camLook: THREE.Vector3;
   camera: THREE.PerspectiveCamera;
-  shotStage: ShotCamStage | "";
+  shotStage: BroadcastCamStage | "";
   landingSpot: { key: string; pos: Vec2 } | null;
 }
 
@@ -52,13 +52,31 @@ export function updateSceneCamera(
       ball.y * (1 - frame.lookAhead) + pin.y * frame.lookAhead,
     );
   } else if (view === "follow" && session.camMode === "auto" && (session.swingPhase === "flight" || session.swingPhase === "settle")) {
-    const shot = shotCamera(rig, session, hole, desired, look);
-    fov = shot.fov;
-    if (shot.stage !== rig.shotStage) {
-      rig.shotStage = shot.stage;
-      // Hard-cut between launch, chase, and landing. Lerping through those
-      // heights drags the lens along the horizon and shows the skybox under the turf.
-      rig.viewAge = 0;
+    const stage = broadcastCamStage(session.hitStop, session.flightTime, session.landingTime, session.shotCarry !== null);
+    if (stage === "hitch") {
+      // Stay on the address lens for the contact hitch, then cut. Lerping off
+      // this height into the chase drags the lens along the horizon.
+      const address = playCamFraming("player", leftover);
+      const back = fromAngle(aim + Math.PI, address.back);
+      const side = fromAngle(aim + Math.PI / 2, address.side);
+      desired.set(ball.x + back.x + side.x, bh + address.height, ball.y + back.y + side.y);
+      const lookDist = addressLookDistance(leftover, address.lookAhead);
+      const ahead = fromAngle(aim, lookDist);
+      look.set(ball.x + ahead.x, groundHeight(hole, ball.x + ahead.x, ball.y + ahead.y) + 0.42, ball.y + ahead.y);
+      fov = address.fov;
+      if (rig.shotStage !== "hitch") {
+        rig.shotStage = "hitch";
+        rig.viewAge = 0;
+      }
+    } else {
+      const shot = shotCamera(rig, session, hole, desired, look, stage);
+      fov = shot.fov;
+      if (shot.stage !== rig.shotStage) {
+        rig.shotStage = shot.stage;
+        // Hard-cut between launch, chase, and landing. Lerping through those
+        // heights drags the lens along the horizon and shows the skybox under the turf.
+        rig.viewAge = 0;
+      }
     }
   } else if (view === "follow") {
     const v = session.ball.vel;
@@ -83,7 +101,7 @@ export function updateSceneCamera(
   }
   if (session.swingPhase !== "flight" && session.swingPhase !== "settle") rig.shotStage = "";
   const catchup =
-    rig.shotStage === "launch"
+    rig.shotStage === "hitch" || rig.shotStage === "launch"
       ? 0.9
       : rig.shotStage === "chase"
         ? 0.62
@@ -105,7 +123,7 @@ export function updateSceneCamera(
   rig.camera.position.copy(rig.camPos);
   if (session.impact > 0) {
     // Contact shake: strong for a frame or two, gone in under half a second.
-    const punch = session.impact * session.impact * 0.22;
+    const punch = session.impact * session.impact * 0.28;
     rig.camera.position.x += Math.sin(rig.time * 91) * punch;
     rig.camera.position.y += Math.sin(rig.time * 113 + 1.3) * punch;
     rig.camera.position.z += Math.cos(rig.time * 97) * punch;
@@ -116,9 +134,15 @@ export function updateSceneCamera(
 }
 
 /** Launch → chase → landing cut for a full shot in auto camera. Writes the camera goal into `desired` / `look`. */
-function shotCamera(rig: CameraRig, session: GameSession, hole: Hole, desired: THREE.Vector3, look: THREE.Vector3): { stage: ShotCamStage; fov: number } {
+function shotCamera(
+  rig: CameraRig,
+  session: GameSession,
+  hole: Hole,
+  desired: THREE.Vector3,
+  look: THREE.Vector3,
+  stage: "launch" | "chase" | "landing",
+): { stage: "launch" | "chase" | "landing"; fov: number } {
   const ball = session.ball.pos;
-  const stage = shotCamStage(session.flightTime, session.landingTime, session.shotCarry !== null);
   const v = session.ball.vel;
   const heading =
     stage === "launch"
@@ -137,7 +161,8 @@ function shotCamera(rig: CameraRig, session: GameSession, hole: Hole, desired: T
     }
     anchor = rig.landingSpot.pos;
   }
-  const pose = flightCamPose(hole, ball, session.ball.z, heading, poseStage, anchor);
+  const outside = poseStage === "chase" ? Math.max(-1, Math.min(1, session.shape)) * 6 : 0;
+  const pose = flightCamPose(hole, ball, session.ball.z, heading, poseStage, anchor, outside);
   desired.set(pose.x, pose.y, pose.z);
   look.set(pose.lookX, pose.lookY, pose.lookZ);
   return { stage: poseStage, fov: pose.fov };

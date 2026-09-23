@@ -122,6 +122,8 @@ export class GameSession {
   hitStop = 0;
   /** 0–1 impact punch that drives camera shake; decays after contact. */
   impact = 0;
+  /** Short-lived turf puff at the strike or the landing. */
+  landBurst: { pos: Vec2; lie: Lie; kind: "strike" | "land"; age: number } | null = null;
   /** Seconds of simulated flight for the current shot. */
   flightTime = 0;
   /** Seconds from launch to first touchdown, and where, from the launch-time simulation. */
@@ -359,6 +361,7 @@ export class GameSession {
     this.landingPos = null;
     this.hitStop = 0;
     this.impact = 0;
+    this.landBurst = null;
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
   }
@@ -472,8 +475,10 @@ export class GameSession {
     this.landingPos = last ? { ...last.pos } : null;
     const quality = this.strike ?? "good";
     if (club.id !== "putter") {
-      this.hitStop = 0.06 + this.power * 0.05;
+      // Long enough to read contact on the address lens, short enough that the cut still feels immediate.
+      this.hitStop = 0.1 + this.power * 0.08;
       this.impact = (0.35 + 0.65 * this.power) * (quality === "perfect" ? 1 : quality === "good" ? 0.75 : 0.55);
+      this.landBurst = { pos: { ...this.lastShotPos }, lie: this.lie, kind: "strike", age: 0 };
       if (quality === "perfect") this.showCallout("Pure strike", `${club.name} · ${Math.round(this.power * 100)}%`, "perfect", 1.6);
       else if (quality === "miss") this.showCallout(this.accuracy > 0 ? "Pulled it" : "Pushed it", "Stop the marker in the green window", "miss", 1.6);
     }
@@ -490,6 +495,11 @@ export class GameSession {
     this.messageTime = Math.max(0, this.messageTime - dt);
     this.calloutTime = Math.max(0, this.calloutTime - dt);
     this.impact = Math.max(0, this.impact - dt * 2.4);
+    if (this.landBurst) {
+      this.landBurst.age += dt;
+      const life = this.landBurst.kind === "strike" ? 0.34 : 0.7;
+      if (this.landBurst.age > life) this.landBurst = null;
+    }
     if (this.screen !== "play") return;
     this.refreshLie();
     const powerLife = this.swingPhase === "power" ? 0.08 : 0.11;
@@ -556,7 +566,9 @@ export class GameSession {
     for (const ev of step.events) {
       if (ev.type === "bounce" && this.shotCarry === null) {
         this.shotCarry = dist(this.lastShotPos, ev.pos);
-        this.audio.land(lieAt(hole, ev.pos));
+        const lie = lieAt(hole, ev.pos);
+        this.audio.land(lie);
+        this.landBurst = { pos: { ...ev.pos }, lie, kind: "land", age: 0 };
       }
       if (ev.type === "splash") {
         this.audio.splash();

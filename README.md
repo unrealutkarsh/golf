@@ -58,7 +58,7 @@ On the **green**, the camera sits over the ball looking at the pin. Tee and fair
 
 ### Shot shape
 
-Before a full swing, pick **Fade** (left-to-right), **Straight**, or **Draw** (right-to-left for a right-handed player). Use the **Shot shape** rail, or tap **Z** / **X**. The aim ribbon and in-air tube bend with the spin. Shape is disabled with the putter / on the green. Wind and the accuracy meter still move the ball; shape is extra curve while it is airborne.
+Before a full swing, pick **Fade** (starts left, works right), **Straight**, or **Draw** (starts right, works left). Use the **Shot shape** rail, or tap **Z** / **X**. The aim ribbon and in-air tube show the bend. Shape is disabled with the putter. A centered accuracy marker keeps the club's carry; missing the window costs ball speed. Wind still moves the ball in the air. Fairway landings release, rough and sand hold.
 
 The first tee shows a short tutorial tip.
 

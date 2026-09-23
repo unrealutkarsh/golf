@@ -64,6 +64,8 @@ export function addressLookDistance(leftover: number, lookAhead: number): number
 }
 
 export type ShotCamStage = "launch" | "chase" | "landing";
+/** Address hold through contact, then the flight stages. */
+export type BroadcastCamStage = "hitch" | ShotCamStage;
 
 export interface FlightCamPose {
   /** World position. y is up; z is the course's horizontal y. */
@@ -89,24 +91,26 @@ export function flightCamPose(
   heading: number,
   stage: ShotCamStage,
   anchor: Vec2,
+  /** Yards to the player's right. A draw is filmed from that side so the ball works across the frame. */
+  outside = 0,
 ): FlightCamPose {
   const zBall = Math.max(0, ballZ);
   const ballGround = groundHeight(hole, ball.x, ball.y);
   const bh = ballGround + zBall;
   if (stage === "launch") {
-    // Far enough behind the tee that the ball and the fairway fit in one lens.
-    // A camera in the turf looking up turns the hole into a dark horizon band.
-    const back = fromAngle(heading + Math.PI, 18);
-    const side = fromAngle(heading + Math.PI / 2, 2.4);
+    // Just behind the ball, high enough that the fairway corridor and a strip of sky
+    // share the frame. A lens in the turf turns the hole into a dark horizon band.
+    const back = fromAngle(heading + Math.PI, 17);
+    const side = fromAngle(heading + Math.PI / 2, 2.8);
     const x = anchor.x + back.x + side.x;
     const z = anchor.y + back.y + side.y;
-    const y = groundHeight(hole, x, z) + 8.2;
-    const ahead = fromAngle(heading, 72);
-    const lookX = (anchor.x + ahead.x) * 0.55 + ball.x * 0.45;
-    const lookZ = (anchor.y + ahead.y) * 0.55 + ball.y * 0.45;
+    const y = groundHeight(hole, x, z) + 11.6;
+    const ahead = fromAngle(heading, 90);
+    const lookX = (anchor.x + ahead.x) * 0.62 + ball.x * 0.38;
+    const lookZ = (anchor.y + ahead.y) * 0.62 + ball.y * 0.38;
     const groundAhead = groundHeight(hole, anchor.x + ahead.x, anchor.y + ahead.y);
-    const lookY = bh * 0.42 + (groundAhead + 1.5) * 0.58;
-    return { x, y, z, lookX, lookY, lookZ, fov: 50 };
+    const lookY = Math.min(bh * 0.35 + groundAhead * 0.65, groundAhead + 0.8);
+    return { x, y, z, lookX, lookY, lookZ, fov: 48 };
   }
 
   const landing = stage === "landing";
@@ -115,23 +119,36 @@ export function flightCamPose(
   if (landing) {
     x = anchor.x;
     z = anchor.y;
+    // The ball rolls toward this spot. Keep the lens ahead of it so it cannot pass under the camera.
+    const awayX = x - ball.x;
+    const awayZ = z - ball.y;
+    const away = Math.hypot(awayX, awayZ);
+    const minDist = 22;
+    if (away < minDist) {
+      const ux = away > 0.4 ? awayX / away : -Math.cos(heading);
+      const uz = away > 0.4 ? awayZ / away : -Math.sin(heading);
+      x = ball.x + ux * minDist;
+      z = ball.y + uz * minDist;
+    }
   } else {
-    const backDist = 16 + Math.min(zBall, 18) * 0.12;
+    const backDist = 16 + Math.min(zBall, 16) * 0.1;
     const back = fromAngle(heading + Math.PI, backDist);
-    const side = fromAngle(heading + Math.PI / 2, 3.4);
+    const side = fromAngle(heading + Math.PI / 2, 4.2 + outside);
     x = ball.x + back.x + side.x;
     z = ball.y + back.y + side.y;
   }
   const camGround = groundHeight(hole, x, z);
-  // Above the ball on the chase and on the way down, so the lens looks down onto the shot.
-  const y = landing ? Math.max(camGround + 8, bh + 3.4) : Math.max(camGround + 5, bh + 4.6);
+  // Above the ball, aimed down the landing corridor, with sky above the tree line.
+  const y = landing ? Math.max(camGround + 10.5, bh + 4.2) : Math.max(camGround + 6.2, bh + 5.6);
   const dx = ball.x - x;
   const dz = ball.y - z;
   const horiz = Math.hypot(dx, dz) || 1;
   const ballPitch = Math.atan2(bh - y, horiz);
-  const fov = landing ? 50 : 52;
+  const fov = 50;
   const half = ((fov * Math.PI) / 180) * 0.5;
-  const lookDown = landing ? (zBall > 4 ? 0.22 : 0.3) : 0.1 + Math.min(zBall, 22) * 0.006;
+  // As the ball rolls up to the lens, look at it. While it is still out, look down the corridor.
+  const close = landing ? clamp((28 - horiz) / 28, 0, 1) : 0;
+  const lookDown = landing ? 0.22 * (1 - close) + 0.04 * close : 0.055 + Math.min(zBall, 18) * 0.0025;
   let lookPitch = ballPitch - lookDown;
   const maxSep = half * 0.68;
   if (ballPitch - lookPitch > maxSep) lookPitch = ballPitch - maxSep;
@@ -153,8 +170,17 @@ export function flightCamPose(
 export function shotCamStage(flightTime: number, landingTime: number, touchedDown: boolean): ShotCamStage {
   // Chips and punch shots are over too quickly for a cut to read.
   const cutsToLanding = landingTime > 2.2;
-  if (cutsToLanding && (touchedDown || flightTime >= landingTime - 1.7)) return "landing";
-  return flightTime < 0.75 ? "launch" : "chase";
+  if (cutsToLanding && (touchedDown || flightTime >= landingTime - 1.35)) return "landing";
+  return flightTime < 0.55 ? "launch" : "chase";
+}
+
+/**
+ * Auto flight camera: hold the address lens through the contact hitch, then launch, chase, and landing.
+ * `flightTime` does not advance during the hitch, so this stays on address until the ball is let go.
+ */
+export function broadcastCamStage(hitStop: number, flightTime: number, landingTime: number, touchedDown: boolean): BroadcastCamStage {
+  if (hitStop > 0.001 && flightTime < 0.02 && !touchedDown) return "hitch";
+  return shotCamStage(flightTime, landingTime, touchedDown);
 }
 
 /** Ground spot for the landing camera: ahead of or beside the touchdown, clear of trees, hazards and OB. */

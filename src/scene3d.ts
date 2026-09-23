@@ -12,7 +12,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { pinMarkerOpacity, renderPixelRatio, screenConstantScale } from "./art";
-import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker } from "./scene-ball";
+import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker, createTurfBurst } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
 import { collectShared, disposeChildren } from "./scene-dispose";
@@ -21,7 +21,7 @@ import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from
 import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam, type ShotCamStage } from "./terrain";
+import { groundHeight, isPuttingSituation, resolveCamView, type BroadcastCamStage, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
 export { ballRollAxis, ballRollRadians, dimpleIndent, makeGolfBallGeometry } from "./scene-ball";
@@ -46,12 +46,13 @@ export class CourseScene implements CameraRig {
   time = 0;
   camPos = new THREE.Vector3(80, 24, 80);
   camLook = new THREE.Vector3(200, 1, 140);
-  shotStage: ShotCamStage | "" = "";
+  shotStage: BroadcastCamStage | "" = "";
   landingSpot: { key: string; pos: Vec2 } | null = null;
   private holeGroup = new THREE.Group();
   private ball: THREE.Mesh;
   /** Soft glow that keeps a tiny ball readable against sky and turf while it flies. */
   private ballGlow: THREE.Sprite;
+  private turfBurst: THREE.Sprite;
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
@@ -133,7 +134,8 @@ export class CourseScene implements CameraRig {
 
     this.ball = createGolfBallMesh();
     this.ballGlow = createBallGlow();
-    this.scene.add(this.ball, this.ballGlow);
+    this.turfBurst = createTurfBurst();
+    this.scene.add(this.ball, this.ballGlow, this.turfBurst);
     const shadows = createBallContactShadows();
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
@@ -302,6 +304,7 @@ export class CourseScene implements CameraRig {
     const putting = !fullShotInAir && isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
+    this.placeTurfBurst(session);
     this.placePin(hole);
     this.updatePath(session, dt);
     this.updateTrail(session);
@@ -401,6 +404,25 @@ export class CourseScene implements CameraRig {
     if (axis) {
       this.ball.rotateOnWorldAxis(new THREE.Vector3(axis.x, axis.y, axis.z), ballRollRadians(speed, dt));
     }
+  }
+
+  private placeTurfBurst(session: GameSession): void {
+    const burst = session.landBurst;
+    const show = Boolean(burst) && session.screen === "play";
+    this.turfBurst.visible = show;
+    if (!burst || !show) return;
+    const life = burst.kind === "strike" ? 0.34 : 0.7;
+    const t = Math.min(1, burst.age / life);
+    const gh = groundHeight(session.hole(), burst.pos.x, burst.pos.y);
+    const rise = burst.kind === "land" ? 0.9 : 0.4;
+    this.turfBurst.position.set(burst.pos.x, gh + 0.12 + t * rise, burst.pos.y);
+    const spread = burst.lie === "bunker" ? 2.6 : burst.lie === "rough" ? 1.7 : burst.kind === "strike" ? 0.85 : 1.25;
+    const s = spread * (0.4 + t * 1.15);
+    this.turfBurst.scale.set(s, s * 0.62, 1);
+    const mat = this.turfBurst.material as THREE.SpriteMaterial;
+    mat.opacity = (1 - t) * (burst.lie === "bunker" ? 0.62 : 0.46);
+    const color = burst.lie === "bunker" ? 0xd2c4a2 : burst.lie === "rough" ? 0x3f5c2c : burst.lie === "green" ? 0x9dcc78 : 0x7eb85a;
+    mat.color.setHex(color);
   }
 
   private placePin(hole: Hole): void {
