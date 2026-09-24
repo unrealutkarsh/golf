@@ -1,69 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { BALL_RADIUS, ballCenterLift, contactShadowPose } from "./scene-ball";
-import {
-  NEAR_BLADE_BUDGET,
-  NEAR_ROUGH_SHARE,
-  NEAR_TURF_FULL_CAM,
-  NEAR_TURF_HIDE_CAM,
-  NEAR_TURF_RADIUS,
-  nearBladeBudget,
-  nearBladeKeep,
-  nearBladeMetrics,
-  nearBladeOffset,
-  nearTurfLod,
-  scuffOpacity,
-  scuffSpec,
-} from "./near-turf";
+import { FAIRWAY_NEAR_GRAIN, GREEN_NEAR_GRAIN, NEAR_FADE_END, NEAR_FADE_START, nearSurfaceFade, scuffOpacity, scuffSpec } from "./near-turf";
 
 describe("near-ball turf", () => {
-  it("stays rich at address distance and drops out with the broadcast camera", () => {
-    expect(NEAR_TURF_RADIUS).toBeGreaterThanOrEqual(15);
-    expect(NEAR_TURF_RADIUS).toBeLessThanOrEqual(25);
-    expect(NEAR_TURF_FULL_CAM).toBeLessThan(NEAR_TURF_HIDE_CAM);
-    const address = nearTurfLod(4);
-    expect(address.visible).toBe(true);
-    expect(address.density).toBe(1);
-    expect(address.detail).toBe(1);
-    const mid = nearTurfLod((NEAR_TURF_FULL_CAM + NEAR_TURF_HIDE_CAM) * 0.5);
-    expect(mid.visible).toBe(true);
-    expect(mid.density).toBeLessThan(address.density);
-    expect(mid.detail).toBeLessThan(1);
-    expect(nearTurfLod(NEAR_TURF_HIDE_CAM + 2).visible).toBe(false);
-  });
-
-  it("packs blades around the ball and keeps rough as a minority", () => {
-    const n = 2400;
-    const dists: number[] = [];
-    let within6 = 0;
-    for (let i = 0; i < n; i++) {
-      const sample = nearBladeOffset(i);
-      expect(sample.dist).toBeLessThanOrEqual(NEAR_TURF_RADIUS + 1e-6);
-      expect(Math.hypot(sample.x, sample.z)).toBeCloseTo(sample.dist, 5);
-      dists.push(sample.dist);
-      if (sample.dist <= 6) within6 += 1;
+  it("fades the surface grain across a wide camera range with no cliff", () => {
+    expect(NEAR_FADE_END - NEAR_FADE_START).toBeGreaterThanOrEqual(18);
+    expect(nearSurfaceFade(0)).toBe(1);
+    expect(nearSurfaceFade(NEAR_FADE_START)).toBe(1);
+    expect(nearSurfaceFade(NEAR_FADE_END)).toBe(0);
+    expect(nearSurfaceFade(NEAR_FADE_END + 14)).toBe(0);
+    const mid = (NEAR_FADE_START + NEAR_FADE_END) * 0.5;
+    expect(nearSurfaceFade(mid)).toBeCloseTo(0.5, 5);
+    let prev = nearSurfaceFade(NEAR_FADE_START);
+    for (let d = NEAR_FADE_START + 1; d <= NEAR_FADE_END; d++) {
+      const next = nearSurfaceFade(d);
+      expect(next).toBeLessThan(prev);
+      prev = next;
     }
-    dists.sort((a, b) => a - b);
-    expect(within6 / n).toBeGreaterThan(0.25);
-    expect(dists[n / 2]).toBeLessThan(NEAR_TURF_RADIUS * 0.62);
-    expect(nearBladeBudget(true)).toBeLessThan(nearBladeBudget(false));
-    expect(nearBladeBudget(false)).toBe(NEAR_BLADE_BUDGET);
-    expect(NEAR_BLADE_BUDGET).toBeLessThan(8000);
-    expect(NEAR_ROUGH_SHARE).toBeLessThan(0.6);
   });
 
-  it("grows a short green nap and a taller rough", () => {
-    const green = nearBladeMetrics("green");
-    const fairway = nearBladeMetrics("fairway");
-    const rough = nearBladeMetrics("rough");
-    expect(green && fairway && rough).toBeTruthy();
-    expect(green!.height).toBeLessThan(fairway!.height);
-    expect(fairway!.height).toBeLessThan(rough!.height);
-    expect(nearBladeMetrics("bunker")).toBeNull();
-    expect(nearBladeMetrics("water")).toBeNull();
-    expect(nearBladeKeep("green", 0.1)).toBe(true);
-    expect(nearBladeKeep("rough", 0.2)).toBe(false);
-    expect(nearBladeKeep("rough", 0.8)).toBe(true);
-    expect(nearBladeKeep("bunker", 0.9)).toBe(false);
+  it("keeps the green nap finer and quieter than the fairway", () => {
+    expect(GREEN_NEAR_GRAIN.scale).toBeGreaterThan(FAIRWAY_NEAR_GRAIN.scale);
+    expect(GREEN_NEAR_GRAIN.strength).toBeLessThan(FAIRWAY_NEAR_GRAIN.strength);
+    expect(GREEN_NEAR_GRAIN.strength).toBeGreaterThan(0);
+    expect(FAIRWAY_NEAR_GRAIN.strength).toBeLessThan(1.2);
+    expect(GREEN_NEAR_GRAIN.sheen).toBeGreaterThan(0);
+    expect(FAIRWAY_NEAR_GRAIN.sheen).toBeGreaterThan(0);
   });
 });
 

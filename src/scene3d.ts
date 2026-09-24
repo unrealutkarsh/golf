@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
-import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
+import { CLOSE_STICK_HIDE, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
 import { clubFamily } from "./clubs";
 import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
@@ -21,7 +21,7 @@ import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
 import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
-import { createNearTurf, createScuffDecal, NEAR_TURF_FULL_CAM, placeScuff, refreshNearTurf, scuffOpacity, scuffSpec, type NearTurf } from "./near-turf";
+import { createScuffDecal, placeScuff, scuffOpacity, scuffSpec } from "./near-turf";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, type BroadcastCamStage, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
@@ -89,7 +89,6 @@ export class CourseScene implements CameraRig {
   private fringeMat: THREE.MeshStandardMaterial;
   private greenBlades: THREE.InstancedMesh | null = null;
   private fringeBlades: THREE.InstancedMesh | null = null;
-  private nearTurf: NearTurf;
   private scuffSlots: { mesh: THREE.Mesh; age: number; life: number; peak: number; active: boolean }[] = [];
   private scuffSeen = "";
   private pendingArtRebuild = false;
@@ -145,8 +144,6 @@ export class CourseScene implements CameraRig {
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
     this.scene.add(this.shadow, this.softShadow);
-    this.nearTurf = createNearTurf(software);
-    this.scene.add(this.nearTurf.blades, this.nearTurf.detail);
     this.scuffSlots = [0, 1].map(() => ({
       mesh: createScuffDecal(),
       age: 0,
@@ -331,9 +328,8 @@ export class CourseScene implements CameraRig {
     this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
     const play = session.screen === "play";
-    updateGreenBladeLod(this.greenBlades, putting && play && camDist > NEAR_TURF_FULL_CAM, camDist);
-    updateFringeBladeLod(this.fringeBlades, play && (putting || camDist < 26), camDist);
-    this.updateNearTurf(session, camDist);
+    updateGreenBladeLod(this.greenBlades, putting && play && camDist > CLOSE_STICK_HIDE, camDist);
+    updateFringeBladeLod(this.fringeBlades, play && camDist > CLOSE_STICK_HIDE, camDist);
   }
 
   render(): void {
@@ -399,8 +395,6 @@ export class CourseScene implements CameraRig {
     this.terrain = built.terrain;
     this.greenBlades = built.greenBlades;
     this.fringeBlades = built.fringeBlades;
-    this.nearTurf.ready = false;
-    this.nearTurf.holeKey = "";
     this.scuffSeen = "";
     for (const slot of this.scuffSlots) {
       slot.active = false;
@@ -458,18 +452,6 @@ export class CourseScene implements CameraRig {
     mat.opacity = (1 - t) * (burst.lie === "bunker" ? 0.62 : 0.46);
     const color = burst.lie === "bunker" ? 0xd2c4a2 : burst.lie === "rough" ? 0x3f5c2c : burst.lie === "green" ? 0x9dcc78 : 0x7eb85a;
     mat.color.setHex(color);
-  }
-
-  private updateNearTurf(session: GameSession, camDist: number): void {
-    this.nearTurf.time.value = this.time;
-    if (session.screen !== "play") {
-      this.nearTurf.blades.visible = false;
-      this.nearTurf.detail.visible = false;
-      return;
-    }
-    const p = session.ball.pos;
-    const hole = session.hole();
-    refreshNearTurf(this.nearTurf, hole, p.x, p.y, `${session.course.id}:${hole.number}`, camDist, session.lie);
   }
 
   private updateScuffs(session: GameSession, dt: number): void {

@@ -1,79 +1,92 @@
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { ClubFamily } from "./clubs";
 import { hashNoise } from "./look";
 import { groundHeight } from "./terrain";
-import { turfBand, type TurfBand } from "./turf";
 import type { Hole, Lie } from "./types";
 
-/** Carpet radius around the ball. Farther ground stays on the stylized course mesh. */
-export const NEAR_TURF_RADIUS = 22;
-/** Painted fiber disc, faded before the blade ring ends. */
-export const NEAR_DETAIL_RADIUS = 16;
-/** Rebuild the carpet after the ball moves this far, so a putt does not realloc every frame. */
-export const NEAR_TURF_MOVE = 2.1;
-export const NEAR_BLADE_BUDGET = 5400;
-export const NEAR_BLADE_BUDGET_SOFTWARE = 4800;
-/** Share of the budget allowed to become tall rough. The rest stays short grass. */
-export const NEAR_ROUGH_SHARE = 0.42;
-/** Full carpet while the lens is this close to the ball (address and putt). */
-export const NEAR_TURF_FULL_CAM = 11;
-/** Hide the carpet once the broadcast camera has pulled out. */
-export const NEAR_TURF_HIDE_CAM = 28;
+/**
+ * Near surface detail is a shader on the course mesh, not a blade patch.
+ * Full strength inside this camera distance (yards), gone by the end.
+ * The ramp is wide so the foreground dissolves into the striped fairway.
+ */
+export const NEAR_FADE_START = 4;
+export const NEAR_FADE_END = 36;
 
-const UP = new THREE.Vector3(0, 1, 0);
-
-export function nearBladeBudget(software: boolean): number {
-  return software ? NEAR_BLADE_BUDGET_SOFTWARE : NEAR_BLADE_BUDGET;
+export interface NearGrain {
+  /** World-space repeats per yard. Higher is a shorter nap. */
+  scale: number;
+  /** How far the close surface may leave the flat mesh color. */
+  strength: number;
+  /** Grazing sheen, kept small so the green stays matte. */
+  sheen: number;
 }
 
-export function nearTurfLod(camDistYards: number): { visible: boolean; density: number; detail: number } {
-  if (camDistYards >= NEAR_TURF_HIDE_CAM) return { visible: false, density: 0, detail: 0 };
-  if (camDistYards <= NEAR_TURF_FULL_CAM) return { visible: true, density: 1, detail: 1 };
-  const t = 1 - (camDistYards - NEAR_TURF_FULL_CAM) / (NEAR_TURF_HIDE_CAM - NEAR_TURF_FULL_CAM);
-  return { visible: true, density: 0.32 + 0.68 * t * t, detail: t };
+/** Short, even nap. Finer and quieter than the fairway. */
+export const GREEN_NEAR_GRAIN: NearGrain = { scale: 4.4, strength: 0.42, sheen: 0.22 };
+/** Living tee and fairway. Coarser, a little stronger, still one surface. */
+export const FAIRWAY_NEAR_GRAIN: NearGrain = { scale: 1.7, strength: 0.72, sheen: 0.16 };
+
+/** 1 at address, 0 once the camera has left the near turf. Smooth, no plateau cliff. */
+export function nearSurfaceFade(dist: number): number {
+  if (dist <= NEAR_FADE_START) return 1;
+  if (dist >= NEAR_FADE_END) return 0;
+  const t = (dist - NEAR_FADE_START) / (NEAR_FADE_END - NEAR_FADE_START);
+  const s = t * t * (3 - 2 * t);
+  return 1 - s;
 }
 
-/** Polar sample biased toward the ball so a cut in instance count keeps the carpet underfoot. */
-export function nearBladeOffset(i: number, radius = NEAR_TURF_RADIUS): { x: number; z: number; dist: number } {
-  const u = hashNoise(i * 1.17, 2.2);
-  const v = hashNoise(i * 0.91, 5.7);
-  const dist = radius * Math.pow(u, 1.35);
-  const angle = v * Math.PI * 2;
-  return { x: Math.cos(angle) * dist, z: Math.sin(angle) * dist, dist };
-}
+let grainTex: THREE.CanvasTexture | null = null;
 
-export function nearBladeMetrics(band: TurfBand): { height: number; width: number; lean: number } | null {
-  switch (band) {
-    case "green":
-      return { height: 0.062, width: 0.036, lean: 0.4 };
-    case "collar":
-      return { height: 0.084, width: 0.042, lean: 0.46 };
-    case "fringe":
-      return { height: 0.12, width: 0.05, lean: 0.54 };
-    case "tee":
-      return { height: 0.12, width: 0.05, lean: 0.46 };
-    case "fairway":
-      return { height: 0.15, width: 0.056, lean: 0.52 };
-    case "rough":
-      return { height: 0.28, width: 0.064, lean: 0.78 };
-    default:
-      return null;
+/**
+ * Soft, tile-periodic color grain. Channels are data (centered on 0.5), not albedo:
+ * R fine nap, G broad clumps, B soft height. No stick strokes.
+ */
+export function getNearGrainTexture(): THREE.CanvasTexture {
+  if (grainTex) return grainTex;
+  const size = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const img = ctx.createImageData(size, size);
+    for (let j = 0; j < size; j++) {
+      const v = (j / size) * Math.PI * 2;
+      for (let i = 0; i < size; i++) {
+        const u = (i / size) * Math.PI * 2;
+        const fine =
+          Math.sin(u * 17) * Math.cos(v * 13) * 0.45 +
+          Math.sin(u * 29 + v * 7) * 0.35 +
+          Math.cos(v * 23 + u * 5) * 0.2;
+        const coarse =
+          Math.sin(u * 3) * Math.cos(v * 2) * 0.5 +
+          Math.sin(u * 5 + 1.3) * Math.cos(v * 4) * 0.35 +
+          Math.sin((u + v) * 2) * 0.15;
+        const height =
+          Math.sin(u * 7) * Math.cos(v * 6) * 0.4 +
+          Math.sin(u * 11 + v * 3) * 0.35 +
+          Math.cos(v * 9) * 0.25;
+        const nap = Math.sin(v * 8) * 0.15;
+        const idx = (j * size + i) * 4;
+        img.data[idx] = unitByte(0.5 + fine * 0.16 + nap * 0.03);
+        img.data[idx + 1] = unitByte(0.5 + coarse * 0.2);
+        img.data[idx + 2] = unitByte(0.5 + height * 0.22);
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
   }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  grainTex = tex;
+  return tex;
 }
 
-export function nearBladeKeep(band: TurfBand, n: number): boolean {
-  if (!nearBladeMetrics(band)) return false;
-  if (band === "rough") return n > 0.48;
-  return true;
-}
-
-export function nearBladeTint(band: TurfBand, n: number): number {
-  const pick = (hexes: number[]) => hexes[Math.min(hexes.length - 1, Math.floor(n * hexes.length))];
-  if (band === "green" || band === "collar") return pick([0x7fbe4e, 0x98d466, 0x6aaa3c, 0x8ed25c]);
-  if (band === "fringe") return pick([0x5c9a38, 0x6eae48, 0x4e882e]);
-  if (band === "rough") return pick([0x3d6e28, 0x2f5a1e, 0x4e8234, 0x355e22]);
-  return pick([0x62a63c, 0x78bc4a, 0x548f32, 0x8bc85a]);
+function unitByte(v: number): number {
+  return Math.max(0, Math.min(255, Math.round(v * 255)));
 }
 
 export interface ScuffSpec {
@@ -85,6 +98,8 @@ export interface ScuffSpec {
   /** Yards to push the mark along aim so an iron divot starts at the ball. */
   forward: number;
 }
+
+const UP = new THREE.Vector3(0, 1, 0);
 
 /** Mark left in the turf after the puff sprite has faded. Longer than the puff on purpose. */
 export function scuffSpec(kind: "strike" | "land", lie: Lie, family: ClubFamily): ScuffSpec {
@@ -130,71 +145,6 @@ export function scuffOpacity(age: number, life: number, peak: number): number {
   return peak * (1 - t) * (1 - t);
 }
 
-export interface NearTurf {
-  blades: THREE.InstancedMesh;
-  detail: THREE.Mesh;
-  time: { value: number };
-  center: THREE.Vector2;
-  anchorX: number;
-  anchorZ: number;
-  holeKey: string;
-  placed: number;
-  ready: boolean;
-}
-
-export function createNearTurf(software: boolean): NearTurf {
-  const budget = nearBladeBudget(software);
-  const time = { value: 0 };
-  const center = new THREE.Vector2();
-  const blades = new THREE.InstancedMesh(makeTuftGeometry(), createNearBladeMaterial(time), budget);
-  blades.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(budget * 3), 3);
-  blades.count = 0;
-  blades.frustumCulled = false;
-  blades.renderOrder = 2;
-  blades.castShadow = false;
-  blades.receiveShadow = false;
-  blades.visible = false;
-  const detail = createDetailDisc(center);
-  return {
-    blades,
-    detail,
-    time,
-    center,
-    anchorX: 1e9,
-    anchorZ: 1e9,
-    holeKey: "",
-    placed: 0,
-    ready: false,
-  };
-}
-
-export function refreshNearTurf(
-  field: NearTurf,
-  hole: Hole,
-  x: number,
-  z: number,
-  holeKey: string,
-  camDist: number,
-  lie: Lie,
-): void {
-  field.center.set(x, z);
-  const lod = nearTurfLod(camDist);
-  const showDetail = lod.visible && lod.detail > 0.05 && lie !== "bunker" && lie !== "water" && lie !== "ob";
-  field.detail.visible = showDetail;
-  if (showDetail) (field.detail.material as THREE.MeshBasicMaterial).opacity = lod.detail;
-  if (!lod.visible) {
-    field.blades.visible = false;
-    return;
-  }
-  const moved = Math.hypot(x - field.anchorX, z - field.anchorZ);
-  if (field.ready && field.holeKey === holeKey && moved < NEAR_TURF_MOVE) {
-    field.blades.visible = field.placed > 0;
-    field.blades.count = Math.max(field.placed > 0 ? 1 : 0, Math.floor(field.placed * lod.density));
-    return;
-  }
-  rebuildNearTurf(field, hole, x, z, holeKey, lod.density);
-}
-
 export function createScuffDecal(): THREE.Mesh {
   const tex = new THREE.CanvasTexture(makeScuffCanvas());
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -228,252 +178,6 @@ export function placeScuff(mesh: THREE.Mesh, hole: Hole, pos: { x: number; y: nu
   mesh.scale.set(Math.max(0.08, spec.length), Math.max(0.08, spec.width), 1);
   (mesh.material as THREE.MeshBasicMaterial).color.setHex(spec.color);
   mesh.visible = spec.opacity > 0;
-}
-
-function rebuildNearTurf(field: NearTurf, hole: Hole, ax: number, az: number, holeKey: string, density: number): void {
-  const capacity = field.blades.instanceMatrix.count;
-  const tries = capacity * 2;
-  const roughCap = Math.floor(capacity * NEAR_ROUGH_SHARE);
-  const sprouts: { dist: number; x: number; z: number; band: TurfBand; i: number }[] = [];
-  let rough = 0;
-  for (let i = 0; i < tries; i++) {
-    const off = nearBladeOffset(i);
-    const x = ax + off.x;
-    const z = az + off.z;
-    const band = turfBand(hole, x, z);
-    const n = hashNoise(i, 4.4);
-    if (!nearBladeKeep(band, n)) continue;
-    if (band === "rough") {
-      if (rough >= roughCap) continue;
-      rough += 1;
-    }
-    sprouts.push({ dist: off.dist, x, z, band, i });
-  }
-  sprouts.sort((a, b) => a.dist - b.dist);
-  const placed = Math.min(capacity, sprouts.length);
-  const dummy = new THREE.Object3D();
-  const color = new THREE.Color();
-  for (let i = 0; i < placed; i++) {
-    const s = sprouts[i];
-    const metrics = nearBladeMetrics(s.band)!;
-    const thatch = s.dist < 5.5 && hashNoise(s.i, 11.2) > 0.58;
-    const h = metrics.height * (0.62 + hashNoise(s.i, 7.2) * 0.75) * (thatch ? 0.42 : 1);
-    const w = metrics.width * (0.78 + hashNoise(s.i, 8.4) * 0.45) * (thatch ? 2.15 : 1);
-    dummy.position.set(s.x, groundHeight(hole, s.x, s.z) + 0.012, s.z);
-    dummy.rotation.set(
-      (hashNoise(s.i, 2.2) - (thatch ? 0.15 : 0.42)) * metrics.lean,
-      hashNoise(s.i, 3.3) * Math.PI * 2,
-      (hashNoise(s.i, 5.5) - 0.5) * metrics.lean * 0.65,
-    );
-    dummy.scale.set(w, h, 1);
-    dummy.updateMatrix();
-    field.blades.setMatrixAt(i, dummy.matrix);
-    color.setHex(nearBladeTint(s.band, hashNoise(s.i, 6.6)));
-    if (thatch) color.multiplyScalar(0.82);
-    field.blades.setColorAt(i, color);
-  }
-  field.placed = placed;
-  field.blades.count = placed > 0 ? Math.max(1, Math.floor(placed * density)) : 0;
-  field.blades.instanceMatrix.needsUpdate = true;
-  if (field.blades.instanceColor) field.blades.instanceColor.needsUpdate = true;
-  field.blades.visible = placed > 0;
-  drapeDetail(field.detail.geometry as THREE.BufferGeometry, hole, ax, az);
-  field.anchorX = ax;
-  field.anchorZ = az;
-  field.holeKey = holeKey;
-  field.ready = true;
-}
-
-function drapeDetail(geo: THREE.BufferGeometry, hole: Hole, ax: number, az: number): void {
-  const local = geo.userData.local as Float32Array;
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const x = ax + local[i * 2];
-    const z = az + local[i * 2 + 1];
-    pos.setXYZ(i, x, groundHeight(hole, x, z) + 0.022, z);
-  }
-  pos.needsUpdate = true;
-}
-
-function makeTuftGeometry(): THREE.BufferGeometry {
-  const a = new THREE.PlaneGeometry(1, 1);
-  a.translate(0, 0.5, 0);
-  const b = a.clone();
-  b.rotateY(Math.PI / 2);
-  const geo = mergeGeometries([a, b], false);
-  a.dispose();
-  b.dispose();
-  if (!geo) throw new Error("Near-turf tuft failed");
-  return geo;
-}
-
-function createNearBladeMaterial(time: { value: number }): THREE.MeshStandardMaterial {
-  const tex = new THREE.CanvasTexture(makeBladeCanvas());
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  const mat = new THREE.MeshStandardMaterial({
-    map: tex,
-    transparent: true,
-    alphaTest: 0.12,
-    side: THREE.DoubleSide,
-    roughness: 0.84,
-    metalness: 0,
-    depthWrite: false,
-  });
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = time;
-    shader.vertexShader = `uniform float uTime;\n${shader.vertexShader}`;
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <project_vertex>",
-      `vec4 mvPosition = vec4( transformed, 1.0 );
-      #ifdef USE_INSTANCING
-        mvPosition = instanceMatrix * mvPosition;
-        float bladeH = length( (instanceMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz );
-      #else
-        float bladeH = 0.08;
-      #endif
-      float tip = uv.y * uv.y;
-      float phase = mvPosition.x * 0.17 + mvPosition.z * 0.13;
-      float amp = bladeH * 0.42;
-      mvPosition.x += sin(uTime * 1.55 + phase) * amp * tip;
-      mvPosition.z += cos(uTime * 1.15 + phase * 0.8) * amp * 0.55 * tip;
-      mvPosition = modelViewMatrix * mvPosition;
-      gl_Position = projectionMatrix * mvPosition;`,
-    );
-  };
-  mat.customProgramCacheKey = () => "ptg-near-blade-v1";
-  return mat;
-}
-
-function createDetailDisc(center: THREE.Vector2): THREE.Mesh {
-  const pad = NEAR_TURF_MOVE + 1;
-  const size = (NEAR_DETAIL_RADIUS + pad) * 2;
-  const geo = new THREE.PlaneGeometry(size, size, 34, 34);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const local = new Float32Array(pos.count * 2);
-  for (let i = 0; i < pos.count; i++) {
-    local[i * 2] = pos.getX(i);
-    local[i * 2 + 1] = pos.getZ(i);
-  }
-  geo.userData.local = local;
-  const tex = new THREE.CanvasTexture(makeFiberCanvas());
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  tex.needsUpdate = true;
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex,
-    transparent: true,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-  });
-  const radius = { value: NEAR_DETAIL_RADIUS };
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uCenter = { value: center };
-    shader.uniforms.uRadius = radius;
-    shader.vertexShader = `uniform vec2 uCenter;\nuniform float uRadius;\nvarying float vFade;\nvarying vec3 vWorld;\n${shader.vertexShader}`;
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <uv_vertex>",
-      `#include <uv_vertex>
-      vec3 wpos = (modelMatrix * vec4(position, 1.0)).xyz;
-      vWorld = wpos;
-      #ifdef USE_MAP
-        vMapUv = wpos.xz * 1.35;
-      #endif
-      vFade = 1.0 - smoothstep(uRadius * 0.48, uRadius, distance(wpos.xz, uCenter));`,
-    );
-    shader.fragmentShader = `uniform vec2 uCenter;\nvarying float vFade;\nvarying vec3 vWorld;\n${shader.fragmentShader}`;
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <map_fragment>",
-      `#include <map_fragment>
-      float press = smoothstep(0.62, 0.08, distance(vWorld.xz, uCenter));
-      diffuseColor.rgb *= mix(1.0, 0.78, press);
-      diffuseColor.a *= vFade;`,
-    );
-  };
-  mat.customProgramCacheKey = () => "ptg-near-fiber-v1";
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.frustumCulled = false;
-  mesh.renderOrder = 1;
-  mesh.receiveShadow = false;
-  mesh.castShadow = false;
-  mesh.visible = false;
-  return mesh;
-}
-
-function makeBladeCanvas(): HTMLCanvasElement {
-  const w = 64;
-  const h = 128;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  ctx.clearRect(0, 0, w, h);
-  const blades = [
-    { x: 32, lean: 0.02, width: 7.2, reach: 0.96 },
-    { x: 21, lean: -0.16, width: 5.4, reach: 0.78 },
-    { x: 44, lean: 0.14, width: 5.1, reach: 0.84 },
-    { x: 28, lean: 0.06, width: 3.6, reach: 0.62 },
-  ];
-  for (const blade of blades) {
-    ctx.save();
-    ctx.translate(blade.x, h);
-    ctx.rotate(blade.lean);
-    const reach = h * blade.reach;
-    const g = ctx.createLinearGradient(0, 0, 0, -reach);
-    g.addColorStop(0, "rgba(214, 222, 196, 0.96)");
-    g.addColorStop(0.42, "rgba(244, 248, 232, 0.92)");
-    g.addColorStop(1, "rgba(255, 255, 246, 0.28)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(-blade.width, 0);
-    ctx.quadraticCurveTo(-blade.width * 0.35, -reach * 0.55, 0, -reach);
-    ctx.quadraticCurveTo(blade.width * 0.28, -reach * 0.48, blade.width * 0.82, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-  return canvas;
-}
-
-function makeFiberCanvas(): HTMLCanvasElement {
-  const size = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  ctx.clearRect(0, 0, size, size);
-  for (let i = 0; i < 70; i++) {
-    const x = hashNoise(i, 1.2) * size;
-    const y = hashNoise(i, 2.4) * size;
-    const rx = 18 + hashNoise(i, 3.1) * 46;
-    const ry = 10 + hashNoise(i, 4.2) * 28;
-    ctx.fillStyle = `rgba(${28 + hashNoise(i, 5) * 24}, ${78 + hashNoise(i, 6) * 36}, 24, 0.07)`;
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, hashNoise(i, 7) * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.lineCap = "round";
-  for (let i = 0; i < 1600; i++) {
-    const x = hashNoise(i, 8.1) * size;
-    const y = hashNoise(i, 9.2) * size;
-    const len = 28 + hashNoise(i, 10.3) * 62;
-    const lean = (hashNoise(i, 11.4) - 0.5) * 18;
-    const dark = hashNoise(i, 12.5) > 0.62;
-    ctx.strokeStyle = dark ? "rgba(20, 42, 12, 0.62)" : "rgba(232, 244, 206, 0.46)";
-    ctx.lineWidth = dark ? 1.4 + hashNoise(i, 13) * 1.3 : 1.1 + hashNoise(i, 14) * 1.1;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + lean, y - len);
-    ctx.stroke();
-  }
-  return canvas;
 }
 
 function makeScuffCanvas(): HTMLCanvasElement {

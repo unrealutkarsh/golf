@@ -63,7 +63,7 @@ export function writePuttLine(line: PuttLine, hole: Hole, preview: PuttPreview):
   // Skip the first dot so the line starts just in front of the ball, not under it.
   const pts = spacedPoints(preview.path, PUTT_DOT_SPACING, PUTT_DOT_MAX + 1).slice(1);
   pts.forEach((p, i) => {
-    dummy.position.set(p.x, groundHeight(hole, p.x, p.y) + 0.07, p.y);
+    dummy.position.set(p.x, groundHeight(hole, p.x, p.y) + 0.05, p.y);
     // Dots shrink toward the finish so the eye follows the curve to where it ends.
     dummy.scale.setScalar(1 - (i / Math.max(pts.length, 1)) * 0.35);
     dummy.updateMatrix();
@@ -75,5 +75,5 @@ export function writePuttLine(line: PuttLine, hole: Hole, preview: PuttPreview):
   line.dots.visible = pts.length > 0;
   const last = preview.path[preview.path.length - 1];
   line.stop.visible = !preview.holed && Boolean(last);
-  if (last) line.stop.position.set(last.pos.x, groundHeight(hole, last.pos.x, last.pos.y) + 0.075, last.pos.y);
+  if (last) line.stop.position.set(last.pos.x, groundHeight(hole, last.pos.x, last.pos.y) + 0.055, last.pos.y);
 }

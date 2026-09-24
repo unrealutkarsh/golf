@@ -8,6 +8,11 @@ import type { Hole } from "./types";
 export const GREEN_BLADE_NEAR = 6;
 /** Hide blades beyond this camera distance (yards). */
 export const GREEN_BLADE_FAR = 14;
+/**
+ * Instanced stick cards stay off inside this camera distance.
+ * Address and putt read the surface shader; a blade card here is a toy wig.
+ */
+export const CLOSE_STICK_HIDE = 18;
 /** Fine nap tufts — short, wide, overlapping. */
 export const GREEN_BLADE_MAX = 4800;
 /** Collar / fringe tufts around the putting surface. */
