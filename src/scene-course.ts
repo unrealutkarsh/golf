@@ -189,7 +189,7 @@ export function rebuildPuttGrid(grid: THREE.Group, hole: Hole): void {
   const toWorld = (lx: number, ly: number) => {
     const x = g.cx + lx * cos - ly * sin;
     const z = g.cy + lx * sin + ly * cos;
-    return { x, z, y: groundHeight(hole, x, z) + 0.03 };
+    return { x, z, y: groundHeight(hole, x, z) + 0.08 };
   };
   for (let i = -3; i <= 3; i++) {
     const u = (i / 3) * g.rx * 0.84;

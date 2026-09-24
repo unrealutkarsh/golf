@@ -78,6 +78,9 @@ describe("aim ribbon", () => {
     expect(sceneSrc).not.toMatch(/warn \? 0xc62828 : 0xf0d78a/);
     expect(sceneSrc).toMatch(/onPutt/);
     expect(sceneSrc).toMatch(/updateSceneCamera/);
+    expect(sceneSrc).toMatch(/refreshNearTurf/);
+    expect(sceneSrc).toMatch(/softShadow\.position/);
+    expect(sceneSrc).toMatch(/updateScuffs/);
     expect(cameraSrc).toMatch(/playCamFraming/);
     expect(cameraSrc).toMatch(/cameraHeightAboveGround/);
     expect(AIM_RIBBON_SEGS).toBeGreaterThanOrEqual(32);

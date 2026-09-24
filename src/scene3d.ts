@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
 import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
+import { clubFamily } from "./clubs";
 import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { loadArtKit } from "./kit";
@@ -12,7 +13,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { pinMarkerOpacity, renderPixelRatio, screenConstantScale } from "./art";
-import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker, createTurfBurst } from "./scene-ball";
+import { BALL_RADIUS, ballCenterLift, ballRollAxis, ballRollRadians, CONTACT_SHADOW_DIR, contactShadowPose, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker, createTurfBurst } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
 import { collectShared, disposeChildren } from "./scene-dispose";
@@ -20,6 +21,7 @@ import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
 import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
+import { createNearTurf, createScuffDecal, NEAR_TURF_FULL_CAM, placeScuff, refreshNearTurf, scuffOpacity, scuffSpec, type NearTurf } from "./near-turf";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, type BroadcastCamStage, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
@@ -87,6 +89,9 @@ export class CourseScene implements CameraRig {
   private fringeMat: THREE.MeshStandardMaterial;
   private greenBlades: THREE.InstancedMesh | null = null;
   private fringeBlades: THREE.InstancedMesh | null = null;
+  private nearTurf: NearTurf;
+  private scuffSlots: { mesh: THREE.Mesh; age: number; life: number; peak: number; active: boolean }[] = [];
+  private scuffSeen = "";
   private pendingArtRebuild = false;
   private waterTime = { value: 0 };
   private ribbon: THREE.Mesh;
@@ -140,6 +145,16 @@ export class CourseScene implements CameraRig {
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
     this.scene.add(this.shadow, this.softShadow);
+    this.nearTurf = createNearTurf(software);
+    this.scene.add(this.nearTurf.blades, this.nearTurf.detail);
+    this.scuffSlots = [0, 1].map(() => ({
+      mesh: createScuffDecal(),
+      age: 0,
+      life: 1,
+      peak: 0,
+      active: false,
+    }));
+    for (const slot of this.scuffSlots) this.scene.add(slot.mesh);
 
     this.landing = new THREE.Mesh(
       new THREE.RingGeometry(0.62, 1.05, 40),
@@ -305,6 +320,7 @@ export class CourseScene implements CameraRig {
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
     this.placeTurfBurst(session);
+    this.updateScuffs(session, dt);
     this.placePin(hole);
     this.updatePath(session, dt);
     this.updateTrail(session);
@@ -315,8 +331,9 @@ export class CourseScene implements CameraRig {
     this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
     const play = session.screen === "play";
-    updateGreenBladeLod(this.greenBlades, putting && play, camDist);
+    updateGreenBladeLod(this.greenBlades, putting && play && camDist > NEAR_TURF_FULL_CAM, camDist);
     updateFringeBladeLod(this.fringeBlades, play && (putting || camDist < 26), camDist);
+    this.updateNearTurf(session, camDist);
   }
 
   render(): void {
@@ -382,17 +399,35 @@ export class CourseScene implements CameraRig {
     this.terrain = built.terrain;
     this.greenBlades = built.greenBlades;
     this.fringeBlades = built.fringeBlades;
+    this.nearTurf.ready = false;
+    this.nearTurf.holeKey = "";
+    this.scuffSeen = "";
+    for (const slot of this.scuffSlots) {
+      slot.active = false;
+      slot.mesh.visible = false;
+    }
     aimSunAt(this.sun, built.focus.cx, built.focus.cz);
   }
 
   private placeBall(session: GameSession, dt: number): void {
     const p = session.ball.pos;
     const gh = groundHeight(session.hole(), p.x, p.y);
-    this.ball.position.set(p.x, gh + Math.max(session.ball.z, 0) + 0.16, p.y);
-    this.shadow.position.set(p.x, gh + 0.025, p.y);
-    const air = Math.max(0.1, 0.26 - session.ball.z * 0.01);
-    this.shadow.scale.setScalar(air);
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = session.ball.z > 8 ? 0.12 : 0.36;
+    const lift = ballCenterLift(session.ball.z);
+    this.ball.position.set(p.x, gh + Math.max(session.ball.z, 0) + lift, p.y);
+    const pose = contactShadowPose(session.ball.z);
+    const ox = CONTACT_SHADOW_DIR.x * pose.offset;
+    const oz = CONTACT_SHADOW_DIR.z * pose.offset;
+    this.shadow.position.set(p.x + ox, gh + 0.027, p.y + oz);
+    this.shadow.scale.setScalar(pose.coreScale);
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = pose.coreOpacity;
+    this.softShadow.position.set(p.x + ox * 0.35, gh + 0.023, p.y + oz * 0.35);
+    this.softShadow.scale.set(pose.softScale * 1.08, pose.softScale * 0.86, 1);
+    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = pose.softOpacity;
+    const halo = this.ball.getObjectByName("sit-halo") as THREE.Mesh | undefined;
+    if (halo) {
+      const air = Math.max(0, session.ball.z);
+      (halo.material as THREE.MeshBasicMaterial).opacity = air > 0.8 ? 0.16 : 0.03 + Math.min(1, air / 0.8) * 0.13;
+    }
     const inFlight = session.swingPhase === "flight" && session.ball.z > 0.4;
     this.ballGlow.visible = inFlight;
     if (inFlight) {
@@ -423,6 +458,49 @@ export class CourseScene implements CameraRig {
     mat.opacity = (1 - t) * (burst.lie === "bunker" ? 0.62 : 0.46);
     const color = burst.lie === "bunker" ? 0xd2c4a2 : burst.lie === "rough" ? 0x3f5c2c : burst.lie === "green" ? 0x9dcc78 : 0x7eb85a;
     mat.color.setHex(color);
+  }
+
+  private updateNearTurf(session: GameSession, camDist: number): void {
+    this.nearTurf.time.value = this.time;
+    if (session.screen !== "play") {
+      this.nearTurf.blades.visible = false;
+      this.nearTurf.detail.visible = false;
+      return;
+    }
+    const p = session.ball.pos;
+    const hole = session.hole();
+    refreshNearTurf(this.nearTurf, hole, p.x, p.y, `${session.course.id}:${hole.number}`, camDist, session.lie);
+  }
+
+  private updateScuffs(session: GameSession, dt: number): void {
+    const burst = session.landBurst;
+    if (burst && session.screen === "play") {
+      const key = `${burst.kind}:${burst.pos.x.toFixed(2)}:${burst.pos.y.toFixed(2)}`;
+      if (key !== this.scuffSeen) {
+        this.scuffSeen = key;
+        const spec = scuffSpec(burst.kind, burst.lie, clubFamily(session.club().id));
+        if (spec.opacity > 0) {
+          const free = this.scuffSlots.find((slot) => !slot.active) ?? this.scuffSlots.reduce((a, b) => (a.age >= b.age ? a : b));
+          free.active = true;
+          free.age = 0;
+          free.life = spec.life;
+          free.peak = spec.opacity;
+          const aim =
+            burst.kind === "strike"
+              ? session.aim
+              : Math.atan2(burst.pos.y - session.lastShotPos.y, burst.pos.x - session.lastShotPos.x);
+          placeScuff(free.mesh, session.hole(), burst.pos, aim, spec);
+        }
+      }
+    }
+    for (const slot of this.scuffSlots) {
+      if (!slot.active) continue;
+      slot.age += dt;
+      const opacity = scuffOpacity(slot.age, slot.life, slot.peak);
+      slot.mesh.visible = opacity > 0.02;
+      (slot.mesh.material as THREE.MeshBasicMaterial).opacity = opacity;
+      if (opacity <= 0) slot.active = false;
+    }
   }
 
   private placePin(hole: Hole): void {
