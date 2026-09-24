@@ -173,22 +173,22 @@ describe("putting grip and roll", () => {
 });
 
 describe("eased power preview", () => {
-  it("does not snap the aim preview to a raw meter tick", () => {
+  it("tracks the putt line to the live meter while the swing ribbon still eases", () => {
     const game = new GameSession(21);
     game.startTournament();
     const hole = game.hole();
     game.ball = createBall({ x: hole.pin.x - 8, y: hole.pin.y });
     game.lie = "green";
     game.clubIndex = clubIndex("putter");
+    game.aim = Math.atan2(hole.pin.y - game.ball.pos.y, hole.pin.x - game.ball.pos.x) + 0.4;
     game.swingPhase = "power";
     game.visualPower = 0.3;
     game.meter = 0.3;
-    game.update(1 / 60);
     const before = previewTravel(game);
     game.meter = 0.95;
-    game.update(1 / 60);
     const after = previewTravel(game);
-    expect(Math.abs(after - before)).toBeLessThan(4);
+    expect(after).toBeGreaterThan(before + 3);
+    game.update(1 / 60);
     expect(game.visualPower).toBeLessThan(0.7);
   });
 

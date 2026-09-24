@@ -122,6 +122,8 @@ export class GameSession {
   hitStop = 0;
   /** 0–1 impact punch that drives camera shake; decays after contact. */
   impact = 0;
+  /** Short-lived turf puff at the strike or the landing. */
+  landBurst: { pos: Vec2; lie: Lie; kind: "strike" | "land"; age: number } | null = null;
   /** Seconds of simulated flight for the current shot. */
   flightTime = 0;
   /** Seconds from launch to first touchdown, and where, from the launch-time simulation. */
@@ -180,8 +182,9 @@ export class GameSession {
   }
 
   /**
-   * Putter power for a meter fill. The promise is the same everywhere — 50% finishes at the hole, 100% runs 1.62× —
-   * so it is solved against how putts actually roll over the ground in front of the ball.
+   * Putter power for a meter fill. 50% is the pace that dies at the hole on flat ground
+   * of this lie. Uphill finishes short of that, downhill runs past, and the preview line
+   * is the putt the slope actually produces — the meter does not hide the hill.
    */
   puttPower(fill: number): number {
     const leftover = Math.max(0.2, this.toPin());
@@ -200,7 +203,9 @@ export class GameSession {
     const aim = Math.round(this.aim / 0.05) * 0.05;
     const key = `${this.course.id}|${this.holeIndex}|${p.x.toFixed(2)}|${p.y.toFixed(2)}|${aim}|${this.lie}`;
     if (this.paceCache?.key !== key) {
-      this.paceCache = { key, points: measurePuttPace(p, aim, this.hole(), this.lie, clubById("putter")) };
+      // Flat copy: slope must change how far a pace rolls, not the pace the meter calls "50%".
+      const flat = { ...this.hole(), greenBreak: { x: 0, y: 0 } };
+      this.paceCache = { key, points: measurePuttPace(p, aim, flat, this.lie, clubById("putter")) };
     }
     return this.paceCache.points;
   }
@@ -256,13 +261,20 @@ export class GameSession {
     return this.power;
   }
 
+  /** Meter fill the putt line is promising. Live on the power swing so the dots match the stroke. */
+  private puttPreviewFill(): number {
+    if (this.swingPhase === "aim") return PUTT_HOLE_FILL;
+    if (this.swingPhase === "power") return this.meter;
+    return this.puttFill(this.power);
+  }
+
   private previewShot() {
     const putting = this.club().id === "putter";
-    const puttFill = this.swingPhase === "aim" ? PUTT_HOLE_FILL : this.visualPower;
     return {
-      aim: this.visualAim,
-      power: putting ? this.puttPower(puttFill) : this.visualPower,
-      accuracy: this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
+      // Full-swing ribbons ease. A putt line that lags the stick is a lie about the break.
+      aim: putting ? this.aim : this.visualAim,
+      power: putting ? this.puttPower(this.puttPreviewFill()) : this.visualPower,
+      accuracy: putting ? 0 : this.swingPhase === "accuracy" ? this.meter * 2 - 1 : this.accuracy,
       club: this.club(),
       lie: this.lie,
       wind: this.wind,
@@ -284,7 +296,7 @@ export class GameSession {
     return cache.landing;
   }
 
-  /** The putt as set up right now, simulated with the same break the real stroke will get. */
+  /** The putt as set up right now. Same aim, pace, and slope the stroke will use. */
   previewPutt(): PuttPreview {
     const shot = this.previewShot();
     const cache = this.previewFor(shot);
@@ -359,6 +371,7 @@ export class GameSession {
     this.landingPos = null;
     this.hitStop = 0;
     this.impact = 0;
+    this.landBurst = null;
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
   }
@@ -472,24 +485,31 @@ export class GameSession {
     this.landingPos = last ? { ...last.pos } : null;
     const quality = this.strike ?? "good";
     if (club.id !== "putter") {
-      this.hitStop = 0.06 + this.power * 0.05;
+      // Long enough to read contact on the address lens, short enough that the cut still feels immediate.
+      this.hitStop = 0.1 + this.power * 0.08;
       this.impact = (0.35 + 0.65 * this.power) * (quality === "perfect" ? 1 : quality === "good" ? 0.75 : 0.55);
+      this.landBurst = { pos: { ...this.lastShotPos }, lie: this.lie, kind: "strike", age: 0 };
       if (quality === "perfect") this.showCallout("Pure strike", `${club.name} · ${Math.round(this.power * 100)}%`, "perfect", 1.6);
       else if (quality === "miss") this.showCallout(this.accuracy > 0 ? "Pulled it" : "Pushed it", "Stop the marker in the green window", "miss", 1.6);
     }
     try {
-      if (club.id === "putter") this.audio.putt();
-      else this.audio.strike(this.power, quality);
+      this.audio.swing(club.id, this.power, quality);
     } catch {
       /* audio must never block the shot */
     }
   }
 
   update(dt: number): void {
+    this.audio.setAmbience(this.screen === "play" ? this.wind.speed : 0, this.screen === "play" && this.putting());
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     this.calloutTime = Math.max(0, this.calloutTime - dt);
     this.impact = Math.max(0, this.impact - dt * 2.4);
+    if (this.landBurst) {
+      this.landBurst.age += dt;
+      const life = this.landBurst.kind === "strike" ? 0.34 : 0.7;
+      if (this.landBurst.age > life) this.landBurst = null;
+    }
     if (this.screen !== "play") return;
     this.refreshLie();
     const powerLife = this.swingPhase === "power" ? 0.08 : 0.11;
@@ -534,11 +554,17 @@ export class GameSession {
     }
   }
 
-  /** Slow the world down while an approach shot is rolling out close to the cup. */
+  /**
+   * Playback rate for the fixed flight steps. Full swings are simulated at a real
+   * hang (~6s) so carry stays honest, then played back faster so a drive settles
+   * in a few seconds. Putts and the last few yards into the cup stay real-time or slower.
+   */
   timeScale(): number {
-    if (this.club().id === "putter" || this.ball.z > 0.3) return 1;
+    if (this.club().id === "putter") return 1;
     const speed = Math.hypot(this.ball.vel.x, this.ball.vel.y);
-    return this.toPin() < 5 && speed > 0.8 ? 0.45 : 1;
+    if (this.ball.z <= 0.3 && this.toPin() < 5 && speed > 0.8) return 0.45;
+    if (this.swingPhase === "flight" && this.landingTime > 3.2) return Math.min(2.15, this.landingTime / 2.8);
+    return 1;
   }
 
   private simulate(dt: number): void {
@@ -550,7 +576,9 @@ export class GameSession {
     for (const ev of step.events) {
       if (ev.type === "bounce" && this.shotCarry === null) {
         this.shotCarry = dist(this.lastShotPos, ev.pos);
-        this.audio.land(lieAt(hole, ev.pos));
+        const lie = lieAt(hole, ev.pos);
+        this.audio.land(lie);
+        this.landBurst = { pos: { ...ev.pos }, lie, kind: "land", age: 0 };
       }
       if (ev.type === "splash") {
         this.audio.splash();

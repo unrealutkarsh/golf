@@ -1,7 +1,6 @@
 import type { GameSession } from "./game";
 import type { FlightSample } from "./physics";
 import { clamp, dist, fromAngle, type Vec2 } from "./math";
-import type { Hole } from "./types";
 import { airbornePos } from "./renderer-lift";
 
 interface Particle {
@@ -83,8 +82,8 @@ export class PlayOverlays {
     });
   }
 
-  draw(ctx: CanvasRenderingContext2D, session: GameSession, hole: Hole, dt: number): void {
-    this.drawAim(ctx, session, hole);
+  draw(ctx: CanvasRenderingContext2D, session: GameSession, dt: number): void {
+    this.drawAim(ctx, session);
     this.drawShotArc(ctx, session);
     this.updateParticles(dt);
     this.drawRings(ctx);
@@ -92,14 +91,19 @@ export class PlayOverlays {
     this.drawBall(ctx, session);
   }
 
-  private drawAim(ctx: CanvasRenderingContext2D, session: GameSession, hole: Hole): void {
+  private drawAim(ctx: CanvasRenderingContext2D, session: GameSession): void {
     if (session.screen !== "play") return;
     if (session.swingPhase !== "aim" && session.swingPhase !== "power" && session.swingPhase !== "accuracy") return;
     const from = session.ball.pos;
     const dir = fromAngle(session.aim, 1);
+    ctx.save();
+    if (session.club().id === "putter") {
+      this.drawPuttRead(ctx, session);
+      ctx.restore();
+      return;
+    }
     const preview = session.previewLanding();
     const path = session.previewFlight();
-    ctx.save();
     ctx.strokeStyle = "rgba(244, 241, 232, 0.28)";
     ctx.setLineDash([2.2, 1.6]);
     ctx.lineWidth = 0.32;
@@ -125,15 +129,31 @@ export class PlayOverlays {
     ctx.beginPath();
     ctx.arc(preview.x, preview.y, 1.25, 0, Math.PI * 2);
     ctx.fill();
-    if (session.lie === "green") {
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
-      ctx.lineWidth = 0.35;
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(from.x + hole.greenBreak.x * 8, from.y + hole.greenBreak.y * 8);
-      ctx.stroke();
-    }
     ctx.restore();
+  }
+
+  /** The putt the stroke will play: curved with the slope, gold when that pace holes. */
+  private drawPuttRead(ctx: CanvasRenderingContext2D, session: GameSession): void {
+    const putt = session.previewPutt();
+    if (putt.path.length < 2) return;
+    ctx.strokeStyle = putt.holed ? "rgba(255, 213, 74, 0.9)" : "rgba(255, 255, 255, 0.78)";
+    ctx.lineWidth = 0.22;
+    ctx.setLineDash([0.12, 0.22]);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    putt.path.forEach((sample, i) => {
+      if (i === 0) ctx.moveTo(sample.pos.x, sample.pos.y);
+      else ctx.lineTo(sample.pos.x, sample.pos.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const last = putt.path[putt.path.length - 1];
+    if (!last || putt.holed) return;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.lineWidth = 0.16;
+    ctx.beginPath();
+    ctx.arc(last.pos.x, last.pos.y, 0.32, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   private drawShotArc(ctx: CanvasRenderingContext2D, session: GameSession): void {

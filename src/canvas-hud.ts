@@ -82,7 +82,7 @@ function drawMeters(ctx: CanvasRenderingContext2D, session: GameSession, w: numb
   ctx.font = "700 9px 'Segoe UI', sans-serif";
   ctx.fillText("PWR", x + 6, y + meterH + 16);
   ctx.fillStyle = putting ? "rgba(243,239,227,0.55)" : "rgba(243,239,227,0.45)";
-  ctx.fillText(putting ? "to hole" : "sug", x + 6, y + meterH + 28);
+  ctx.fillText(putting ? "pace" : "sug", x + 6, y + meterH + 28);
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   roundRect(ctx, x - 2, y, 16, meterH, 6);
   ctx.fill();

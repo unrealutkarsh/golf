@@ -173,11 +173,11 @@ export class UI {
         <h2>How to play</h2>
         <ol>
           <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards. The white tick is the suggested fill — with the putter, flat hole-pace.</li>
           <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
           <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. The game suggests a club after each shot, but any club can be played from anywhere — including a wedge off the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
-          <li><b>Putting</b>: the dotted line follows the slope of the green to where the ball will stop, and turns gold when the putt drops. Read the break with ← → or by dragging. G toggles the break grid.</li>
+          <li><b>Putting</b>: the dotted line is the putt you are about to hit, break included, and it turns gold when that pace drops. The white tick is flat hole-pace — uphill dies short of it, downhill runs by. Soft dies short, firm runs long. Read the line with ← → or by dragging. G toggles the fall grid. Sound is on (M mutes): a whoosh and contact for each club, plus a quiet wind.</li>
           <li>Wind moves the ball in the air. Rough grabs a landing ball and costs you distance and accuracy on the next shot; sand stops the ball dead, and only a wedge gets out cleanly. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
@@ -292,7 +292,9 @@ export class UI {
         : session.swingPhase === "accuracy"
           ? "Time it"
           : session.swingPhase === "flight"
-            ? "Ball in air"
+            ? session.ball.z > 0.45
+              ? "Ball in air"
+              : "Rolling"
             : "Aim and swing";
     return `
       <div class="ticker">

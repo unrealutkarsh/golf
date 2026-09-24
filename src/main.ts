@@ -163,9 +163,16 @@ function step(dt: number): void {
 
 let last = performance.now();
 function frame(now: number): void {
-  const dt = Math.min(0.033, (now - last) / 1000);
+  const elapsed = Math.max(0, (now - last) / 1000);
   last = now;
-  step(dt);
+  // The swing meter stays on a short step so a hitch cannot skip the accuracy window.
+  // Flight integrates in fixed 1/60 steps inside that budget. Capping it at 33ms
+  // turns a slow frame into slow motion, and on a software GPU a drive then sits
+  // on "Ball in air" for tens of seconds. A one-second cap keeps the ball on
+  // wall-clock time down to about 1 fps; settle uses it too so the landing hold
+  // does not stall after the ball is already down.
+  const cap = session.swingPhase === "flight" || session.swingPhase === "settle" ? 1 : 0.033;
+  step(Math.min(cap, elapsed));
   requestAnimationFrame(frame);
 }
 

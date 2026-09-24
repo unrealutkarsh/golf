@@ -216,6 +216,18 @@ describe("shot physics", () => {
     }
   });
 
+  it("notices a putt that steps across the cup instead of tunneling through it", () => {
+    const hole = HARBOR_DUNES.holes[0];
+    const wind = { speed: 0, dir: 0 };
+    const ball = createBall({ x: hole.pin.x - 0.9, y: hole.pin.y });
+    ball.vel = { x: 130, y: 0 };
+    ball.spinning = 130;
+    const step = stepBall(ball, hole, wind, 1 / 60, 0);
+    const sawCup = step.holed || step.events.some((e) => e.type === "lip");
+    expect(sawCup).toBe(true);
+    expect(step.holed).toBe(false);
+  });
+
   it("lets a missed putt come to rest instead of creeping on the break", () => {
     const hole = HARBOR_DUNES.holes[0];
     const from = { x: hole.pin.x - 8.5, y: hole.pin.y + 3.2 };
