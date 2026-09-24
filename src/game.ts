@@ -1,4 +1,5 @@
 import { AudioBus } from "./audio";
+import { ambienceMph, characterForCourse, windForCharacter } from "./course-character";
 import { burstLife, strikeCallout } from "./lie-story";
 import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubById, clubIndex, meterYardage, recommendClub, suggestedShotPower } from "./clubs";
@@ -25,6 +26,7 @@ import {
   MAX_HOLE_STROKES,
   SIM_DT,
   type FlightSample,
+  type GroundPlay,
 } from "./physics";
 import { prizeMoney, scoreName } from "./scoring";
 import { TOURNAMENTS, tournamentById } from "./tour";
@@ -295,6 +297,7 @@ export class GameSession {
       lie: this.lie,
       wind: this.wind,
       shape: this.shape,
+      ground: this.groundPlay(),
     };
   }
 
@@ -328,7 +331,8 @@ export class GameSession {
   /** Previews run the full fixed-step sim, so reuse them while the inputs are unchanged. */
   private previewFor(shot: ReturnType<GameSession["previewShot"]>) {
     const p = this.ball.pos;
-    const key = `${this.course.id}|${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${shot.wind.speed}|${shot.wind.dir}|${shot.shape}`;
+    const w = shot.wind;
+    const key = `${this.course.id}|${this.holeIndex}|${p.x}|${p.y}|${shot.aim}|${shot.power}|${shot.accuracy}|${shot.club.id}|${shot.lie}|${w.speed}|${w.dir}|${w.gust ?? 0}|${w.influence ?? 1}|${w.shear ?? 0}|${shot.ground?.roll ?? 1}|${shot.ground?.hop ?? 1}|${shot.shape}`;
     if (key !== this.previewCache.key) this.previewCache = { key, flight: null, landing: null, putt: null };
     return this.previewCache;
   }
@@ -398,8 +402,16 @@ export class GameSession {
   }
 
   windForHole(index: number): Wind {
+    const hole = this.course.holes[index];
+    const aim = Math.atan2(hole.pin.y - hole.tee.y, hole.pin.x - hole.tee.x);
     const rng = mulberry32(hashString(`${this.seed}-${this.course.id}-${index}`));
-    return { speed: 2 + rng() * 11, dir: rng() * Math.PI * 2 };
+    return windForCharacter(characterForCourse(this.course.id), rng, aim);
+  }
+
+  /** Fairway release for the course being played. Greens, rough, and sand keep their own lies. */
+  groundPlay(): GroundPlay {
+    const play = characterForCourse(this.course.id);
+    return { roll: play.roll, hop: play.hop };
   }
 
   autoClub(): void {
@@ -529,6 +541,7 @@ export class GameSession {
       lie: this.lie,
       wind: this.wind,
       shape: this.shape,
+      ground: this.groundPlay(),
     };
     // Launch first so a preview or audio failure cannot swallow the stroke.
     this.ball = launchBall(this.ball.pos, shot);
@@ -563,7 +576,7 @@ export class GameSession {
   }
 
   update(dt: number): void {
-    this.audio.setAmbience(this.screen === "play" ? this.wind.speed : 0, this.screen === "play" && this.putting());
+    this.audio.setAmbience(this.screen === "play" ? ambienceMph(this.wind) : 0, this.screen === "play" && this.putting());
     this.bannerTime = Math.max(0, this.bannerTime - dt);
     this.messageTime = Math.max(0, this.messageTime - dt);
     this.calloutTime = Math.max(0, this.calloutTime - dt);
@@ -633,7 +646,7 @@ export class GameSession {
 
   private simulate(dt: number): void {
     const hole = this.hole();
-    const step = stepBall(this.ball, hole, this.wind, dt, this.club().bounce);
+    const step = stepBall(this.ball, hole, this.wind, dt, this.club().bounce, this.groundPlay());
     this.ball = step.ball;
     this.refreshLie();
 

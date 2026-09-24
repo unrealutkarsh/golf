@@ -187,8 +187,12 @@ function frame(now: number): void {
 
 requestAnimationFrame(frame);
 
+function qaEvent(): string | undefined {
+  return new URLSearchParams(location.search).get("event") || undefined;
+}
+
 function poseShapedShot(session: GameSession, shape: number): void {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.wind = { speed: 0, dir: 0 };
   session.tipVisible = false;
   session.clubIndex = clubIndex("iron7");
@@ -246,7 +250,7 @@ function poseLie(session: GameSession, lie: "bunker" | "rough" | "fairway" | "gr
 }
 
 function poseLieContact(session: GameSession, lie: "bunker" | "rough" | "fairway", club: "driver" | "sw" | "iron7", frames: number, release: boolean): void {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   session.wind = { speed: 3, dir: 0.4 };
   if (!poseLie(session, lie)) return;
@@ -270,14 +274,14 @@ function poseLieContact(session: GameSession, lie: "bunker" | "rough" | "fairway
 
 const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.playThroughForTest();
 } else if (qa === "fairway" || qa === "tee" || qa === "clubs") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   if (qa === "clubs") session.toggleClubTray();
 } else if (qa === "swing") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   session.camMode = "player";
   session.swingPhase = "accuracy";
@@ -287,7 +291,7 @@ if (qa === "round") {
   session.lockedAccuracy = false;
   session.update = () => undefined;
 } else if (qa === "fairwayClose") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   const hole = session.hole();
   session.ball.pos = { x: hole.tee.x + 92, y: hole.tee.y - 2 };
@@ -297,7 +301,7 @@ if (qa === "round") {
   session.visualAim = session.aim;
   session.camMode = "player";
 } else if (qa === "flight") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.power = 1;
   session.accuracy = 0;
   session.shape = 0;
@@ -314,7 +318,7 @@ if (qa === "round") {
 } else if (qa === "shape" || qa === "fade") {
   poseShapedShot(session, qa === "fade" ? -1 : 1);
 } else if (qa === "green" || qa === "greenShort" || qa === "greenLie") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   const hole = session.hole();
   const offset = qa === "greenShort" ? { x: hole.pin.x - 1.15, y: hole.pin.y } : { x: hole.pin.x - 7.4, y: hole.pin.y + 2.1 };
@@ -330,13 +334,13 @@ if (qa === "round") {
   session.camMode = "putt";
   session.puttGrid = qa === "green";
 } else if (qa === "bunker" || qa === "bunkerWedge") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   poseLie(session, "bunker");
   session.clubIndex = clubIndex(qa === "bunkerWedge" ? "sw" : "driver");
   session.camMode = "player";
 } else if (qa === "rough") {
-  session.startTournament();
+  session.startTournament(qaEvent());
   session.tipVisible = false;
   poseLie(session, "rough");
   session.clubIndex = clubIndex("iron7");

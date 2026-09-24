@@ -1,7 +1,8 @@
 import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
-import { playHudMode, showClubTray, windArrowDegrees, yardageReadout } from "./hud";
+import { characterForCourse, hazeForHole } from "./course-character";
+import { playHudMode, showClubTray, windArrowDegrees, windCharacterNote, yardageReadout } from "./hud";
 import { lieCarryNote } from "./lie-story";
 import { surfaceLabel, windLabel } from "./physics";
 import { shapeLabel } from "./terrain";
@@ -180,7 +181,7 @@ export class UI {
           <li><b>Clubs</b> with Q / E, the mouse wheel, or the club name on the monitor. The bag stays closed at address and opens while you change clubs. The game suggests a club after each shot, but any club can be played from anywhere — including a wedge off the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
           <li><b>Putting</b>: the dotted line is the putt you are about to hit, break included, and it turns gold when that pace drops. The white tick is flat hole-pace — uphill dies short of it, downhill runs by. Soft dies short, firm runs long. Read the line with ← → or by dragging. G toggles the fall grid. Sound is on (M mutes): a whoosh and contact for each club, plus a quiet wind.</li>
-          <li>Wind moves the ball in the air. Rough grabs a landing ball and costs you distance and accuracy on the next shot; sand stops the ball dead, and only a wedge gets out cleanly. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
+          <li>Wind moves the ball in the air. Fog Belt is a firm links: a steady marine cross, extra run, and a hazy yardage once the pin is far. Harbor Dunes kicks off the fairway and gusts, and the number stays exact. Rough grabs a landing ball and costs you distance and accuracy on the next shot; sand stops the ball dead, and only a wedge gets out cleanly. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
         <button class="btn primary" data-action="close-help">Got it</button>
@@ -290,7 +291,9 @@ export function playHudHtml(session: GameSession): string {
   const wind = windLabel(session.wind);
   const club = session.club();
   const running = session.results.length ? formatToPar(toPar(session.results)) : "E";
-  const yards = yardageReadout(session.toPin(), session.putting());
+  const play = characterForCourse(session.course.id);
+  const yards = yardageReadout(session.toPin(), session.putting(), hazeForHole(play, session.course.id, hole.number));
+  const windNote = windCharacterNote(session.wind);
   const tray = showClubTray(session.swingPhase, session.clubTray);
   const mode = playHudMode(session.swingPhase, session.clubTray);
   const arrow = windArrowDegrees(session.wind.dir);
@@ -328,6 +331,7 @@ export function playHudHtml(session: GameSession): string {
     <div class="lm" data-hud="${mode}">
       <div class="lm-status">
         <span class="lm-hole">Hole ${hole.number}</span>
+        <span class="lm-venue">${escapeHtml(play.cue)}</span>
         <span>Par ${hole.par}</span>
         <span>${hole.yards}</span>
         <b class="lm-score">${running}</b>
@@ -346,15 +350,16 @@ export function playHudHtml(session: GameSession): string {
           <p class="lm-lie">${surfaceLabel(session.lie)}</p>
           ${lieNote ? `<p class="lm-lie-note">${escapeHtml(lieNote)}</p>` : ""}
           <div class="lm-main">
-            <div class="lm-yards">
+            <div class="lm-yards${yards.caption === "HAZY" ? " is-hazy" : ""}">
               <b>${yards.value}</b>
               <span class="lm-cap">${yards.caption}<i>${yards.unit}</i></span>
             </div>
-            <div class="lm-wind" title="${wind.mph} ${wind.arrow}">
+            <div class="lm-wind" title="${wind.mph} ${wind.arrow}${windNote ? ` · ${windNote}` : ""}">
               <i class="lm-arrow" style="transform:rotate(${arrow.toFixed(1)}deg)"></i>
               <div>
                 <b>${Math.round(session.wind.speed)}</b>
                 <span>${wind.arrow} · MPH</span>
+                ${windNote ? `<span class="lm-wind-note">${escapeHtml(windNote)}</span>` : ""}
               </div>
             </div>
           </div>

@@ -40,6 +40,16 @@ export interface ShotInput {
   wind: Wind;
   /** -1 fade, 0 straight, +1 draw (curves left of the aim line). */
   shape?: number;
+  /** Tee and fairway release. Omitted plays the stock hop and roll. */
+  ground?: GroundPlay;
+}
+
+/** How firm the short grass is. Greens, rough, and sand ignore this — those lies already have their own story. */
+export interface GroundPlay {
+  /** Multiplies the club's fairway rollout on the first landing. */
+  roll: number;
+  /** Multiplies the first hop. Under 1 stays down and runs. Over 1 kicks. */
+  hop: number;
 }
 
 export interface SimEvent {
@@ -311,12 +321,16 @@ export function applyGreenGrip(ball: Ball, dt: number): { vel: Vec2; spinning: n
 
 export function windAccel(wind: Wind, z: number): Vec2 {
   if (z <= 0.2) return { x: 0, y: 0 };
-  const mph = wind.speed;
-  const k = 0.12 * mph * (0.5 + (Math.min(z, 30) / 30) * 0.8);
-  return fromAngle(wind.dir, k);
+  const climb = Math.min(z, 30) / 30;
+  // One swell: nothing on the ground, full gust around 15 yards up, gone again at the top of a drive.
+  const swell = Math.sin(climb * Math.PI);
+  const mph = Math.max(0, wind.speed + (wind.gust ?? 0) * swell);
+  const influence = wind.influence ?? 1;
+  const k = 0.12 * mph * influence * (0.5 + climb * 0.8);
+  return fromAngle(wind.dir + (wind.shear ?? 0) * swell, k);
 }
 
-export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBounce: number): StepResult {
+export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBounce: number, ground?: GroundPlay): StepResult {
   const events: SimEvent[] = [];
   const flight = ball.flight;
   const gravity = flight ? (ball.vz > 0 ? flight.gUp : flight.gDown) : GRAVITY;
@@ -389,9 +403,11 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     }
 
     if (firstTouch) {
-      const hop = landingHop(lie, check, ball.vz);
+      // Firmness is a fairway and tee story. A green still holds, and rough and sand still smother.
+      const release = lie === "fairway" || lie === "tee";
+      const hop = Math.min(7.6, landingHop(lie, check, ball.vz) * (release ? (ground?.hop ?? 1) : 1));
       const hopTime = hop > 2.2 ? (2 * hop) / GRAVITY : 0;
-      const target = Math.max(0, intendedRoll) * LANDING_GRAB[lie];
+      const target = Math.max(0, intendedRoll) * LANDING_GRAB[lie] * (release ? (ground?.roll ?? 1) : 1);
       let speed = speedForRollout(target, lie);
       if (hopTime > 0 && speed > 0) {
         speed = speedForRollout(Math.max(0, target - speed * hopTime), lie);
@@ -564,7 +580,7 @@ export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilR
   const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
   let airborne = ball.z > 0.05;
   for (let i = 0; i < 1800; i++) {
-    const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce);
+    const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce, shot.ground);
     samples.push({ pos: clone(step.ball.pos), z: step.ball.z });
     if (step.penaltyKind || step.holed) break;
     if (!untilRest && airborne && step.ball.z <= 0.05) break;

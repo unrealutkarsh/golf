@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { GameSession } from "./game";
 import { playHudHtml } from "./ui";
-import { playHudMode, showClubTray, showSwingMeter, windArrowDegrees, yardageReadout } from "./hud";
+import { playHudMode, showClubTray, showSwingMeter, windArrowDegrees, windCharacterNote, yardageReadout } from "./hud";
 import { createBall } from "./physics";
 import { clubIndex } from "./clubs";
 
@@ -13,6 +13,24 @@ describe("launch monitor readout", () => {
     expect(yardageReadout(7.4, true)).toEqual({ value: "22", unit: "FT", caption: "TO HOLE" });
     expect(yardageReadout(2, true).value).toBe("6.0");
     expect(yardageReadout(2, true).caption).toBe("TO HOLE");
+  });
+
+  it("softens a long hazy number and leaves a putt and a short shot exact", () => {
+    const haze = { from: 145, step: 5, bias: 3 };
+    const long = yardageReadout(220, false, haze);
+    expect(long.caption).toBe("HAZY");
+    expect(long.unit).toBe("YDS");
+    expect(Number(long.value) % 5).toBe(0);
+    expect(Math.abs(Number(long.value) - 220)).toBeLessThanOrEqual(5);
+    expect(yardageReadout(90, false, haze)).toEqual({ value: "90", unit: "YDS", caption: "TO PIN" });
+    expect(yardageReadout(12, true, haze).caption).toBe("TO HOLE");
+    expect(yardageReadout(12, true, haze).unit).toBe("FT");
+  });
+
+  it("names a gust by its peak and a strong breeze as steady", () => {
+    expect(windCharacterNote({ speed: 5, gust: 6.5, influence: 1 })).toBe("Gust 12");
+    expect(windCharacterNote({ speed: 12, gust: 1.1, influence: 1.38 })).toBe("Steady");
+    expect(windCharacterNote({ speed: 4 })).toBe("");
   });
 
   it("points the wind arrow east at dir 0 and north at a quarter turn the other way", () => {

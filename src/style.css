@@ -329,6 +329,11 @@ td.empty {
   color: rgba(247, 244, 236, 0.78);
 }
 
+.lm-venue {
+  color: rgba(232, 214, 176, 0.72);
+  letter-spacing: 0.12em;
+}
+
 .lm-score {
   color: rgba(247, 244, 236, 0.92);
   font-weight: 600;
@@ -444,6 +449,10 @@ td.empty {
   font-size: clamp(72px, 8vw, 108px);
 }
 
+.lm-yards.is-hazy .lm-cap {
+  color: rgba(214, 220, 226, 0.78);
+}
+
 .lm-cap {
   display: block;
   margin-top: 8px;
@@ -468,6 +477,13 @@ td.empty {
 
 .lm-wind span {
   letter-spacing: 0.14em;
+}
+
+.lm-wind .lm-wind-note {
+  display: block;
+  margin-top: 4px;
+  color: rgba(232, 214, 176, 0.8);
+  letter-spacing: 0.16em;
 }
 
 .lm-arrow {

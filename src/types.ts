@@ -83,7 +83,14 @@ export interface Course {
 
 export interface Wind {
   speed: number;
+  /** Radians. 0 blows east (+x). */
   dir: number;
+  /** Extra mph that swells through the middle of the flight. Omitted means a steady breeze. */
+  gust?: number;
+  /** How hard one mph pushes the ball. Omitted means 1, the stock breeze. */
+  influence?: number;
+  /** Radians the gust swings the direction at mid-height. Omitted means it stays on `dir`. */
+  shear?: number;
 }
 
 export interface Ball {
