@@ -105,6 +105,12 @@ export class GameSession {
   tipVisible = true;
   helpOpen = false;
   scorecardOpen = false;
+  /**
+   * Club bag. Closed at address. Opens when the player asks for it, or flashes
+   * after a club change, then tucks away. Linger 0 while it is pinned open.
+   */
+  clubTray: "closed" | "open" = "closed";
+  clubTrayLinger = 0;
   profile: PlayerProfile = loadProfile();
   lastHoleBanner: { title: string; detail: string } | null = null;
   lastMoney = 0;
@@ -367,6 +373,8 @@ export class GameSession {
     this.camHold = false;
     this.shape = 0;
     this.aimExplicit = false;
+    this.clubTray = "closed";
+    this.clubTrayLinger = 0;
     this.shotArc = [];
     this.landingPos = null;
     this.hitStop = 0;
@@ -393,11 +401,49 @@ export class GameSession {
   cycleClub(dir: number): void {
     if (this.swingPhase !== "aim") return;
     this.clubIndex = (this.clubIndex + dir + CLUBS.length) % CLUBS.length;
+    this.revealClubTray(2.8);
   }
 
   setClub(index: number): void {
     if (this.swingPhase !== "aim") return;
-    this.clubIndex = clamp(index, 0, CLUBS.length - 1);
+    const next = clamp(index, 0, CLUBS.length - 1);
+    if (next === this.clubIndex) return;
+    this.clubIndex = next;
+    this.revealClubTray(1.7);
+  }
+
+  /** Pin the bag open, or tuck it if it is already up. */
+  toggleClubTray(): void {
+    if (this.screen !== "play" || this.swingPhase !== "aim") return;
+    if (this.clubTray === "open") this.closeClubTray();
+    else {
+      this.clubTray = "open";
+      this.clubTrayLinger = 0;
+    }
+  }
+
+  closeClubTray(): void {
+    this.clubTray = "closed";
+    this.clubTrayLinger = 0;
+  }
+
+  /** Flash the bag after a club change. A pinned bag stays pinned. */
+  private revealClubTray(seconds: number): void {
+    if (this.swingPhase !== "aim") return;
+    if (this.clubTray === "open" && this.clubTrayLinger === 0) return;
+    this.clubTray = "open";
+    this.clubTrayLinger = seconds;
+  }
+
+  private tickClubTray(dt: number): void {
+    if (this.swingPhase !== "aim") {
+      if (this.clubTray !== "closed") this.closeClubTray();
+      return;
+    }
+    if (this.clubTray === "open" && this.clubTrayLinger > 0) {
+      this.clubTrayLinger -= dt;
+      if (this.clubTrayLinger <= 0) this.closeClubTray();
+    }
   }
 
   nudgeAim(delta: number): void {
@@ -420,6 +466,7 @@ export class GameSession {
     this.audio.unlock();
     if (this.screen !== "play") return;
     if (this.swingPhase === "aim") {
+      this.closeClubTray();
       this.swingPhase = "power";
       this.meter = 0.02;
       this.meterDir = 1;
@@ -511,6 +558,7 @@ export class GameSession {
       if (this.landBurst.age > life) this.landBurst = null;
     }
     if (this.screen !== "play") return;
+    this.tickClubTray(dt);
     this.refreshLie();
     const powerLife = this.swingPhase === "power" ? 0.08 : 0.11;
     this.visualPower = expApproach(this.visualPower, this.previewTargetPower(), powerLife, dt);

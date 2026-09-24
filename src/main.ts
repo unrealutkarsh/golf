@@ -66,6 +66,9 @@ function handleAction(action: string, payload?: string): void {
     case "shape":
       if (payload) session.setShape(Number(payload));
       break;
+    case "clubs":
+      session.toggleClubTray();
+      break;
   }
 }
 
@@ -146,6 +149,7 @@ window.addEventListener("keydown", (e) => {
   if (key === "escape") {
     if (session.helpOpen) session.helpOpen = false;
     else if (session.scorecardOpen) session.scorecardOpen = false;
+    else if (session.screen === "play" && session.clubTray === "open" && session.swingPhase === "aim") session.closeClubTray();
     else if (session.screen === "play") session.cancelSwing();
     else if (session.screen === "tour") session.screen = "title";
   }
@@ -206,9 +210,20 @@ const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
   session.playThroughForTest();
-} else if (qa === "fairway" || qa === "tee") {
+} else if (qa === "fairway" || qa === "tee" || qa === "clubs") {
   session.startTournament();
   session.tipVisible = false;
+  if (qa === "clubs") session.toggleClubTray();
+} else if (qa === "swing") {
+  session.startTournament();
+  session.tipVisible = false;
+  session.camMode = "player";
+  session.swingPhase = "accuracy";
+  session.meter = 0.62;
+  session.power = 0.72;
+  session.accuracy = 0;
+  session.lockedAccuracy = false;
+  session.update = () => undefined;
 } else if (qa === "fairwayClose") {
   session.startTournament();
   session.tipVisible = false;
