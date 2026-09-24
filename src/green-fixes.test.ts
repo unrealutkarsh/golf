@@ -106,13 +106,13 @@ describe("putt pace", () => {
     const game = puttSetup(45, 0, -7, 2);
     const base = game.aim;
     let read: number | null = null;
-    for (let i = -60; i <= 60 && read === null; i++) {
-      game.visualAim = base + i * 0.004;
-      if (game.previewPutt().holed) read = game.visualAim;
+    for (let i = -80; i <= 80 && read === null; i++) {
+      game.aim = base + i * 0.004;
+      if (game.previewPutt().holed) read = game.aim;
     }
     expect(read).not.toBeNull();
     // Played straight at the pin it misses: the break is real.
-    game.visualAim = base;
+    game.aim = base;
     expect(game.previewPutt().holed).toBe(false);
     game.aim = read!;
     game.visualAim = read!;
@@ -125,7 +125,64 @@ describe("putt pace", () => {
     for (let i = 0; i < 900 && game.screen === "play"; i++) game.update(1 / 60);
     expect(game.screen).toBe("holeEnd");
   });
+
+  it("rolls the same pace shorter uphill than downhill", () => {
+    const game = puttSetup(47, 5, -9, 0);
+    const br = game.hole().greenBreak;
+    const bl = Math.hypot(br.x, br.y);
+    const down = { x: br.x / bl, y: br.y / bl };
+    const yards = 10;
+    const downhill = rollPace(game, down, yards, 0.5);
+    const uphill = rollPace(game, { x: -down.x, y: -down.y }, yards, 0.5);
+    expect(downhill).toBeGreaterThan(uphill + 0.7);
+    expect(uphill).toBeGreaterThan(yards * 0.5);
+    expect(downhill).toBeLessThan(yards * 1.6);
+  });
+
+  it("dies a soft putt short and runs a firm one past", () => {
+    const game = puttSetup(49, 0, -14, 0);
+    const pin = game.hole().pin;
+    const from = game.ball.pos;
+    const dir = { x: pin.x - from.x, y: pin.y - from.y };
+    const len = Math.hypot(dir.x, dir.y);
+    const yards = 14;
+    const soft = rollPace(game, { x: dir.x / len, y: dir.y / len }, yards, 0.22);
+    const firm = rollPace(game, { x: dir.x / len, y: dir.y / len }, yards, 0.95);
+    expect(soft).toBeLessThan(yards - 2);
+    expect(firm).toBeGreaterThan(yards + 2);
+  });
+
+  it("plays the aim on the stick, not a lagged heading", () => {
+    const game = puttSetup(48, 5, -8, 1.5);
+    game.swingPhase = "power";
+    game.meter = 0.62;
+    game.visualAim = game.aim + 0.45;
+    const preview = game.previewPutt();
+    const predicted = preview.path[preview.path.length - 1].pos;
+    game.tap();
+    game.meter = 0.5;
+    game.tap();
+    for (let i = 0; i < 900 && game.swingPhase !== "aim" && game.screen === "play"; i++) game.update(1 / 60);
+    const finish = preview.holed ? game.hole().pin : game.ball.pos;
+    expect(Math.hypot(finish.x - predicted.x, finish.y - predicted.y)).toBeLessThan(0.35);
+  });
 });
+
+/** Distance a putt at `fill` rolls along `dir` (unit), aimed a touch offline so the cup cannot catch it. */
+function rollPace(game: GameSession, dir: { x: number; y: number }, yards: number, fill: number) {
+  const pin = game.hole().pin;
+  game.ball = createBall({ x: pin.x - dir.x * yards, y: pin.y - dir.y * yards });
+  game.lie = "green";
+  game.clubIndex = clubIndex("putter");
+  game.aim = Math.atan2(dir.y, dir.x) + 0.16;
+  game.visualAim = game.aim;
+  game.aimExplicit = true;
+  game.swingPhase = "power";
+  game.meter = fill;
+  const path = game.previewPutt().path;
+  const end = path[path.length - 1].pos;
+  return Math.hypot(end.x - game.ball.pos.x, end.y - game.ball.pos.y);
+}
 
 describe("long and off-green putts", () => {
   /** Distance a putt at `fill` rolls from `back` yards out along the tee line, with the break and cup out of the way. */
@@ -147,6 +204,7 @@ describe("long and off-green putts", () => {
     game.visualAim = game.aim;
     game.aimExplicit = true;
     game.swingPhase = "power";
+    game.meter = fill;
     game.visualPower = fill;
     const path = game.previewPutt().path;
     const end = path[path.length - 1].pos;

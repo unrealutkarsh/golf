@@ -40,6 +40,16 @@ export interface ShotInput {
   wind: Wind;
   /** -1 fade, 0 straight, +1 draw (curves left of the aim line). */
   shape?: number;
+  /** Tee and fairway release. Omitted plays the stock hop and roll. */
+  ground?: GroundPlay;
+}
+
+/** How firm the short grass is. Greens, rough, and sand ignore this — those lies already have their own story. */
+export interface GroundPlay {
+  /** Multiplies the club's fairway rollout on the first landing. */
+  roll: number;
+  /** Multiplies the first hop. Under 1 stays down and runs. Over 1 kicks. */
+  hop: number;
 }
 
 export interface SimEvent {
@@ -73,7 +83,16 @@ const GREEN_DIE_SPEED = 2.4;
 const GREEN_CATCH = 0.55;
 /** A rolling ball on the green comes to rest below this speed, yd/s. */
 const GREEN_REST_SPEED = 0.78;
-/** Sideways pull of a green's slope, yd/s² per unit of `greenBreak`. At the old 2.4 a 9-yard putt broke only a few inches; 4.5 gives roughly 1–4 ft over 9 yards across these greens. */
+/**
+ * Drop of the putting surface, yards per yard, for one unit of `greenBreak`.
+ * The mesh uses this same fall, and +greenBreak is downhill — the way the ball is pulled.
+ */
+export const GREEN_FALL = 0.016;
+/**
+ * Downhill pull, yd/s² per unit of `greenBreak`. One vector does the side break and the
+ * uphill/downhill pace, so the line cannot bend a different way than the slope.
+ * About 1–4 ft of break on a 9-yard putt across these greens.
+ */
 const GREEN_BREAK_ACCEL = 4.5;
 
 const RESTITUTION: Record<Lie, number> = {
@@ -90,15 +109,73 @@ const RESTITUTION: Record<Lie, number> = {
  * Share of forward speed a landing ball keeps on its first bounce. Fairways release it; long grass smothers it,
  * so a miss stays in the rough instead of skipping back out; sand swallows it.
  */
+/**
+ * Share of the club's fairway rollout a landing ball keeps. Fairways release the authored roll;
+ * long grass and sand swallow it; a green holds a wedge and only leaks a low-spin ball forward.
+ */
 const LANDING_GRAB: Record<Lie, number> = {
   tee: 1,
   fairway: 1,
-  rough: 0.35,
-  green: 0.8,
-  bunker: 0.06,
+  rough: 0.1,
+  green: 0.48,
+  bunker: 0.04,
   water: 0,
-  ob: 0.6,
+  ob: 0.45,
 };
+
+/** How far a ball already rolling at `speed` travels on a flat lie before the stop rule. */
+function flatRollout(speed: number, lie: Lie): number {
+  let vel = Math.max(0, speed);
+  let spinning = vel;
+  let yards = 0;
+  for (let i = 0; i < 4000; i++) {
+    if (vel <= STOP_SPEED) break;
+    yards += vel * SIM_DT;
+    if (lie === "green") {
+      const next = applyGreenGrip({ pos: { x: 0, y: 0 }, vel: { x: vel, y: 0 }, z: 0, vz: 0, spinning, curve: 0, lipped: false }, SIM_DT);
+      vel = next.vel.x;
+      spinning = next.spinning;
+    } else {
+      vel *= FRICTION[lie];
+      if (lie === "bunker") vel *= 0.82;
+    }
+  }
+  return yards;
+}
+
+const rolloutTables = new Map<Lie, { speed: number; yards: number }[]>();
+
+function rolloutTable(lie: Lie): { speed: number; yards: number }[] {
+  let table = rolloutTables.get(lie);
+  if (!table) {
+    table = [{ speed: 0, yards: 0 }];
+    for (let speed = 0.15; speed <= 48; speed += speed < 6 ? 0.15 : 0.6) table.push({ speed, yards: flatRollout(speed, lie) });
+    rolloutTables.set(lie, table);
+  }
+  return table;
+}
+
+/** Launch speed that rolls `yards` on a flat `lie` under the same grip as stepBall. */
+export function speedForRollout(yards: number, lie: Lie): number {
+  const table = rolloutTable(lie);
+  const y = Math.max(0, yards);
+  let i = 1;
+  while (i < table.length - 1 && table[i].yards < y) i++;
+  const a = table[i - 1];
+  const b = table[i];
+  if (y >= b.yards) return b.speed;
+  const t = b.yards === a.yards ? 0 : (y - a.yards) / (b.yards - a.yards);
+  return a.speed + (b.speed - a.speed) * t;
+}
+
+/** First-bounce hop. Sand plugs, rough thuds, wedges check, and a driver on short grass skips. */
+function landingHop(lie: Lie, check: number, impactVz: number): number {
+  if (lie === "bunker" || lie === "water") return 0.25;
+  if (lie === "rough") return Math.min(1.35, Math.abs(impactVz) * 0.035);
+  const firm = lie === "green" ? 0.42 : 1;
+  const spinKill = 1.12 - 0.92 * clamp(check, 0, 1);
+  return Math.min(6.2, Math.abs(impactVz) * RESTITUTION[lie] * spinKill * firm * 0.9);
+}
 
 /** How much wider a mistimed strike sprays from a bad lie. */
 const LIE_SPRAY: Record<Lie, number> = {
@@ -122,8 +199,9 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
   const spray = ((1 - shot.club.accuracy) * acc * 0.1 + acc * 0.016) * LIE_SPRAY[shot.lie];
   const aim = shot.aim + spray;
   const shape = shot.club.id === "putter" ? 0 : clamp(shot.shape ?? 0, -1, 1);
-  // Lateral curve distance at full swing ≈ curve / 2 yards; divided by hang² at launch to become an acceleration.
-  const curve = shape * (1.1 - shot.club.loft / 80) * (0.55 + power * 0.7) * 34;
+  // Centered strike keeps full smash. A toe or heel loses ball speed, the way a monitor drops carry.
+  const purity = 1 - Math.min(1, Math.abs(acc));
+  const smash = shot.club.id === "putter" ? 1 : 0.86 + 0.14 * purity;
 
   if (shot.club.id === "putter") {
     const roll = shot.club.roll * power * lieMul * (shot.lie === "green" ? 1 : 0.55);
@@ -134,15 +212,36 @@ export function launchBall(from: Vec2, shot: ShotInput): Ball {
 
   const profile = flightProfile(shot.club, power, lieMul);
   const { hang, apex, drag, rise } = profile;
-  const carry = shot.club.carry * power * lieMul;
+  const carry = shot.club.carry * power * lieMul * smash;
   // Horizontal speed decays with drag, so solve for the launch speed that still carries `carry` in `hang` seconds.
   const horiz = drag > 0 ? (carry * drag) / (1 - Math.exp(-drag * hang)) : carry / hang;
   // The ball climbs for `rise` of the flight and falls faster than it rose — that is what gives the steep descent.
   const tUp = hang * rise;
   const tDown = hang - tUp;
-  const flight = { gUp: (2 * apex) / (tUp * tUp), gDown: (2 * apex) / (tDown * tDown), drag };
+  // A draw starts right of the aim line and sidespin works it back left. A fade mirrors that.
+  const startLine = shape * 0.052 * (0.78 + 0.22 * Math.min(power, 1));
+  const side = shape * (1.06 - shot.club.loft / 120) * (0.6 + 0.48 * Math.min(power, 1)) * 2.45;
+  const flight = {
+    gUp: (2 * apex) / (tUp * tUp),
+    gDown: (2 * apex) / (tDown * tDown),
+    drag,
+    sideX: Math.sin(shot.aim) * side,
+    sideY: -Math.cos(shot.aim) * side,
+    check: clamp((shot.club.loft - 8) / 50, 0.04, 1) * (0.62 + 0.38 * purity),
+  };
   const vz = (2 * apex) / tUp;
-  return { pos: clone(from), vel: fromAngle(aim, horiz), z: 0.2, vz, spinning: shot.club.roll * power, curve: curve / (hang * hang), lipped: false, flight };
+  // `spinning` is the fairway rollout this swing should finish with, in yards. Lies scale it on landing.
+  const rollout = shot.club.roll * power * (1.06 - 0.06 * purity);
+  return {
+    pos: clone(from),
+    vel: fromAngle(aim + startLine, horiz),
+    z: 0.2,
+    vz,
+    spinning: rollout,
+    curve: shape * 24,
+    lipped: false,
+    flight,
+  };
 }
 
 /** Hang time, apex, and drag for a swing. Partial swings fly lower and land sooner. */
@@ -222,12 +321,16 @@ export function applyGreenGrip(ball: Ball, dt: number): { vel: Vec2; spinning: n
 
 export function windAccel(wind: Wind, z: number): Vec2 {
   if (z <= 0.2) return { x: 0, y: 0 };
-  const mph = wind.speed;
-  const k = 0.12 * mph * (0.5 + (Math.min(z, 30) / 30) * 0.8);
-  return fromAngle(wind.dir, k);
+  const climb = Math.min(z, 30) / 30;
+  // One swell: nothing on the ground, full gust around 15 yards up, gone again at the top of a drive.
+  const swell = Math.sin(climb * Math.PI);
+  const mph = Math.max(0, wind.speed + (wind.gust ?? 0) * swell);
+  const influence = wind.influence ?? 1;
+  const k = 0.12 * mph * influence * (0.5 + climb * 0.8);
+  return fromAngle(wind.dir + (wind.shear ?? 0) * swell, k);
 }
 
-export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBounce: number): StepResult {
+export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBounce: number, ground?: GroundPlay): StepResult {
   const events: SimEvent[] = [];
   const flight = ball.flight;
   const gravity = flight ? (ball.vz > 0 ? flight.gUp : flight.gDown) : GRAVITY;
@@ -243,13 +346,9 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     flight,
   };
 
-  if (next.z > 0.35 && Math.abs(ball.curve) > 0.01) {
-    const speed = len(next.vel) || 1;
-    next.vel = {
-      // Positive curve bends left of travel. +y is south, i.e. to the player's right when facing +x, so rotate toward -y.
-      x: next.vel.x + (next.vel.y / speed) * ball.curve * dt,
-      y: next.vel.y + (-next.vel.x / speed) * ball.curve * dt,
-    };
+  if (next.z > 0.35 && flight && (Math.abs(flight.sideX) > 0.001 || Math.abs(flight.sideY) > 0.001)) {
+    // Fixed to the aim line, so a draw can start right and still work back across it.
+    next.vel = { x: next.vel.x + flight.sideX * dt, y: next.vel.y + flight.sideY * dt };
   }
 
   const tree = treeHit(hole, next.pos, next.z);
@@ -271,6 +370,9 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
   if (next.z <= 0) {
     next.z = 0;
+    const firstTouch = Boolean(ball.flight);
+    const check = ball.flight?.check ?? 0;
+    const intendedRoll = ball.spinning;
     // Bounces after touchdown use plain gravity so the ball does not float back up.
     next.flight = undefined;
     const lie = lieAt(hole, next.pos);
@@ -300,11 +402,25 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
       };
     }
 
-    if (Math.abs(ball.vz) > 2.2) {
-      next.vz = -ball.vz * RESTITUTION[lie] * (0.64 + clubBounce * 0.42);
-      const rollKeep = (0.22 + Math.min(0.42, (ball.spinning / 28) * 0.45)) * LANDING_GRAB[lie];
-      next.vel = scale(next.vel, rollKeep);
-      next.spinning *= 0.35;
+    if (firstTouch) {
+      // Firmness is a fairway and tee story. A green still holds, and rough and sand still smother.
+      const release = lie === "fairway" || lie === "tee";
+      const hop = Math.min(7.6, landingHop(lie, check, ball.vz) * (release ? (ground?.hop ?? 1) : 1));
+      const hopTime = hop > 2.2 ? (2 * hop) / GRAVITY : 0;
+      const target = Math.max(0, intendedRoll) * LANDING_GRAB[lie] * (release ? (ground?.roll ?? 1) : 1);
+      let speed = speedForRollout(target, lie);
+      if (hopTime > 0 && speed > 0) {
+        speed = speedForRollout(Math.max(0, target - speed * hopTime), lie);
+        speed = speedForRollout(Math.max(0, target - speed * hopTime), lie);
+      }
+      const ang = Math.atan2(ball.vel.y, ball.vel.x);
+      next.vel = fromAngle(ang, speed);
+      next.spinning = speed;
+      next.vz = hop > 2.2 ? hop : 0;
+      events.push({ type: "bounce", pos: clone(next.pos) });
+    } else if (Math.abs(ball.vz) > 2.2) {
+      next.vz = Math.abs(ball.vz) * RESTITUTION[lie] * (0.45 + clubBounce * 0.15);
+      next.vel = scale(next.vel, 0.96);
       events.push({ type: "bounce", pos: clone(next.pos) });
     } else {
       next.vz = 0;
@@ -312,8 +428,8 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
         const gripped = applyGreenGrip(next, dt);
         next.vel = gripped.vel;
         next.spinning = gripped.spinning;
-        // Break only while the ball is still rolling. Applying it at rest
-        // kept putts creeping forever and blocked the next stroke.
+        // Pull downhill (+greenBreak, the same fall the mesh uses) only while the ball
+        // is still rolling. Applying it at rest kept putts creeping and blocked the next stroke.
         if (len(next.vel) > STOP_SPEED * 1.2) {
           next.vel = add(next.vel, scale(hole.greenBreak, dt * GREEN_BREAK_ACCEL));
         }
@@ -328,17 +444,19 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
 
   const speed = len(next.vel);
   const lie = lieAt(hole, next.pos);
-  const pinDist = dist(next.pos, hole.pin);
+  const endDist = dist(next.pos, hole.pin);
+  // A fast step can jump the cup. The closest point on this step is what the hole actually saw.
+  const cupDist = Math.min(endDist, distToSegment(hole.pin, ball.pos, next.pos));
   let holed = false;
 
-  if (onGreen(hole, next.pos) && next.z <= 0.05) {
-    if (pinDist < CUP_RADIUS) {
+  if (next.z <= 0.05 && (onGreen(hole, next.pos) || cupDist < CUP_RADIUS)) {
+    if (cupDist < CUP_RADIUS) {
       if (!ball.lipped && speed < CAPTURE_SPEED) {
         holed = true;
       } else if (speed >= LIP_SPEED && !ball.lipped) {
         next.lipped = true;
         const away = angleTo(hole.pin, next.pos);
-        next.pos = add(next.pos, fromAngle(away, CUP_RADIUS + 0.14));
+        next.pos = add(hole.pin, fromAngle(away, CUP_RADIUS + 0.14));
         next.vel = fromAngle(away, Math.min(speed * 0.2, 2.1));
         events.push({ type: "lip", pos: clone(next.pos) });
       } else if (!ball.lipped) {
@@ -346,7 +464,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
         next.vel = add(next.vel, fromAngle(toward, dt * 2.8));
         next.vel = scale(next.vel, Math.pow(0.93, dt * 60));
       }
-    } else if (!ball.lipped && pinDist < GIMME_RADIUS && speed < STOP_SPEED) {
+    } else if (!ball.lipped && endDist < GIMME_RADIUS && speed < STOP_SPEED) {
       holed = true;
     }
     if (holed) {
@@ -357,7 +475,7 @@ export function stepBall(ball: Ball, hole: Hole, wind: Wind, dt: number, clubBou
     }
   }
 
-  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < GREEN_REST_SPEED && pinDist > CUP_RADIUS;
+  const dyingOnGreen = lie === "green" && next.z <= 0 && speed < GREEN_REST_SPEED && endDist > CUP_RADIUS;
   const flying = !holed && !dyingOnGreen && (next.z > 0.05 || speed > STOP_SPEED);
   if (!flying && !holed) {
     next.vel = { x: 0, y: 0 };
@@ -461,8 +579,8 @@ export function sampleFlightPath(from: Vec2, shot: ShotInput, hole: Hole, untilR
   let ball = launchBall(from, shot);
   const samples: FlightSample[] = [{ pos: clone(from), z: ball.z }];
   let airborne = ball.z > 0.05;
-  for (let i = 0; i < 900; i++) {
-    const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce);
+  for (let i = 0; i < 1800; i++) {
+    const step = stepBall(ball, hole, shot.wind, SIM_DT, shot.club.bounce, shot.ground);
     samples.push({ pos: clone(step.ball.pos), z: step.ball.z });
     if (step.penaltyKind || step.holed) break;
     if (!untilRest && airborne && step.ball.z <= 0.05) break;

@@ -66,7 +66,7 @@ export class Renderer {
     const staticCanvas = this.course.paintStatic(hole);
     ctx.drawImage(staticCanvas, hole.bounds.x, hole.bounds.y, hole.bounds.w, hole.bounds.h);
     this.course.drawLive(ctx, session, hole, this.time, this.w, this.h);
-    this.overlays.draw(ctx, session, hole, dt);
+    this.overlays.draw(ctx, session, dt);
     ctx.restore();
     this.course.drawAtmosphere(ctx, this.w, this.h);
     if (session.screen === "play") drawHud(ctx, session, this.w, this.h);
