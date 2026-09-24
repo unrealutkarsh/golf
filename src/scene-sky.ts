@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { SCENE_TONE } from "./look";
+import { type CourseAtmosphere, SCENE_TONE } from "./look";
 
 const SKY_VERT = /* glsl */ `
   varying vec3 vDir;
@@ -62,6 +62,21 @@ const SKY_FRAG = /* glsl */ `
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+
+export function applySkyAtmosphere(sky: THREE.Mesh, atmo: CourseAtmosphere): void {
+  const mat = sky.material as THREE.ShaderMaterial;
+  const set = (name: string, rgb: readonly [number, number, number]) => {
+    (mat.uniforms[name].value as THREE.Vector3).set(rgb[0], rgb[1], rgb[2]);
+  };
+  set("uZenith", atmo.skyZenith);
+  set("uMid", atmo.skyMid);
+  set("uHorizon", atmo.skyHorizon);
+  set("uGround", atmo.skyGround);
+  set("uHaze", atmo.skyHaze);
+  mat.uniforms.uGlow.value = atmo.sunGlow;
+  mat.uniforms.uWash.value = atmo.sunWash;
+  mat.uniforms.uCloud.value = atmo.cloudMix;
+}
 
 export function makeSky(): THREE.Mesh {
   const tone = SCENE_TONE;

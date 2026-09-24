@@ -66,6 +66,9 @@ function handleAction(action: string, payload?: string): void {
     case "shape":
       if (payload) session.setShape(Number(payload));
       break;
+    case "clubs":
+      session.toggleClubTray();
+      break;
   }
 }
 
@@ -146,6 +149,7 @@ window.addEventListener("keydown", (e) => {
   if (key === "escape") {
     if (session.helpOpen) session.helpOpen = false;
     else if (session.scorecardOpen) session.scorecardOpen = false;
+    else if (session.screen === "play" && session.clubTray === "open" && session.swingPhase === "aim") session.closeClubTray();
     else if (session.screen === "play") session.cancelSwing();
     else if (session.screen === "tour") session.screen = "title";
   }
@@ -163,9 +167,16 @@ function step(dt: number): void {
 
 let last = performance.now();
 function frame(now: number): void {
-  const dt = Math.min(0.033, (now - last) / 1000);
+  const elapsed = Math.max(0, (now - last) / 1000);
   last = now;
-  step(dt);
+  // The swing meter stays on a short step so a hitch cannot skip the accuracy window.
+  // Flight integrates in fixed 1/60 steps inside that budget. Capping it at 33ms
+  // turns a slow frame into slow motion, and on a software GPU a drive then sits
+  // on "Ball in air" for tens of seconds. A one-second cap keeps the ball on
+  // wall-clock time down to about 1 fps; settle uses it too so the landing hold
+  // does not stall after the ball is already down.
+  const cap = session.swingPhase === "flight" || session.swingPhase === "settle" ? 1 : 0.033;
+  step(Math.min(cap, elapsed));
   requestAnimationFrame(frame);
 }
 
@@ -199,9 +210,20 @@ const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
   session.playThroughForTest();
-} else if (qa === "fairway" || qa === "tee") {
+} else if (qa === "fairway" || qa === "tee" || qa === "clubs") {
   session.startTournament();
   session.tipVisible = false;
+  if (qa === "clubs") session.toggleClubTray();
+} else if (qa === "swing") {
+  session.startTournament();
+  session.tipVisible = false;
+  session.camMode = "player";
+  session.swingPhase = "accuracy";
+  session.meter = 0.62;
+  session.power = 0.72;
+  session.accuracy = 0;
+  session.lockedAccuracy = false;
+  session.update = () => undefined;
 } else if (qa === "fairwayClose") {
   session.startTournament();
   session.tipVisible = false;

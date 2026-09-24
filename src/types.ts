@@ -92,12 +92,18 @@ export interface Ball {
   z: number;
   vz: number;
   spinning: number;
-  /** Lateral curve rate while airborne. Positive is a draw (left of aim). */
+  /**
+   * Signed shot shape for cameras and the tracer. Positive is a draw (works left).
+   * The bend itself is `flight.sideX` / `flight.sideY`.
+   */
   curve: number;
   /** True after a lip-out this stroke so the cup does not keep kicking. */
   lipped: boolean;
-  /** Launch flight model: rise / fall gravity and air drag. Cleared on first ground contact. */
-  flight?: { gUp: number; gDown: number; drag: number };
+  /**
+   * Launch flight model. Cleared on first ground contact.
+   * `sideX`/`sideY` are world-frame sidespin (yards/s²). `check` is backspin, 0 runs and 1 stops.
+   */
+  flight?: { gUp: number; gDown: number; drag: number; sideX: number; sideY: number; check: number };
 }
 
 export type CamMode = "auto" | "player" | "follow" | "putt";
