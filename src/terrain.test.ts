@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HARBOR_DUNES, inWater } from "./course";
-import { MAX_PUTT_POWER } from "./physics";
+import { GREEN_FALL, MAX_PUTT_POWER } from "./physics";
 import {
   bladeHeight,
   bladeKeepChance,
@@ -33,6 +33,17 @@ describe("course terrain", () => {
     expect(inWater(hole, pond)).toBe(true);
     expect(green).toBeGreaterThan(sand + 0.2);
     expect(green).toBeGreaterThan(groundHeight(hole, pond.x, pond.y) + 0.4);
+  });
+
+  it("falls in the direction the ball breaks", () => {
+    const hole = HARBOR_DUNES.holes[5];
+    const br = hole.greenBreak;
+    const c = hole.green;
+    const high = groundHeight(hole, c.cx - br.x * 6, c.cy - br.y * 6);
+    const low = groundHeight(hole, c.cx + br.x * 6, c.cy + br.y * 6);
+    expect(low).toBeLessThan(high - 0.08);
+    expect(GREEN_FALL).toBeGreaterThan(0.01);
+    expect(GREEN_FALL).toBeLessThan(0.04);
   });
 
   it("picks player, follow, and putting cameras", () => {

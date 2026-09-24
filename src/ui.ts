@@ -1,12 +1,14 @@
 import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
+import { playHudMode, showClubTray, windArrowDegrees, yardageReadout } from "./hud";
+import { lieCarryNote } from "./lie-story";
 import { surfaceLabel, windLabel } from "./physics";
-import { camLabel, shapeLabel } from "./terrain";
+import { shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
 import { courseById } from "./course";
 import { PLAYER_CARD, TOURNAMENTS } from "./tour";
-import type { ScreenId } from "./types";
+import type { CamMode, ScreenId } from "./types";
 
 export class UI {
   private overlay: HTMLElement;
@@ -173,11 +175,11 @@ export class UI {
         <h2>How to play</h2>
         <ol>
           <li><b>Aim</b> by dragging, or nudge with arrows / A / D. A click or Space starts the swing without moving the line.</li>
-          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. The PWR bar shows percent and yards; the white tick is the fill that should finish at the hole.</li>
-          <li><b>Shape</b> Fade / Straight / Draw before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
-          <li><b>Clubs</b> with Q / E, mouse wheel, or the tray. The game suggests a club after each shot, but any club can be played from anywhere — including a wedge off the green.</li>
+          <li><b>Swing</b> with click or Space: start the meter, set power, then time the wide accuracy window. Power and accuracy appear only while you swing, then tuck away at address. The bar shows percent and yards. The white tick is the suggested fill — with the putter, flat hole-pace.</li>
+          <li><b>Shape</b> Fade / Straight / Draw from the bag before you swing (or Z / X). The aim ribbon and flight tube bend in the air. Shape is off with the putter.</li>
+          <li><b>Clubs</b> with Q / E, the mouse wheel, or the club name on the monitor. The bag stays closed at address and opens while you change clubs. The game suggests a club after each shot, but any club can be played from anywhere — including a wedge off the green.</li>
           <li><b>Camera</b> with V or View: auto, address (over the ball), follow. On the green the view sits over the ball looking at the pin — no player mesh in the way.</li>
-          <li><b>Putting</b>: the dotted line follows the slope of the green to where the ball will stop, and turns gold when the putt drops. Read the break with ← → or by dragging. G toggles the break grid.</li>
+          <li><b>Putting</b>: the dotted line is the putt you are about to hit, break included, and it turns gold when that pace drops. The white tick is flat hole-pace — uphill dies short of it, downhill runs by. Soft dies short, firm runs long. Read the line with ← → or by dragging. G toggles the fall grid. Sound is on (M mutes): a whoosh and contact for each club, plus a quiet wind.</li>
           <li>Wind moves the ball in the air. Rough grabs a landing ball and costs you distance and accuracy on the next shot; sand stops the ball dead, and only a wedge gets out cleanly. Misses just off the rough stay in play. Water is a drop plus one; far OB is stroke and distance.</li>
         </ol>
         <p class="keys">V camera · G grid · Z / X shape · C scorecard · H help · M mute · Esc cancel</p>
@@ -278,67 +280,108 @@ export class UI {
   }
 
   private renderHud(session: GameSession): string {
-    const hole = session.hole();
-    const wind = windLabel(session.wind);
-    const club = session.club();
-    const running = session.results.length ? formatToPar(toPar(session.results)) : "E";
-    const tip = session.tipVisible
-      ? `<div class="tip">Move to aim. Click or Space three times: start · power · accuracy.</div>`
+    return playHudHtml(session);
+  }
+}
+
+/** In-round monitor. Yardage, wind, and lie stay up; the bag and swing chrome do not. */
+export function playHudHtml(session: GameSession): string {
+  const hole = session.hole();
+  const wind = windLabel(session.wind);
+  const club = session.club();
+  const running = session.results.length ? formatToPar(toPar(session.results)) : "E";
+  const yards = yardageReadout(session.toPin(), session.putting());
+  const tray = showClubTray(session.swingPhase, session.clubTray);
+  const mode = playHudMode(session.swingPhase, session.clubTray);
+  const arrow = windArrowDegrees(session.wind.dir);
+  const stroke = Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0);
+  const atAddress = session.swingPhase === "aim";
+  const phase = phaseLabel(session);
+  const shape = shapeLabel(session.shape);
+  const atStance = session.swingPhase === "aim" || session.swingPhase === "power" || session.swingPhase === "accuracy";
+  const lieNote = atStance ? lieCarryNote(session.lie, club.id) : "";
+  const tip = session.tipVisible
+    ? `<p class="lm-tip">Drag to aim. Click or Space three times: start, power, accuracy.</p>`
+    : "";
+  const msg = session.messageTime > 0 ? `<p class="lm-toast">${escapeHtml(session.message)}</p>` : "";
+  const bag = tray
+    ? `<div class="lm-bag">
+        <div class="lm-clubs">
+          ${CLUBS.map(
+            (c, i) =>
+              `<button type="button" class="lm-club-btn${i === session.clubIndex ? " is-on" : ""}" data-action="club" data-payload="${i}">${c.shortName}</button>`,
+          ).join("")}
+        </div>
+        <div class="lm-shapes">
+          <button type="button" class="lm-shape-btn${session.shape < -0.2 ? " is-on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
+          <button type="button" class="lm-shape-btn${Math.abs(session.shape) <= 0.2 ? " is-on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
+          <button type="button" class="lm-shape-btn${session.shape > 0.2 ? " is-on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
+        </div>
+        ${session.putting() ? `<p class="lm-bag-note">Read the break. Arrows or drag to aim.</p>` : `<p class="lm-bag-note">Z fade · X draw</p>`}
+      </div>`
+    : "";
+  const shapeControl =
+    atAddress && session.canShape()
+      ? `<button type="button" class="lm-shape" data-action="clubs">${shape}</button>`
       : "";
-    const msg = session.messageTime > 0 ? `<div class="toast">${escapeHtml(session.message)}</div>` : "";
-    const phase =
-      session.swingPhase === "power"
-        ? "Set power"
-        : session.swingPhase === "accuracy"
-          ? "Time it"
-          : session.swingPhase === "flight"
-            ? "Ball in air"
-            : "Aim and swing";
-    return `
-      <div class="ticker">
-        <span class="brand">${PLAYER_CARD.tour}</span>
-        <span class="dot"></span>
-        <b>H${hole.number}</b>
+  return `
+    <div class="lm" data-hud="${mode}">
+      <div class="lm-status">
+        <span class="lm-hole">Hole ${hole.number}</span>
         <span>Par ${hole.par}</span>
         <span>${hole.yards}</span>
-        <span class="dot"></span>
-        <span class="live">${Math.round(session.toPin())} yds</span>
-        <span class="lie-chip lie-${session.lie}">${surfaceLabel(session.lie)}</span>
-        <span>${wind.mph} ${wind.arrow}</span>
-        <span class="club-chip">${club.shortName}</span>
-        <span class="shape-chip ${shapeLabel(session.shape).toLowerCase()}">${session.canShape() || session.swingPhase === "flight" ? `Shape · ${shapeLabel(session.shape)}` : "Shape off"}</span>
-        <span>${camLabel(session.resolvedCam())}</span>
-        <span class="grow"></span>
-        <span>${escapeHtml(session.profile.name)}</span>
-        <span>Str ${Math.max(session.strokes, 0) + (session.swingPhase === "aim" ? 1 : 0)}</span>
-        <span class="score">${running}</span>
+        <b class="lm-score">${running}</b>
+        <span>Stroke ${stroke}</span>
+        <span class="lm-name">${escapeHtml(session.profile.name)}</span>
+        <div class="lm-tools">
+          <button type="button" data-action="scorecard">Card</button>
+          <button type="button" data-action="help">Help</button>
+          <button type="button" data-action="mute" class="${session.audio.muted ? "is-on" : ""}">${session.audio.muted ? "Muted" : "Sound"}</button>
+          <button type="button" data-action="camera">${camModeLabel(session.camMode)}</button>
+          <button type="button" data-action="grid" class="${session.puttGrid ? "is-on" : ""}">Grid</button>
+        </div>
+      </div>
+      <div class="lm-stack">
+        <section class="lm-readout lie-${session.lie}">
+          <p class="lm-lie">${surfaceLabel(session.lie)}</p>
+          ${lieNote ? `<p class="lm-lie-note">${escapeHtml(lieNote)}</p>` : ""}
+          <div class="lm-main">
+            <div class="lm-yards">
+              <b>${yards.value}</b>
+              <span class="lm-cap">${yards.caption}<i>${yards.unit}</i></span>
+            </div>
+            <div class="lm-wind" title="${wind.mph} ${wind.arrow}">
+              <i class="lm-arrow" style="transform:rotate(${arrow.toFixed(1)}deg)"></i>
+              <div>
+                <b>${Math.round(session.wind.speed)}</b>
+                <span>${wind.arrow} · MPH</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="lm-club" data-action="clubs" aria-expanded="${tray ? "true" : "false"}" ${atAddress ? "" : "disabled"}>${escapeHtml(club.name)}</button>
+          ${shapeControl}
+          ${phase ? `<p class="lm-phase">${phase}</p>` : ""}
+        </section>
+        ${bag}
       </div>
       ${tip}
       ${msg}
-      <div class="hud-dock">
-        <div class="shape-rail ${session.canShape() || session.swingPhase === "flight" ? "" : "off"}">
-          <span>Shot shape</span>
-          <button class="fade ${session.shape < -0.2 ? "on" : ""}" data-action="shape" data-payload="-1" ${session.canShape() ? "" : "disabled"}>Fade</button>
-          <button class="${Math.abs(session.shape) <= 0.2 ? "on" : ""}" data-action="shape" data-payload="0" ${session.canShape() ? "" : "disabled"}>Straight</button>
-          <button class="draw ${session.shape > 0.2 ? "on" : ""}" data-action="shape" data-payload="1" ${session.canShape() ? "" : "disabled"}>Draw</button>
-          <span class="shape-hint">${session.club().id === "putter" ? "Read the break · ← → or drag to aim" : "Z fade · X draw"}</span>
-        </div>
-        <div class="clubs">
-          ${CLUBS.map(
-            (c, i) =>
-              `<button class="club ${i === session.clubIndex ? "on" : ""}" data-action="club" data-payload="${i}">${c.shortName}</button>`,
-          ).join("")}
-        </div>
-        <div class="tools">
-          <span class="phase">${phase}</span>
-          <button data-action="camera">View · ${session.camMode === "player" ? "address" : session.camMode}</button>
-          <button class="${session.puttGrid ? "on" : ""}" data-action="grid">Grid</button>
-          <button data-action="scorecard">Card</button>
-          <button data-action="help">Help</button>
-          <button data-action="mute">${session.audio.muted ? "Muted" : "Sound"}</button>
-        </div>
-      </div>`;
-  }
+    </div>`;
+}
+
+function phaseLabel(session: GameSession): string {
+  if (session.swingPhase === "power") return "Set power";
+  if (session.swingPhase === "accuracy") return "Time it";
+  if (session.swingPhase === "flight") return session.ball.z > 0.45 ? "In the air" : "Rolling";
+  if (session.swingPhase === "settle") return "Ball down";
+  return "";
+}
+
+function camModeLabel(mode: CamMode): string {
+  if (mode === "player") return "Address";
+  if (mode === "follow") return "Follow";
+  if (mode === "putt") return "Putt";
+  return "Auto";
 }
 
 function initials(name: string): string {

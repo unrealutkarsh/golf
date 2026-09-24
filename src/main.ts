@@ -66,6 +66,9 @@ function handleAction(action: string, payload?: string): void {
     case "shape":
       if (payload) session.setShape(Number(payload));
       break;
+    case "clubs":
+      session.toggleClubTray();
+      break;
   }
 }
 
@@ -146,6 +149,7 @@ window.addEventListener("keydown", (e) => {
   if (key === "escape") {
     if (session.helpOpen) session.helpOpen = false;
     else if (session.scorecardOpen) session.scorecardOpen = false;
+    else if (session.screen === "play" && session.clubTray === "open" && session.swingPhase === "aim") session.closeClubTray();
     else if (session.screen === "play") session.cancelSwing();
     else if (session.screen === "tour") session.screen = "title";
   }
@@ -163,9 +167,16 @@ function step(dt: number): void {
 
 let last = performance.now();
 function frame(now: number): void {
-  const dt = Math.min(0.033, (now - last) / 1000);
+  const elapsed = Math.max(0, (now - last) / 1000);
   last = now;
-  step(dt);
+  // The swing meter stays on a short step so a hitch cannot skip the accuracy window.
+  // Flight integrates in fixed 1/60 steps inside that budget. Capping it at 33ms
+  // turns a slow frame into slow motion, and on a software GPU a drive then sits
+  // on "Ball in air" for tens of seconds. A one-second cap keeps the ball on
+  // wall-clock time down to about 1 fps; settle uses it too so the landing hold
+  // does not stall after the ball is already down.
+  const cap = session.swingPhase === "flight" || session.swingPhase === "settle" ? 1 : 0.033;
+  step(Math.min(cap, elapsed));
   requestAnimationFrame(frame);
 }
 
@@ -195,13 +206,86 @@ function poseShapedShot(session: GameSession, shape: number): void {
   session.update = () => undefined;
 }
 
+/** Park the ball on a lie, then optionally hold a contact so the splash can be framed. */
+function poseLie(session: GameSession, lie: "bunker" | "rough" | "fairway" | "green"): boolean {
+  const hole = session.hole();
+  const ax = hole.pin.x - hole.tee.x;
+  const ay = hole.pin.y - hole.tee.y;
+  const len = Math.hypot(ax, ay) || 1;
+  const fx = ax / len;
+  const fy = ay / len;
+  const px = -fy;
+  const py = fx;
+  const spots: { x: number; y: number }[] = [];
+  if (lie === "bunker") {
+    for (const b of hole.bunkers) spots.push({ x: b.cx, y: b.cy });
+  } else if (lie === "green") {
+    spots.push({ x: hole.pin.x - 6, y: hole.pin.y + 1.2 });
+  } else if (lie === "fairway") {
+    // Short leftover first so the address lens lifts and the ball stays in frame.
+    for (const t of [0.86, 0.78, 0.2, 0.35]) spots.push({ x: hole.tee.x + fx * len * t, y: hole.tee.y + fy * len * t });
+  } else {
+    for (const t of [0.8, 0.72, 0.2]) {
+      const x = hole.tee.x + fx * len * t;
+      const y = hole.tee.y + fy * len * t;
+      for (const s of [24, 30, 36, -26, -34]) spots.push({ x: x + px * s, y: y + py * s });
+    }
+  }
+  for (const p of spots) {
+    session.ball.pos = p;
+    session.ball.vel = { x: 0, y: 0 };
+    session.ball.z = 0;
+    session.refreshLie();
+    if (session.lie !== lie) continue;
+    session.aim = Math.atan2(hole.pin.y - p.y, hole.pin.x - p.x);
+    session.visualAim = session.aim;
+    session.aimExplicit = true;
+    return true;
+  }
+  return false;
+}
+
+function poseLieContact(session: GameSession, lie: "bunker" | "rough" | "fairway", club: "driver" | "sw" | "iron7", frames: number, release: boolean): void {
+  session.startTournament();
+  session.tipVisible = false;
+  session.wind = { speed: 3, dir: 0.4 };
+  if (!poseLie(session, lie)) return;
+  session.clubIndex = clubIndex(club);
+  session.power = 0.84;
+  session.accuracy = 0;
+  session.swingPhase = "accuracy";
+  session.meter = 0.5;
+  // Follow keeps the strike in the middle of the frame. Address looks past a long shot.
+  session.camMode = "follow";
+  session.tap();
+  session.hitStop = release ? session.hitStop : 30;
+  if (release) {
+    for (let i = 0; i < frames; i++) step(1 / 60);
+  }
+  session.impact = 0;
+  session.calloutTime = 0;
+  session.lieStill = true;
+  session.update = () => undefined;
+}
+
 const qa = new URLSearchParams(location.search).get("qa");
 if (qa === "round") {
   session.startTournament();
   session.playThroughForTest();
-} else if (qa === "fairway" || qa === "tee") {
+} else if (qa === "fairway" || qa === "tee" || qa === "clubs") {
   session.startTournament();
   session.tipVisible = false;
+  if (qa === "clubs") session.toggleClubTray();
+} else if (qa === "swing") {
+  session.startTournament();
+  session.tipVisible = false;
+  session.camMode = "player";
+  session.swingPhase = "accuracy";
+  session.meter = 0.62;
+  session.power = 0.72;
+  session.accuracy = 0;
+  session.lockedAccuracy = false;
+  session.update = () => undefined;
 } else if (qa === "fairwayClose") {
   session.startTournament();
   session.tipVisible = false;
@@ -245,6 +329,26 @@ if (qa === "round") {
   session.visualPower = session.power;
   session.camMode = "putt";
   session.puttGrid = qa === "green";
+} else if (qa === "bunker" || qa === "bunkerWedge") {
+  session.startTournament();
+  session.tipVisible = false;
+  poseLie(session, "bunker");
+  session.clubIndex = clubIndex(qa === "bunkerWedge" ? "sw" : "driver");
+  session.camMode = "player";
+} else if (qa === "rough") {
+  session.startTournament();
+  session.tipVisible = false;
+  poseLie(session, "rough");
+  session.clubIndex = clubIndex("iron7");
+  session.camMode = "player";
+} else if (qa === "bunkerHit") {
+  poseLieContact(session, "bunker", "driver", 16, false);
+} else if (qa === "bunkerWedgeHit") {
+  poseLieContact(session, "bunker", "sw", 16, false);
+} else if (qa === "roughHit") {
+  poseLieContact(session, "rough", "iron7", 6, true);
+} else if (qa === "fairwayHit") {
+  poseLieContact(session, "fairway", "iron7", 8, false);
 }
 
 (window as unknown as { __ptg: GameSession }).__ptg = session;

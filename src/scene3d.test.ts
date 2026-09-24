@@ -7,6 +7,7 @@ import { AIM_RIBBON_SEGS, aimRibbonHalfWidth, dimpleIndent, makeGolfBallGeometry
 import cameraSrc from "./scene-camera.ts?raw";
 import sceneSrc from "./scene3d.ts?raw";
 import terrainSrc from "./terrain.ts?raw";
+import turfSrc from "./turf.ts?raw";
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
 
@@ -78,6 +79,13 @@ describe("aim ribbon", () => {
     expect(sceneSrc).not.toMatch(/warn \? 0xc62828 : 0xf0d78a/);
     expect(sceneSrc).toMatch(/onPutt/);
     expect(sceneSrc).toMatch(/updateSceneCamera/);
+    expect(sceneSrc).not.toMatch(/refreshNearTurf/);
+    expect(sceneSrc).not.toMatch(/createNearTurf/);
+    expect(sceneSrc).toMatch(/CLOSE_STICK_HIDE/);
+    expect(sceneSrc).toMatch(/softShadow\.position/);
+    expect(sceneSrc).toMatch(/updateScuffs/);
+    expect(turfSrc).toMatch(/uGrainStrength/);
+    expect(turfSrc).toMatch(/ptg-world-uv-v3-grain/);
     expect(cameraSrc).toMatch(/playCamFraming/);
     expect(cameraSrc).toMatch(/cameraHeightAboveGround/);
     expect(AIM_RIBBON_SEGS).toBeGreaterThanOrEqual(32);

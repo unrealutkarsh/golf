@@ -54,11 +54,13 @@ npm test
 | Help | H or **Help** |
 | Mute | M or **Sound** |
 
-On the **green**, the camera sits over the ball looking at the pin. Tee and fairway shots use an over-the-ball address camera, then follow the ball in flight. Slight misses stay in the rough instead of going out of bounds.
+On the **green**, the camera sits over the ball looking at the pin. The dotted line is the putt you are about to hit: it bends with the slope and turns gold when that pace will drop. The white tick on the meter is flat hole-pace — uphill finishes short of it, downhill runs past, and the line shows which. A soft meter dies short; a firm one runs long. **G** shows the fall of the green. Tee and fairway shots use an over-the-ball address camera, then follow the ball in flight. Slight misses stay in the rough instead of going out of bounds.
+
+Sound is on by default and stays in the browser (no download): a whoosh and a different contact for driver, iron, wedge, and putter, plus a quiet wind that softens on the green. **M** or **Sound** mutes it.
 
 ### Shot shape
 
-Before a full swing, pick **Fade** (left-to-right), **Straight**, or **Draw** (right-to-left for a right-handed player). Use the **Shot shape** rail, or tap **Z** / **X**. The aim ribbon and in-air tube bend with the spin. Shape is disabled with the putter / on the green. Wind and the accuracy meter still move the ball; shape is extra curve while it is airborne.
+Before a full swing, pick **Fade** (starts left, works right), **Straight**, or **Draw** (starts right, works left). Use the **Shot shape** rail, or tap **Z** / **X**. The aim ribbon and in-air tube show the bend. Shape is disabled with the putter. A centered accuracy marker keeps the club's carry; missing the window costs ball speed. Wind still moves the ball in the air. Fairway landings release, rough and sand hold.
 
 The first tee shows a short tutorial tip.
 

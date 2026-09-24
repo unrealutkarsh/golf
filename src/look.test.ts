@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fbm, hashNoise, heightToNormal, packNormalRgb, SCENE_TONE } from "./look";
+import { atmosphereForCourse, fbm, fogRemain, hashNoise, heightToNormal, packNormalRgb, SCENE_TONE } from "./look";
 import { angleApproach, expApproach, wrapAngle } from "./math";
 
 describe("look noise", () => {
@@ -38,6 +38,20 @@ describe("scene tone", () => {
     expect(SCENE_TONE.fogNear).toBeGreaterThan(200);
     expect(SCENE_TONE.sunSoftware).toBeGreaterThan(0.9);
     expect(SCENE_TONE.exposureSoftware).toBeGreaterThan(0.95);
+  });
+
+  it("keeps Fog Belt in a marine layer and Harbor Dunes clear", () => {
+    const harbor = atmosphereForCourse("harbor-dunes");
+    const fog = atmosphereForCourse("fog-belt-links");
+    expect(harbor.fogNear).toBe(SCENE_TONE.fogNear);
+    expect(fog.fogNear).toBeLessThan(80);
+    expect(fog.fogFar).toBeLessThan(harbor.fogFar * 0.4);
+    // The fairway in front of the tee stays readable; the horizon does not.
+    expect(fogRemain(fog, 90)).toBeGreaterThan(0.8);
+    expect(fogRemain(fog, 280)).toBeLessThan(0.55);
+    expect(fogRemain(harbor, 280)).toBeGreaterThan(0.95);
+    expect(fog.skyZenith[2] - fog.skyZenith[0]).toBeLessThan(0.25);
+    expect(harbor.skyZenith[2]).toBeGreaterThan(harbor.skyZenith[0] * 2);
   });
 
   it("eases values instead of snapping", () => {

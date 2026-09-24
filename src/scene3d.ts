@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { lieAt, nearOb } from "./course";
-import { createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
+import { CLOSE_STICK_HIDE, createBladeMaterial, createFringeBladeMaterial, updateFringeBladeLod, updateGreenBladeLod } from "./blades";
+import { clubFamily } from "./clubs";
 import { bindFoliageArt, createFoliageKit, type FoliageKit } from "./foliage";
 import type { GameSession } from "./game";
 import { loadArtKit } from "./kit";
-import { SCENE_TONE } from "./look";
+import { atmosphereForCourse, SCENE_TONE } from "./look";
 import { lerp, type Vec2 } from "./math";
 import { samplePathPoint, type FlightSample } from "./physics";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -12,16 +13,19 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { pinMarkerOpacity, renderPixelRatio, screenConstantScale } from "./art";
-import { BALL_RADIUS, ballRollAxis, ballRollRadians, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker } from "./scene-ball";
+import { BALL_RADIUS, ballCenterLift, ballRollAxis, ballRollRadians, CONTACT_SHADOW_DIR, contactShadowPose, createBallContactShadows, createBallGlow, createGolfBallMesh, createPinMarker, createTurfBurst } from "./scene-ball";
 import { updateSceneCamera, type CameraRig } from "./scene-camera";
 import { populateHoleGroup } from "./scene-course";
 import { collectShared, disposeChildren } from "./scene-dispose";
 import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
-import { makeSky } from "./scene-sky";
+import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
+import { LieGrains } from "./lie-grains";
+import { grainBurst, trailLook, type TrailLook } from "./lie-story";
+import { createScuffDecal, placeScuff, scuffOpacity, scuffSpec } from "./near-turf";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
-import { groundHeight, isPuttingSituation, resolveCamView, type ResolvedCam, type ShotCamStage } from "./terrain";
+import { groundHeight, isPuttingSituation, resolveCamView, type BroadcastCamStage, type ResolvedCam } from "./terrain";
 import type { Hole } from "./types";
 
 export { ballRollAxis, ballRollRadians, dimpleIndent, makeGolfBallGeometry } from "./scene-ball";
@@ -46,12 +50,15 @@ export class CourseScene implements CameraRig {
   time = 0;
   camPos = new THREE.Vector3(80, 24, 80);
   camLook = new THREE.Vector3(200, 1, 140);
-  shotStage: ShotCamStage | "" = "";
+  shotStage: BroadcastCamStage | "" = "";
   landingSpot: { key: string; pos: Vec2 } | null = null;
   private holeGroup = new THREE.Group();
   private ball: THREE.Mesh;
   /** Soft glow that keeps a tiny ball readable against sky and turf while it flies. */
   private ballGlow: THREE.Sprite;
+  private turfBurst: THREE.Sprite;
+  private grains = new LieGrains();
+  private shotLook: TrailLook = trailLook("fairway");
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
@@ -86,6 +93,8 @@ export class CourseScene implements CameraRig {
   private fringeMat: THREE.MeshStandardMaterial;
   private greenBlades: THREE.InstancedMesh | null = null;
   private fringeBlades: THREE.InstancedMesh | null = null;
+  private scuffSlots: { mesh: THREE.Mesh; age: number; life: number; peak: number; active: boolean }[] = [];
+  private scuffSeen = "";
   private pendingArtRebuild = false;
   private waterTime = { value: 0 };
   private ribbon: THREE.Mesh;
@@ -102,10 +111,13 @@ export class CourseScene implements CameraRig {
   private h = 1;
   private composer: EffectComposer | null = null;
   private bloom: UnrealBloomPass | null = null;
+  private software = false;
+  private atmoId = "";
 
   constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     const software = isSoftwareGL(this.renderer);
+    this.software = software;
     configureWebGLRenderer(this.renderer, software);
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(SCENE_TONE.fogColor, SCENE_TONE.fogNear, SCENE_TONE.fogFar);
@@ -130,11 +142,20 @@ export class CourseScene implements CameraRig {
 
     this.ball = createGolfBallMesh();
     this.ballGlow = createBallGlow();
-    this.scene.add(this.ball, this.ballGlow);
+    this.turfBurst = createTurfBurst();
+    this.scene.add(this.ball, this.ballGlow, this.turfBurst, this.grains.group);
     const shadows = createBallContactShadows();
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
     this.scene.add(this.shadow, this.softShadow);
+    this.scuffSlots = [0, 1].map(() => ({
+      mesh: createScuffDecal(),
+      age: 0,
+      life: 1,
+      peak: 0,
+      active: false,
+    }));
+    for (const slot of this.scuffSlots) this.scene.add(slot.mesh);
 
     this.landing = new THREE.Mesh(
       new THREE.RingGeometry(0.62, 1.05, 40),
@@ -285,7 +306,9 @@ export class CourseScene implements CameraRig {
 
   sync(session: GameSession, dt: number): void {
     this.time += dt;
+    this.applyCourseAtmosphere(session.course.id);
     const hole = session.hole();
+    this.shotLook = trailLook(session.launchLie, session.club().id);
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     if (this.pendingArtRebuild && !flying) {
       this.pendingArtRebuild = false;
@@ -298,6 +321,9 @@ export class CourseScene implements CameraRig {
     const putting = !fullShotInAir && isPuttingSituation(session.lie, session.toPin(), session.club().id, hole, session.ball.pos);
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
+    this.placeTurfBurst(session);
+    this.grains.sync(session, dt, (x, z) => groundHeight(hole, x, z));
+    this.updateScuffs(session, dt);
     this.placePin(hole);
     this.updatePath(session, dt);
     this.updateTrail(session);
@@ -308,8 +334,8 @@ export class CourseScene implements CameraRig {
     this.waterTime.value = this.time;
     const camDist = this.camera.position.distanceTo(this.ball.position);
     const play = session.screen === "play";
-    updateGreenBladeLod(this.greenBlades, putting && play, camDist);
-    updateFringeBladeLod(this.fringeBlades, play && (putting || camDist < 26), camDist);
+    updateGreenBladeLod(this.greenBlades, putting && play && camDist > CLOSE_STICK_HIDE, camDist);
+    updateFringeBladeLod(this.fringeBlades, play && camDist > CLOSE_STICK_HIDE, camDist);
   }
 
   render(): void {
@@ -321,6 +347,22 @@ export class CourseScene implements CameraRig {
       this.composer = null;
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  private applyCourseAtmosphere(courseId: string): void {
+    if (this.atmoId === courseId) return;
+    this.atmoId = courseId;
+    const atmo = atmosphereForCourse(courseId);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.setHex(atmo.fogColor);
+    fog.near = atmo.fogNear;
+    fog.far = atmo.fogFar;
+    this.renderer.setClearColor(atmo.clearColor, 1);
+    applySkyAtmosphere(this.sky, atmo);
+    const baseSun = this.software ? SCENE_TONE.sunSoftware : SCENE_TONE.sunHardware;
+    this.sun.intensity = baseSun * atmo.sunScale;
+    const baseExposure = this.software ? SCENE_TONE.exposureSoftware : SCENE_TONE.exposureHardware;
+    this.renderer.toneMappingExposure = baseExposure * atmo.exposureScale;
   }
 
   private rebuildHole(hole: Hole): void {
@@ -359,27 +401,93 @@ export class CourseScene implements CameraRig {
     this.terrain = built.terrain;
     this.greenBlades = built.greenBlades;
     this.fringeBlades = built.fringeBlades;
+    this.scuffSeen = "";
+    for (const slot of this.scuffSlots) {
+      slot.active = false;
+      slot.mesh.visible = false;
+    }
     aimSunAt(this.sun, built.focus.cx, built.focus.cz);
   }
 
   private placeBall(session: GameSession, dt: number): void {
     const p = session.ball.pos;
     const gh = groundHeight(session.hole(), p.x, p.y);
-    this.ball.position.set(p.x, gh + Math.max(session.ball.z, 0) + 0.16, p.y);
-    this.shadow.position.set(p.x, gh + 0.025, p.y);
-    const air = Math.max(0.1, 0.26 - session.ball.z * 0.01);
-    this.shadow.scale.setScalar(air);
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = session.ball.z > 8 ? 0.12 : 0.36;
+    const lift = ballCenterLift(session.ball.z);
+    this.ball.position.set(p.x, gh + Math.max(session.ball.z, 0) + lift, p.y);
+    const pose = contactShadowPose(session.ball.z);
+    const ox = CONTACT_SHADOW_DIR.x * pose.offset;
+    const oz = CONTACT_SHADOW_DIR.z * pose.offset;
+    this.shadow.position.set(p.x + ox, gh + 0.027, p.y + oz);
+    this.shadow.scale.setScalar(pose.coreScale);
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = pose.coreOpacity;
+    this.softShadow.position.set(p.x + ox * 0.35, gh + 0.023, p.y + oz * 0.35);
+    this.softShadow.scale.set(pose.softScale * 1.08, pose.softScale * 0.86, 1);
+    (this.softShadow.material as THREE.MeshBasicMaterial).opacity = pose.softOpacity;
+    const halo = this.ball.getObjectByName("sit-halo") as THREE.Mesh | undefined;
+    if (halo) {
+      const air = Math.max(0, session.ball.z);
+      (halo.material as THREE.MeshBasicMaterial).opacity = air > 0.8 ? 0.16 : 0.03 + Math.min(1, air / 0.8) * 0.13;
+    }
     const inFlight = session.swingPhase === "flight" && session.ball.z > 0.4;
     this.ballGlow.visible = inFlight;
     if (inFlight) {
       this.ballGlow.position.copy(this.ball.position);
-      this.ballGlow.scale.setScalar(Math.max(0.7, this.camera.position.distanceTo(this.ball.position) * 0.05));
+      this.ballGlow.scale.setScalar(Math.max(0.7, this.camera.position.distanceTo(this.ball.position) * 0.05) * this.shotLook.glowScale);
+      (this.ballGlow.material as THREE.SpriteMaterial).opacity = 0.85 * this.shotLook.glowScale;
     }
     const speed = Math.hypot(session.ball.vel.x, session.ball.vel.y);
     const axis = ballRollAxis(session.ball.vel.x, session.ball.vel.y);
     if (axis) {
       this.ball.rotateOnWorldAxis(new THREE.Vector3(axis.x, axis.y, axis.z), ballRollRadians(speed, dt));
+    }
+  }
+
+  private placeTurfBurst(session: GameSession): void {
+    const burst = session.landBurst;
+    const show = Boolean(burst) && session.screen === "play";
+    this.turfBurst.visible = show;
+    if (!burst || !show) return;
+    const spec = grainBurst(burst.lie, burst.kind, session.club().id);
+    const life = spec.cloudLife;
+    const t = Math.min(1, burst.age / Math.max(life, 0.05));
+    const gh = groundHeight(session.hole(), burst.pos.x, burst.pos.y);
+    const rise = spec.read === "splash" ? 1.15 : spec.read === "smother" ? 0.42 : 0.2;
+    this.turfBurst.position.set(burst.pos.x, gh + 0.1 + t * rise, burst.pos.y);
+    const s = spec.cloud * (0.55 + t * 0.95);
+    this.turfBurst.scale.set(s, s * (spec.read === "splash" ? 0.7 : 0.5), 1);
+    const mat = this.turfBurst.material as THREE.SpriteMaterial;
+    mat.opacity = (1 - t) * spec.cloudOpacity;
+    mat.color.setHex(spec.cloudColor);
+  }
+
+  private updateScuffs(session: GameSession, dt: number): void {
+    const burst = session.landBurst;
+    if (burst && session.screen === "play") {
+      const key = `${burst.kind}:${burst.pos.x.toFixed(2)}:${burst.pos.y.toFixed(2)}`;
+      if (key !== this.scuffSeen) {
+        this.scuffSeen = key;
+        const spec = scuffSpec(burst.kind, burst.lie, clubFamily(session.club().id));
+        if (spec.opacity > 0) {
+          const free = this.scuffSlots.find((slot) => !slot.active) ?? this.scuffSlots.reduce((a, b) => (a.age >= b.age ? a : b));
+          free.active = true;
+          free.age = 0;
+          free.life = spec.life;
+          free.peak = spec.opacity;
+          const aim =
+            burst.kind === "strike"
+              ? session.aim
+              : Math.atan2(burst.pos.y - session.lastShotPos.y, burst.pos.x - session.lastShotPos.x);
+          placeScuff(free.mesh, session.hole(), burst.pos, aim, spec);
+        }
+      }
+    }
+    for (const slot of this.scuffSlots) {
+      if (!slot.active) continue;
+      slot.age += dt;
+      const opacity = scuffOpacity(slot.age, slot.life, slot.peak);
+      slot.mesh.visible = opacity > 0.02;
+      (slot.mesh.material as THREE.MeshBasicMaterial).opacity = opacity;
+      if (opacity <= 0) slot.active = false;
     }
   }
 
@@ -432,7 +540,11 @@ export class CourseScene implements CameraRig {
         });
         this.setFlightTube(pts, 0.07);
       }
-      if (this.flightMesh) this.flightMesh.visible = true;
+      if (this.flightMesh) {
+        this.flightMesh.visible = true;
+        this.flightMat.color.setHex(this.shotLook.ribbon);
+        this.flightMat.opacity = this.shotLook.ribbonOpacity;
+      }
       return;
     }
     if (this.flightMesh) this.flightMesh.visible = false;
@@ -498,6 +610,7 @@ export class CourseScene implements CameraRig {
   private updateTrail(session: GameSession): void {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     const inAir = session.ball.z > 0.2;
+    this.shotLook = trailLook(session.launchLie, session.club().id);
     // Keep the tracer for the whole shot, including the roll-out, so you can read the flight you just hit.
     const show = session.screen === "play" && flying && (inAir || this.trailCount > 1);
     this.trail.visible = show;
@@ -507,6 +620,13 @@ export class CourseScene implements CameraRig {
       this.ribbon.visible = false;
       return;
     }
+    const look = this.shotLook;
+    (this.trail.material as THREE.LineBasicMaterial).color.setHex(look.color);
+    (this.trail.material as THREE.LineBasicMaterial).opacity = look.opacity;
+    (this.trailGlow.material as THREE.LineBasicMaterial).color.setHex(look.glow);
+    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = look.glowOpacity;
+    (this.ribbon.material as THREE.MeshBasicMaterial).color.setHex(look.ribbon);
+    (this.ribbon.material as THREE.MeshBasicMaterial).opacity = Math.min(0.72, look.opacity);
     if (!inAir) {
       this.updateRibbon();
       return;
@@ -525,8 +645,10 @@ export class CourseScene implements CameraRig {
       this.trailPos[(TRAIL_LEN - 1) * 3 + 1] = y;
       this.trailPos[(TRAIL_LEN - 1) * 3 + 2] = p.y;
     }
-    setLine(this.trail, this.trailCount);
-    setLine(this.trailGlow, this.trailCount);
+    const visible = Math.max(2, Math.ceil(this.trailCount * this.shotLook.keep));
+    const start = Math.max(0, this.trailCount - visible);
+    setLine(this.trail, visible, start);
+    setLine(this.trailGlow, visible, start);
     this.updateRibbon();
   }
 
@@ -552,12 +674,14 @@ export class CourseScene implements CameraRig {
       side.crossVectors(tangent, toCam).normalize();
       if (!Number.isFinite(side.x)) side.set(1, 0, 0);
       const age = i / Math.max(n - 1, 1);
-      const half = Math.max(0.05, camDist * 0.0032) * (0.55 + 0.45 * age);
+      const half = Math.max(0.05, camDist * 0.0032) * (0.55 + 0.45 * age) * this.shotLook.width;
       pos.setXYZ(i * 2, x - side.x * half, y - side.y * half, z - side.z * half);
       pos.setXYZ(i * 2 + 1, x + side.x * half, y + side.y * half, z + side.z * half);
     }
     pos.needsUpdate = true;
-    this.ribbonGeo.setDrawRange(0, Math.max(0, n - 1) * 6);
+    const visible = Math.max(2, Math.ceil(n * this.shotLook.keep));
+    const start = Math.max(0, n - visible);
+    this.ribbonGeo.setDrawRange(start * 6, Math.max(0, visible - 1) * 6);
   }
 
   private setFlightTube(pts: THREE.Vector3[], radius: number): void {
@@ -613,10 +737,10 @@ function makeLine(data: Float32Array, color: number): THREE.Line {
   return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.36 }));
 }
 
-function setLine(line: THREE.Line, count: number): void {
+function setLine(line: THREE.Line, count: number, start = 0): void {
   const attr = line.geometry.getAttribute("position") as THREE.BufferAttribute;
   attr.needsUpdate = true;
-  line.geometry.setDrawRange(0, count);
+  line.geometry.setDrawRange(start, count);
 }
 
 export function createCourseScene(canvas: HTMLCanvasElement): CourseScene | null {
