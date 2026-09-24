@@ -12,8 +12,8 @@ export const NEAR_TURF_RADIUS = 22;
 export const NEAR_DETAIL_RADIUS = 16;
 /** Rebuild the carpet after the ball moves this far, so a putt does not realloc every frame. */
 export const NEAR_TURF_MOVE = 2.1;
-export const NEAR_BLADE_BUDGET = 5200;
-export const NEAR_BLADE_BUDGET_SOFTWARE = 3600;
+export const NEAR_BLADE_BUDGET = 5400;
+export const NEAR_BLADE_BUDGET_SOFTWARE = 4800;
 /** Share of the budget allowed to become tall rough. The rest stays short grass. */
 export const NEAR_ROUGH_SHARE = 0.42;
 /** Full carpet while the lens is this close to the ball (address and putt). */
@@ -46,17 +46,17 @@ export function nearBladeOffset(i: number, radius = NEAR_TURF_RADIUS): { x: numb
 export function nearBladeMetrics(band: TurfBand): { height: number; width: number; lean: number } | null {
   switch (band) {
     case "green":
-      return { height: 0.05, width: 0.032, lean: 0.38 };
+      return { height: 0.062, width: 0.036, lean: 0.4 };
     case "collar":
-      return { height: 0.068, width: 0.038, lean: 0.44 };
+      return { height: 0.084, width: 0.042, lean: 0.46 };
     case "fringe":
-      return { height: 0.1, width: 0.046, lean: 0.52 };
+      return { height: 0.12, width: 0.05, lean: 0.54 };
     case "tee":
-      return { height: 0.072, width: 0.04, lean: 0.42 };
+      return { height: 0.12, width: 0.05, lean: 0.46 };
     case "fairway":
-      return { height: 0.098, width: 0.048, lean: 0.5 };
+      return { height: 0.15, width: 0.056, lean: 0.52 };
     case "rough":
-      return { height: 0.24, width: 0.058, lean: 0.74 };
+      return { height: 0.28, width: 0.064, lean: 0.78 };
     default:
       return null;
   }
@@ -99,13 +99,13 @@ export function scuffSpec(kind: "strike" | "land", lie: Lie, family: ClubFamily)
       life: 3.1,
       length: bunker ? 1.35 : green ? 0.4 : lie === "rough" ? 0.95 : 0.7,
       width: bunker ? 1.05 : green ? 0.32 : lie === "rough" ? 0.72 : 0.56,
-      opacity: bunker ? 0.5 : green ? 0.48 : 0.55,
+      opacity: bunker ? 0.58 : green ? 0.55 : 0.62,
       color: tint,
       forward: 0,
     };
   }
   if (lie === "green") {
-    return { life: 2.5, length: 0.46, width: 0.28, opacity: 0.42, color: tint, forward: 0.14 };
+    return { life: 2.5, length: 0.46, width: 0.28, opacity: 0.52, color: tint, forward: 0.14 };
   }
   if (family === "iron" || family === "wedge") {
     const length = lie === "bunker" ? 0.9 : family === "wedge" ? 1.15 : 1.45;
@@ -113,12 +113,12 @@ export function scuffSpec(kind: "strike" | "land", lie: Lie, family: ClubFamily)
       life: 3.6,
       length,
       width: lie === "bunker" ? 0.7 : 0.36,
-      opacity: 0.62,
+      opacity: 0.72,
       color: tint,
       forward: length * 0.42,
     };
   }
-  return { life: 2.6, length: 0.62, width: 0.48, opacity: 0.4, color: tint, forward: 0.16 };
+  return { life: 2.6, length: 0.72, width: 0.52, opacity: 0.5, color: tint, forward: 0.18 };
 }
 
 /** Holds through the puff, then eases out. */
@@ -315,11 +315,11 @@ function createNearBladeMaterial(time: { value: number }): THREE.MeshStandardMat
   const mat = new THREE.MeshStandardMaterial({
     map: tex,
     transparent: true,
-    alphaTest: 0.28,
+    alphaTest: 0.12,
     side: THREE.DoubleSide,
     roughness: 0.84,
     metalness: 0,
-    depthWrite: true,
+    depthWrite: false,
   });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = time;
@@ -428,7 +428,7 @@ function makeBladeCanvas(): HTMLCanvasElement {
     const g = ctx.createLinearGradient(0, 0, 0, -reach);
     g.addColorStop(0, "rgba(214, 222, 196, 0.96)");
     g.addColorStop(0.42, "rgba(244, 248, 232, 0.92)");
-    g.addColorStop(1, "rgba(255, 255, 246, 0.05)");
+    g.addColorStop(1, "rgba(255, 255, 246, 0.28)");
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(-blade.width, 0);
@@ -466,7 +466,7 @@ function makeFiberCanvas(): HTMLCanvasElement {
     const len = 28 + hashNoise(i, 10.3) * 62;
     const lean = (hashNoise(i, 11.4) - 0.5) * 18;
     const dark = hashNoise(i, 12.5) > 0.62;
-    ctx.strokeStyle = dark ? "rgba(24, 48, 16, 0.42)" : "rgba(236, 246, 214, 0.3)";
+    ctx.strokeStyle = dark ? "rgba(20, 42, 12, 0.62)" : "rgba(232, 244, 206, 0.46)";
     ctx.lineWidth = dark ? 1.4 + hashNoise(i, 13) * 1.3 : 1.1 + hashNoise(i, 14) * 1.1;
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -495,14 +495,14 @@ function makeScuffCanvas(): HTMLCanvasElement {
       const soil = Math.max(0, 1 - e * 1.45);
       const lip = Math.max(0, 1 - Math.abs(e - 0.68) * 3.4);
       const alpha = Math.max(0, 1 - smooth01(Math.max(0, e - 0.72) / 0.33)) * (0.72 + n * 0.28);
-      const r = 96 * soil + 198 * (1 - soil) + lip * 24;
-      const g = 72 * soil + 206 * (1 - soil) + lip * 16;
-      const b = 40 * soil + 132 * (1 - soil);
+      const r = 62 * soil + 150 * (1 - soil) + lip * 18;
+      const g = 48 * soil + 168 * (1 - soil) + lip * 12;
+      const b = 28 * soil + 78 * (1 - soil);
       const i = (y * size + x) * 4;
       img.data[i] = Math.max(0, Math.min(255, r));
       img.data[i + 1] = Math.max(0, Math.min(255, g));
       img.data[i + 2] = Math.max(0, Math.min(255, b));
-      img.data[i + 3] = Math.round(Math.max(0, Math.min(1, alpha)) * 220);
+      img.data[i + 3] = Math.round(Math.max(0, Math.min(1, alpha)) * 245);
     }
   }
   ctx.putImageData(img, 0, 0);
