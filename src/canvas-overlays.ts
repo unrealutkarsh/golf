@@ -1,4 +1,5 @@
 import type { GameSession } from "./game";
+import { grainBurst, trailLook } from "./lie-story";
 import type { FlightSample } from "./physics";
 import { clamp, dist, fromAngle, type Vec2 } from "./math";
 import { airbornePos } from "./renderer-lift";
@@ -66,10 +67,14 @@ export class PlayOverlays {
         this.trail.push({ x: b.pos.x, y: b.pos.y, z: b.z });
         if (this.trail.length > 110) this.trail.shift();
       }
-      if (this.trail.length === 1 && b.z < 1.2) this.burst(b.pos, "#c6d89a", 14, 16);
+      if (this.trail.length === 1 && b.z < 1.2 && session.club().id !== "putter") {
+        const spec = grainBurst(session.launchLie, "strike", session.club().id);
+        this.burst(b.pos, cssHex(spec.cloudColor), Math.max(4, Math.round(spec.count * 0.45)), spec.spread * 7);
+      }
       if (this.prevZ > 2.2 && b.z <= 0.08) {
-        this.burst(b.pos, "#d8e8b0", 18, 14);
-        this.rings.push({ x: b.pos.x, y: b.pos.y, life: 0.6, max: 0.6 });
+        const spec = grainBurst(session.lie, "land", session.club().id);
+        this.burst(b.pos, cssHex(spec.cloudColor), Math.max(4, Math.round(spec.count * 0.4)), spec.spread * 6);
+        if (spec.read !== "quiet") this.rings.push({ x: b.pos.x, y: b.pos.y, life: spec.read === "splash" ? 0.85 : 0.5, max: spec.read === "splash" ? 0.85 : 0.5 });
       }
       this.prevZ = b.z;
     } else if (this.trail.length && session.swingPhase === "aim") {
@@ -217,7 +222,7 @@ export class PlayOverlays {
     const vis = airbornePos(ground, air);
     const flying = air > 0.08;
     if (this.trail.length > 1 && (session.swingPhase === "flight" || session.swingPhase === "settle" || this.trail.some((p) => p.z > 0.2))) {
-      this.drawTrail(ctx);
+      this.drawTrail(ctx, session);
     }
 
     ctx.save();
@@ -260,19 +265,22 @@ export class PlayOverlays {
     ctx.restore();
   }
 
-  private drawTrail(ctx: CanvasRenderingContext2D): void {
+  private drawTrail(ctx: CanvasRenderingContext2D, session: GameSession): void {
     if (this.trail.length < 2) return;
+    const look = trailLook(session.launchLie, session.club().id);
+    const rgb = cssRgb(look.color);
+    const keepFrom = Math.max(1, Math.floor(this.trail.length * (1 - look.keep)));
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    for (let i = 1; i < this.trail.length; i++) {
+    for (let i = keepFrom; i < this.trail.length; i++) {
       const a = this.trail[i - 1];
       const b = this.trail[i];
       const pa = airbornePos(a, a.z);
       const pb = airbornePos(b, b.z);
       const t = i / this.trail.length;
-      ctx.strokeStyle = `rgba(255, 236, 180, ${0.08 + t * 0.55})`;
-      ctx.lineWidth = 0.35 + t * 0.9;
+      ctx.strokeStyle = `rgba(${rgb}, ${look.opacity * (0.12 + t * 0.7)})`;
+      ctx.lineWidth = (0.35 + t * 0.9) * look.width;
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(pb.x, pb.y);
@@ -312,4 +320,12 @@ export class PlayOverlays {
     }
     ctx.globalAlpha = 1;
   }
+}
+
+function cssHex(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+function cssRgb(color: number): string {
+  return `${(color >> 16) & 255}, ${(color >> 8) & 255}, ${color & 255}`;
 }

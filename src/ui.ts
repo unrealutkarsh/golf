@@ -2,6 +2,7 @@ import { formatMoney, rankingFromProfile } from "./career";
 import { CLUBS } from "./clubs";
 import type { GameSession } from "./game";
 import { playHudMode, showClubTray, windArrowDegrees, yardageReadout } from "./hud";
+import { lieCarryNote } from "./lie-story";
 import { surfaceLabel, windLabel } from "./physics";
 import { shapeLabel } from "./terrain";
 import { formatToPar, scoreName, toPar, totalStrokes } from "./scoring";
@@ -297,6 +298,8 @@ export function playHudHtml(session: GameSession): string {
   const atAddress = session.swingPhase === "aim";
   const phase = phaseLabel(session);
   const shape = shapeLabel(session.shape);
+  const atStance = session.swingPhase === "aim" || session.swingPhase === "power" || session.swingPhase === "accuracy";
+  const lieNote = atStance ? lieCarryNote(session.lie, club.id) : "";
   const tip = session.tipVisible
     ? `<p class="lm-tip">Drag to aim. Click or Space three times: start, power, accuracy.</p>`
     : "";
@@ -341,6 +344,7 @@ export function playHudHtml(session: GameSession): string {
       <div class="lm-stack">
         <section class="lm-readout lie-${session.lie}">
           <p class="lm-lie">${surfaceLabel(session.lie)}</p>
+          ${lieNote ? `<p class="lm-lie-note">${escapeHtml(lieNote)}</p>` : ""}
           <div class="lm-main">
             <div class="lm-yards">
               <b>${yards.value}</b>

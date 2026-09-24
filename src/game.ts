@@ -1,4 +1,5 @@
 import { AudioBus } from "./audio";
+import { burstLife, strikeCallout } from "./lie-story";
 import { loadProfile, recordRound, saveProfile } from "./career";
 import { CLUBS, clubById, clubIndex, meterYardage, recommendClub, suggestedShotPower } from "./clubs";
 import { courseById, HARBOR_DUNES, lieAt, onGreen } from "./course";
@@ -130,6 +131,15 @@ export class GameSession {
   impact = 0;
   /** Short-lived turf puff at the strike or the landing. */
   landBurst: { pos: Vec2; lie: Lie; kind: "strike" | "land"; age: number } | null = null;
+  /**
+   * Impact the scene has not shown yet. Stays up until the grain system takes it,
+   * so a slow frame cannot skip the splash by expiring `landBurst` first.
+   */
+  contactFx: { pos: Vec2; lie: Lie; kind: "strike" | "land" } | null = null;
+  /** Lie the current shot left from. The tracer keeps this after the ball has rolled onto something else. */
+  launchLie: Lie = "tee";
+  /** QA hold: grains stay on the frame they have already reached. */
+  lieStill = false;
   /** Seconds of simulated flight for the current shot. */
   flightTime = 0;
   /** Seconds from launch to first touchdown, and where, from the launch-time simulation. */
@@ -380,6 +390,9 @@ export class GameSession {
     this.hitStop = 0;
     this.impact = 0;
     this.landBurst = null;
+    this.contactFx = null;
+    this.launchLie = this.lie;
+    this.lieStill = false;
     this.lastHoleBanner = null;
     if (!keepResults) this.message = "";
   }
@@ -505,6 +518,7 @@ export class GameSession {
     }
     const club = this.club();
     this.lastShotPos = { ...this.ball.pos };
+    this.launchLie = this.lie;
     this.strokes += 1;
     if (club.id === "putter" && this.lie === "green") this.putts += 1;
     const shot = {
@@ -531,16 +545,18 @@ export class GameSession {
     this.landingTime = (this.shotArc.length - 1) * SIM_DT;
     this.landingPos = last ? { ...last.pos } : null;
     const quality = this.strike ?? "good";
+    this.landBurst = { pos: { ...this.lastShotPos }, lie: this.lie, kind: "strike", age: 0 };
+    this.contactFx = { pos: { ...this.lastShotPos }, lie: this.lie, kind: "strike" };
     if (club.id !== "putter") {
       // Long enough to read contact on the address lens, short enough that the cut still feels immediate.
       this.hitStop = 0.1 + this.power * 0.08;
       this.impact = (0.35 + 0.65 * this.power) * (quality === "perfect" ? 1 : quality === "good" ? 0.75 : 0.55);
-      this.landBurst = { pos: { ...this.lastShotPos }, lie: this.lie, kind: "strike", age: 0 };
-      if (quality === "perfect") this.showCallout("Pure strike", `${club.name} · ${Math.round(this.power * 100)}%`, "perfect", 1.6);
+      const told = strikeCallout(this.lie, club.id, quality, club.name, Math.round(this.power * 100));
+      if (told) this.showCallout(told.title, told.detail, told.tone, 1.6);
       else if (quality === "miss") this.showCallout(this.accuracy > 0 ? "Pulled it" : "Pushed it", "Stop the marker in the green window", "miss", 1.6);
     }
     try {
-      this.audio.swing(club.id, this.power, quality);
+      this.audio.swing(club.id, this.power, quality, this.lie);
     } catch {
       /* audio must never block the shot */
     }
@@ -554,7 +570,7 @@ export class GameSession {
     this.impact = Math.max(0, this.impact - dt * 2.4);
     if (this.landBurst) {
       this.landBurst.age += dt;
-      const life = this.landBurst.kind === "strike" ? 0.34 : 0.7;
+      const life = burstLife(this.landBurst.lie, this.landBurst.kind, this.club().id);
       if (this.landBurst.age > life) this.landBurst = null;
     }
     if (this.screen !== "play") return;
@@ -627,6 +643,7 @@ export class GameSession {
         const lie = lieAt(hole, ev.pos);
         this.audio.land(lie);
         this.landBurst = { pos: { ...ev.pos }, lie, kind: "land", age: 0 };
+        this.contactFx = { pos: { ...ev.pos }, lie, kind: "land" };
       }
       if (ev.type === "splash") {
         this.audio.splash();

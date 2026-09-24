@@ -44,6 +44,7 @@ describe("turf scuff", () => {
     expect(bunker.color).not.toBe(land.color);
     expect(green.length).toBeLessThan(land.length);
     expect(scuffSpec("strike", "water", "iron").opacity).toBe(0);
+    expect(scuffSpec("strike", "green", "putter").opacity).toBe(0);
     expect(scuffOpacity(0, iron.life, iron.opacity)).toBeCloseTo(iron.opacity);
     expect(scuffOpacity(iron.life * 0.85, iron.life, iron.opacity)).toBeLessThan(iron.opacity * 0.5);
     expect(scuffOpacity(iron.life + 0.01, iron.life, iron.opacity)).toBe(0);

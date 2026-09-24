@@ -112,6 +112,34 @@ describe("club bag disclosure", () => {
     expect(game.swingPhase).toBe("aim");
   });
 
+  it("puts a quiet carry line on sand and rough and leaves a fairway readout bare", () => {
+    const game = new GameSession(11);
+    game.startTournament();
+    game.tipVisible = false;
+    expect(playHudHtml(game)).not.toContain("lm-lie-note");
+
+    game.lie = "bunker";
+    game.clubIndex = clubIndex("driver");
+    expect(playHudHtml(game)).toContain("lm-lie-note");
+    expect(playHudHtml(game)).toMatch(/half carry/i);
+
+    game.clubIndex = clubIndex("sw");
+    const wedge = playHudHtml(game);
+    expect(wedge).toMatch(/Wedge/);
+    expect(wedge).not.toMatch(/half carry/i);
+
+    game.lie = "rough";
+    game.clubIndex = clubIndex("iron7");
+    expect(playHudHtml(game)).toMatch(/Smothered launch/i);
+
+    game.lie = "green";
+    game.clubIndex = clubIndex("putter");
+    expect(playHudHtml(game)).not.toContain("lm-lie-note");
+    game.swingPhase = "flight";
+    game.lie = "bunker";
+    expect(playHudHtml(game)).not.toContain("lm-lie-note");
+  });
+
   it("reads a putt in feet to the hole without a club tray", () => {
     const game = new GameSession(9);
     game.startTournament();

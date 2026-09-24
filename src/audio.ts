@@ -35,6 +35,17 @@ export function hushBedGain(hush: boolean): number {
   return hush ? 0.011 : 0;
 }
 
+/**
+ * How a lie colors the contact. Sand dulls the click and adds a scrape;
+ * rough rustles; a fairway strike is the club on its own.
+ */
+export function lieStrikeMix(lie: string): { crack: number; body: number; sand: number; grass: number } {
+  if (lie === "bunker") return { crack: 0.42, body: 1.2, sand: 0.2, grass: 0 };
+  if (lie === "rough") return { crack: 0.64, body: 0.82, sand: 0, grass: 0.11 };
+  if (lie === "green") return { crack: 0.78, body: 0.7, sand: 0, grass: 0 };
+  return { crack: 1, body: 1, sand: 0, grass: 0 };
+}
+
 export class AudioBus {
   muted = false;
   private ctx: AudioContext | null = null;
@@ -79,22 +90,30 @@ export class AudioBus {
     this.writeBed(windBedGain(this.bedWind, hush), hushBedGain(hush));
   }
 
-  /** Whoosh, then contact. Family changes the pitch and the weight; a miss is duller. */
-  swing(clubId: ClubId, power: number, quality: "perfect" | "good" | "miss"): void {
+  /** Whoosh, then contact. Family changes the pitch and the weight; a miss is duller. Lie adds sand or grass without replacing the club voice. */
+  swing(clubId: ClubId, power: number, quality: "perfect" | "good" | "miss", lie = "fairway"): void {
     if (this.muted) return;
     const ctx = this.ensure();
     if (!ctx) return;
     if (ctx.state === "suspended") void ctx.resume();
     const family = clubFamily(clubId);
     const voice = STRIKE_VOICE[family];
+    const mix = lieStrikeMix(lie);
     const t = ctx.currentTime;
     const pace = Math.max(0.22, Math.min(1, power / (family === "putter" ? 1.35 : 1)));
-    const taste = quality === "perfect" ? 1 : quality === "good" ? 0.84 : 0.58;
+    const taste = (quality === "perfect" ? 1 : quality === "good" ? 0.84 : 0.58) * (family === "putter" ? 1 : mix.crack);
+    const bodyScale = family === "putter" ? 1 : mix.body;
     this.burst(ctx, t, voice.whooshDur, "bandpass", voice.whooshFrom, voice.whooshTo, voice.whooshVol * pace, 0.7);
     const hit = t + voice.whooshDur * (family === "putter" ? 0.4 : 0.62);
     const crackType: BiquadFilterType = family === "wedge" || family === "putter" ? "bandpass" : "highpass";
     this.burst(ctx, hit, voice.crackDur, crackType, voice.crackFrom, Math.max(80, voice.crackTo * taste), voice.crackVol * pace * taste, quality === "miss" ? 0.55 : 0.9);
-    this.body(ctx, hit, voice.bodyHz * (quality === "miss" ? 0.8 : 1), voice.bodyVol * pace * (quality === "miss" ? 1.15 : 1), family === "putter" ? 0.07 : 0.11);
+    this.body(ctx, hit, voice.bodyHz * (quality === "miss" ? 0.8 : 1), voice.bodyVol * pace * (quality === "miss" ? 1.15 : 1) * bodyScale, family === "putter" ? 0.07 : 0.11);
+    if (mix.sand > 0) {
+      this.burst(ctx, hit, 0.26, "bandpass", 1800, 420, mix.sand, 0.55);
+      this.burst(ctx, hit + 0.02, 0.2, "lowpass", 640, 140, mix.sand * 0.7, 0.4);
+    } else if (mix.grass > 0 && family !== "putter") {
+      this.burst(ctx, hit, 0.16, "bandpass", 2100, 680, mix.grass, 1.15);
+    }
   }
 
   /** Club-on-ball contact kept for older call sites. Woods. */
@@ -109,10 +128,16 @@ export class AudioBus {
     if (!ctx) return;
     const t = ctx.currentTime;
     if (lie === "bunker") {
-      this.burst(ctx, t, 0.22, "bandpass", 2200, 900, 0.1, 0.8);
+      this.burst(ctx, t, 0.3, "bandpass", 2100, 520, 0.16, 0.55);
+      this.burst(ctx, t, 0.18, "lowpass", 480, 120, 0.12, 0.45);
       return;
     }
-    const soft = lie === "rough" ? 0.55 : lie === "green" ? 0.45 : 0.75;
+    if (lie === "rough") {
+      this.burst(ctx, t, 0.14, "bandpass", 1500, 520, 0.07, 0.8);
+      this.burst(ctx, t, 0.1, "lowpass", 380, 140, 0.1);
+      return;
+    }
+    const soft = lie === "green" ? 0.45 : 0.75;
     this.burst(ctx, t, 0.08, "lowpass", lie === "green" ? 900 : 520, 180, 0.22 * soft);
     if (lie === "green") this.tone(280, 0.06, "sine", 0.03);
   }

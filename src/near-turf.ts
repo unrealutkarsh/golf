@@ -103,7 +103,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 /** Mark left in the turf after the puff sprite has faded. Longer than the puff on purpose. */
 export function scuffSpec(kind: "strike" | "land", lie: Lie, family: ClubFamily): ScuffSpec {
-  if (lie === "water" || lie === "ob") {
+  if (lie === "water" || lie === "ob" || family === "putter") {
     return { life: 0.2, length: 0.2, width: 0.2, opacity: 0, color: 0xffffff, forward: 0 };
   }
   const tint = lie === "bunker" ? 0xf2e6c8 : lie === "rough" ? 0xb7c6a4 : lie === "green" ? 0xf7fbf2 : 0xffffff;

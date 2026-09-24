@@ -21,6 +21,8 @@ import { createPuttLine, writePuttLine, type PuttLine } from "./scene-putt";
 import { addOutdoorLights, aimSunAt, configureWebGLRenderer, isSoftwareGL } from "./scene-lights";
 import { applySkyAtmosphere, makeSky } from "./scene-sky";
 import { createWaterMaterial } from "./scene-water";
+import { LieGrains } from "./lie-grains";
+import { grainBurst, trailLook, type TrailLook } from "./lie-story";
 import { createScuffDecal, placeScuff, scuffOpacity, scuffSpec } from "./near-turf";
 import { createCountryMaterial, createGreenMaterial, createSandMaterial, createTurfMaterial } from "./turf";
 import { groundHeight, isPuttingSituation, resolveCamView, type BroadcastCamStage, type ResolvedCam } from "./terrain";
@@ -55,6 +57,8 @@ export class CourseScene implements CameraRig {
   /** Soft glow that keeps a tiny ball readable against sky and turf while it flies. */
   private ballGlow: THREE.Sprite;
   private turfBurst: THREE.Sprite;
+  private grains = new LieGrains();
+  private shotLook: TrailLook = trailLook("fairway");
   private shadow: THREE.Mesh;
   private softShadow: THREE.Mesh;
   private pin = new THREE.Group();
@@ -139,7 +143,7 @@ export class CourseScene implements CameraRig {
     this.ball = createGolfBallMesh();
     this.ballGlow = createBallGlow();
     this.turfBurst = createTurfBurst();
-    this.scene.add(this.ball, this.ballGlow, this.turfBurst);
+    this.scene.add(this.ball, this.ballGlow, this.turfBurst, this.grains.group);
     const shadows = createBallContactShadows();
     this.shadow = shadows.shadow;
     this.softShadow = shadows.softShadow;
@@ -304,6 +308,7 @@ export class CourseScene implements CameraRig {
     this.time += dt;
     this.applyCourseAtmosphere(session.course.id);
     const hole = session.hole();
+    this.shotLook = trailLook(session.launchLie, session.club().id);
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     if (this.pendingArtRebuild && !flying) {
       this.pendingArtRebuild = false;
@@ -317,6 +322,7 @@ export class CourseScene implements CameraRig {
     const view = resolveCamView(session.camMode, session.swingPhase, putting);
     this.placeBall(session, dt);
     this.placeTurfBurst(session);
+    this.grains.sync(session, dt, (x, z) => groundHeight(hole, x, z));
     this.updateScuffs(session, dt);
     this.placePin(hole);
     this.updatePath(session, dt);
@@ -426,7 +432,8 @@ export class CourseScene implements CameraRig {
     this.ballGlow.visible = inFlight;
     if (inFlight) {
       this.ballGlow.position.copy(this.ball.position);
-      this.ballGlow.scale.setScalar(Math.max(0.7, this.camera.position.distanceTo(this.ball.position) * 0.05));
+      this.ballGlow.scale.setScalar(Math.max(0.7, this.camera.position.distanceTo(this.ball.position) * 0.05) * this.shotLook.glowScale);
+      (this.ballGlow.material as THREE.SpriteMaterial).opacity = 0.85 * this.shotLook.glowScale;
     }
     const speed = Math.hypot(session.ball.vel.x, session.ball.vel.y);
     const axis = ballRollAxis(session.ball.vel.x, session.ball.vel.y);
@@ -440,18 +447,17 @@ export class CourseScene implements CameraRig {
     const show = Boolean(burst) && session.screen === "play";
     this.turfBurst.visible = show;
     if (!burst || !show) return;
-    const life = burst.kind === "strike" ? 0.34 : 0.7;
-    const t = Math.min(1, burst.age / life);
+    const spec = grainBurst(burst.lie, burst.kind, session.club().id);
+    const life = spec.cloudLife;
+    const t = Math.min(1, burst.age / Math.max(life, 0.05));
     const gh = groundHeight(session.hole(), burst.pos.x, burst.pos.y);
-    const rise = burst.kind === "land" ? 0.9 : 0.4;
-    this.turfBurst.position.set(burst.pos.x, gh + 0.12 + t * rise, burst.pos.y);
-    const spread = burst.lie === "bunker" ? 2.6 : burst.lie === "rough" ? 1.7 : burst.kind === "strike" ? 0.85 : 1.25;
-    const s = spread * (0.4 + t * 1.15);
-    this.turfBurst.scale.set(s, s * 0.62, 1);
+    const rise = spec.read === "splash" ? 1.15 : spec.read === "smother" ? 0.42 : 0.2;
+    this.turfBurst.position.set(burst.pos.x, gh + 0.1 + t * rise, burst.pos.y);
+    const s = spec.cloud * (0.55 + t * 0.95);
+    this.turfBurst.scale.set(s, s * (spec.read === "splash" ? 0.7 : 0.5), 1);
     const mat = this.turfBurst.material as THREE.SpriteMaterial;
-    mat.opacity = (1 - t) * (burst.lie === "bunker" ? 0.62 : 0.46);
-    const color = burst.lie === "bunker" ? 0xd2c4a2 : burst.lie === "rough" ? 0x3f5c2c : burst.lie === "green" ? 0x9dcc78 : 0x7eb85a;
-    mat.color.setHex(color);
+    mat.opacity = (1 - t) * spec.cloudOpacity;
+    mat.color.setHex(spec.cloudColor);
   }
 
   private updateScuffs(session: GameSession, dt: number): void {
@@ -534,7 +540,11 @@ export class CourseScene implements CameraRig {
         });
         this.setFlightTube(pts, 0.07);
       }
-      if (this.flightMesh) this.flightMesh.visible = true;
+      if (this.flightMesh) {
+        this.flightMesh.visible = true;
+        this.flightMat.color.setHex(this.shotLook.ribbon);
+        this.flightMat.opacity = this.shotLook.ribbonOpacity;
+      }
       return;
     }
     if (this.flightMesh) this.flightMesh.visible = false;
@@ -600,6 +610,7 @@ export class CourseScene implements CameraRig {
   private updateTrail(session: GameSession): void {
     const flying = session.swingPhase === "flight" || session.swingPhase === "settle";
     const inAir = session.ball.z > 0.2;
+    this.shotLook = trailLook(session.launchLie, session.club().id);
     // Keep the tracer for the whole shot, including the roll-out, so you can read the flight you just hit.
     const show = session.screen === "play" && flying && (inAir || this.trailCount > 1);
     this.trail.visible = show;
@@ -609,6 +620,13 @@ export class CourseScene implements CameraRig {
       this.ribbon.visible = false;
       return;
     }
+    const look = this.shotLook;
+    (this.trail.material as THREE.LineBasicMaterial).color.setHex(look.color);
+    (this.trail.material as THREE.LineBasicMaterial).opacity = look.opacity;
+    (this.trailGlow.material as THREE.LineBasicMaterial).color.setHex(look.glow);
+    (this.trailGlow.material as THREE.LineBasicMaterial).opacity = look.glowOpacity;
+    (this.ribbon.material as THREE.MeshBasicMaterial).color.setHex(look.ribbon);
+    (this.ribbon.material as THREE.MeshBasicMaterial).opacity = Math.min(0.72, look.opacity);
     if (!inAir) {
       this.updateRibbon();
       return;
@@ -627,8 +645,10 @@ export class CourseScene implements CameraRig {
       this.trailPos[(TRAIL_LEN - 1) * 3 + 1] = y;
       this.trailPos[(TRAIL_LEN - 1) * 3 + 2] = p.y;
     }
-    setLine(this.trail, this.trailCount);
-    setLine(this.trailGlow, this.trailCount);
+    const visible = Math.max(2, Math.ceil(this.trailCount * this.shotLook.keep));
+    const start = Math.max(0, this.trailCount - visible);
+    setLine(this.trail, visible, start);
+    setLine(this.trailGlow, visible, start);
     this.updateRibbon();
   }
 
@@ -654,12 +674,14 @@ export class CourseScene implements CameraRig {
       side.crossVectors(tangent, toCam).normalize();
       if (!Number.isFinite(side.x)) side.set(1, 0, 0);
       const age = i / Math.max(n - 1, 1);
-      const half = Math.max(0.05, camDist * 0.0032) * (0.55 + 0.45 * age);
+      const half = Math.max(0.05, camDist * 0.0032) * (0.55 + 0.45 * age) * this.shotLook.width;
       pos.setXYZ(i * 2, x - side.x * half, y - side.y * half, z - side.z * half);
       pos.setXYZ(i * 2 + 1, x + side.x * half, y + side.y * half, z + side.z * half);
     }
     pos.needsUpdate = true;
-    this.ribbonGeo.setDrawRange(0, Math.max(0, n - 1) * 6);
+    const visible = Math.max(2, Math.ceil(n * this.shotLook.keep));
+    const start = Math.max(0, n - visible);
+    this.ribbonGeo.setDrawRange(start * 6, Math.max(0, visible - 1) * 6);
   }
 
   private setFlightTube(pts: THREE.Vector3[], radius: number): void {
@@ -715,10 +737,10 @@ function makeLine(data: Float32Array, color: number): THREE.Line {
   return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.36 }));
 }
 
-function setLine(line: THREE.Line, count: number): void {
+function setLine(line: THREE.Line, count: number, start = 0): void {
   const attr = line.geometry.getAttribute("position") as THREE.BufferAttribute;
   attr.needsUpdate = true;
-  line.geometry.setDrawRange(0, count);
+  line.geometry.setDrawRange(start, count);
 }
 
 export function createCourseScene(canvas: HTMLCanvasElement): CourseScene | null {
