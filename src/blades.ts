@@ -8,6 +8,11 @@ import type { Hole } from "./types";
 export const GREEN_BLADE_NEAR = 6;
 /** Hide blades beyond this camera distance (yards). */
 export const GREEN_BLADE_FAR = 14;
+/**
+ * Instanced stick cards stay off inside this camera distance.
+ * Address and putt read the surface shader; a blade card here is a toy wig.
+ */
+export const CLOSE_STICK_HIDE = 18;
 /** Fine nap tufts — short, wide, overlapping. */
 export const GREEN_BLADE_MAX = 4800;
 /** Collar / fringe tufts around the putting surface. */
@@ -26,22 +31,38 @@ export function shouldShowGreenBlades(putting: boolean, camDistYards: number): b
 }
 
 function makeNapCard(): THREE.DataTexture {
-  const w = 24;
-  const h = 20;
+  const w = 40;
+  const h = 56;
   const data = new Uint8Array(w * h * 4);
+  const blades = [
+    { cx: 0.5, half: 0.15, lean: 0.02 },
+    { cx: 0.3, half: 0.1, lean: -0.07 },
+    { cx: 0.7, half: 0.09, lean: 0.06 },
+  ];
   for (let y = 0; y < h; y++) {
+    const v = y / (h - 1);
     for (let x = 0; x < w; x++) {
-      const u = (x + 0.5) / w - 0.5;
-      const v = (y + 0.5) / h - 0.15;
+      const u = x / (w - 1);
       const n = hashNoise(x * 0.8, y * 0.7);
-      const ellipse = Math.hypot(u / 0.46, v / 0.38);
-      const edge = Math.max(0, 1 - ellipse);
-      const a = edge > 0.08 ? Math.min(1, edge * 1.15) * (0.35 + n * 0.22) : 0;
+      let alpha = 0;
+      let shade = 0.66;
+      for (const blade of blades) {
+        const tip = 0.94;
+        if (v > tip) continue;
+        const t = v / tip;
+        const width = blade.half * (1 - t * t);
+        const center = blade.cx + blade.lean * t;
+        const d = Math.abs(u - center);
+        if (d >= width) continue;
+        const edge = 1 - d / width;
+        alpha = Math.max(alpha, Math.min(1, edge * 1.35) * (0.5 + (1 - t) * 0.5));
+        shade = Math.max(shade, 0.62 + t * 0.4);
+      }
       const i = (y * w + x) * 4;
-      data[i] = 118 + n * 18;
-      data[i + 1] = 176 + n * 18;
-      data[i + 2] = 76 + n * 12;
-      data[i + 3] = Math.round(a * 255);
+      data[i] = Math.round((132 + n * 18) * shade);
+      data[i + 1] = Math.round((176 + n * 14) * shade);
+      data[i + 2] = Math.round((78 + n * 10) * shade);
+      data[i + 3] = Math.round(alpha * 255);
     }
   }
   const tex = new THREE.DataTexture(data, w, h);
@@ -54,10 +75,10 @@ export function createBladeMaterial(): THREE.MeshStandardMaterial {
   const map = makeNapCard();
   return new THREE.MeshStandardMaterial({
     map,
-    color: 0xd8f0c0,
+    color: 0xa8d072,
     transparent: true,
     opacity: 0.7,
-    alphaTest: 0.1,
+    alphaTest: 0.22,
     side: THREE.DoubleSide,
     roughness: 0.72,
     metalness: 0,
@@ -99,10 +120,10 @@ export function buildGreenBladeField(hole: Hole, mat: THREE.MeshStandardMaterial
     if (greenRadial(hole, x, z) > 0.96) continue;
     const band = turfBand(hole, x, z);
     if (band !== "green") continue;
-    const y = groundHeight(hole, x, z) + 0.004;
-    const hgt = 0.0032 + hashNoise(i, 7) * 0.0042;
-    const w = 0.014 + hashNoise(i, 9) * 0.012;
-    dummy.position.set(x, y + hgt * 0.35, z);
+    const y = groundHeight(hole, x, z) + 0.01;
+    const hgt = 0.016 + hashNoise(i, 7) * 0.022;
+    const w = 0.012 + hashNoise(i, 9) * 0.012;
+    dummy.position.set(x, y + hgt * 0.45, z);
     dummy.rotation.set((hashNoise(i, 2) - 0.5) * 0.55, hashNoise(i, 3) * Math.PI * 2, (hashNoise(i, 5) - 0.5) * 0.35);
     dummy.scale.set(w, hgt, 1);
     dummy.updateMatrix();

@@ -1,5 +1,15 @@
 import type { Club, ClubId } from "./types";
 
+export type ClubFamily = "wood" | "iron" | "wedge" | "putter";
+
+/** Driver and fairway woods, irons, wedges, putter — used for contact sound. */
+export function clubFamily(id: ClubId): ClubFamily {
+  if (id === "putter") return "putter";
+  if (id === "pw" || id === "sw") return "wedge";
+  if (id === "driver" || id === "wood3" || id === "wood5") return "wood";
+  return "iron";
+}
+
 export const CLUBS: Club[] = [
   { id: "driver", name: "Driver", shortName: "Dr", carry: 255, roll: 22, loft: 11, accuracy: 0.72, bounce: 0.28, apex: 30, hang: 5.6, drag: 0.12 },
   { id: "wood3", name: "3-Wood", shortName: "3W", carry: 230, roll: 18, loft: 15, accuracy: 0.78, bounce: 0.3, apex: 29, hang: 5.4, drag: 0.12 },

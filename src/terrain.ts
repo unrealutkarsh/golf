@@ -1,7 +1,7 @@
 import { inWater, lieAt, onGreen } from "./course";
 import { fbm } from "./look";
-import { clamp, dist, type Vec2 } from "./math";
-import { MAX_PUTT_POWER } from "./physics";
+import { clamp, dist, fromAngle, type Vec2 } from "./math";
+import { GREEN_FALL, MAX_PUTT_POWER } from "./physics";
 import type { CamMode, Hole, Lie } from "./types";
 
 export type ResolvedCam = "player" | "follow" | "putt";
@@ -64,13 +64,123 @@ export function addressLookDistance(leftover: number, lookAhead: number): number
 }
 
 export type ShotCamStage = "launch" | "chase" | "landing";
+/** Address hold through contact, then the flight stages. */
+export type BroadcastCamStage = "hitch" | ShotCamStage;
+
+export interface FlightCamPose {
+  /** World position. y is up; z is the course's horizontal y. */
+  x: number;
+  y: number;
+  z: number;
+  lookX: number;
+  lookY: number;
+  lookZ: number;
+  fov: number;
+}
+
+/**
+ * Broadcast follow for an airborne shot.
+ * The lens sits above the ball and aims below it, so the fairway and landing
+ * area fill the frame. A camera at ball height looking down the line turns the
+ * course into a thin horizon band with the skybox showing underneath.
+ */
+export function flightCamPose(
+  hole: Hole,
+  ball: Vec2,
+  ballZ: number,
+  heading: number,
+  stage: ShotCamStage,
+  anchor: Vec2,
+  /** Yards to the player's right. A draw is filmed from that side so the ball works across the frame. */
+  outside = 0,
+): FlightCamPose {
+  const zBall = Math.max(0, ballZ);
+  const ballGround = groundHeight(hole, ball.x, ball.y);
+  const bh = ballGround + zBall;
+  if (stage === "launch") {
+    // Just behind the ball, high enough that the fairway corridor and a strip of sky
+    // share the frame. A lens in the turf turns the hole into a dark horizon band.
+    const back = fromAngle(heading + Math.PI, 17);
+    const side = fromAngle(heading + Math.PI / 2, 2.8);
+    const x = anchor.x + back.x + side.x;
+    const z = anchor.y + back.y + side.y;
+    const y = groundHeight(hole, x, z) + 11.6;
+    const ahead = fromAngle(heading, 90);
+    const lookX = (anchor.x + ahead.x) * 0.62 + ball.x * 0.38;
+    const lookZ = (anchor.y + ahead.y) * 0.62 + ball.y * 0.38;
+    const groundAhead = groundHeight(hole, anchor.x + ahead.x, anchor.y + ahead.y);
+    const lookY = Math.min(bh * 0.35 + groundAhead * 0.65, groundAhead + 0.8);
+    return { x, y, z, lookX, lookY, lookZ, fov: 48 };
+  }
+
+  const landing = stage === "landing";
+  let x: number;
+  let z: number;
+  if (landing) {
+    x = anchor.x;
+    z = anchor.y;
+    // The ball rolls toward this spot. Keep the lens ahead of it so it cannot pass under the camera.
+    const awayX = x - ball.x;
+    const awayZ = z - ball.y;
+    const away = Math.hypot(awayX, awayZ);
+    const minDist = 22;
+    if (away < minDist) {
+      const ux = away > 0.4 ? awayX / away : -Math.cos(heading);
+      const uz = away > 0.4 ? awayZ / away : -Math.sin(heading);
+      x = ball.x + ux * minDist;
+      z = ball.y + uz * minDist;
+    }
+  } else {
+    const backDist = 16 + Math.min(zBall, 16) * 0.1;
+    const back = fromAngle(heading + Math.PI, backDist);
+    const side = fromAngle(heading + Math.PI / 2, 4.2 + outside);
+    x = ball.x + back.x + side.x;
+    z = ball.y + back.y + side.y;
+  }
+  const camGround = groundHeight(hole, x, z);
+  // Above the ball, aimed down the landing corridor, with sky above the tree line.
+  const y = landing ? Math.max(camGround + 10.5, bh + 4.2) : Math.max(camGround + 6.2, bh + 5.6);
+  const dx = ball.x - x;
+  const dz = ball.y - z;
+  const horiz = Math.hypot(dx, dz) || 1;
+  const ballPitch = Math.atan2(bh - y, horiz);
+  const fov = 50;
+  const half = ((fov * Math.PI) / 180) * 0.5;
+  // As the ball rolls up to the lens, look at it. While it is still out, look down the corridor.
+  const close = landing ? clamp((28 - horiz) / 28, 0, 1) : 0;
+  const lookDown = landing ? 0.22 * (1 - close) + 0.04 * close : 0.055 + Math.min(zBall, 18) * 0.0025;
+  let lookPitch = ballPitch - lookDown;
+  const maxSep = half * 0.68;
+  if (ballPitch - lookPitch > maxSep) lookPitch = ballPitch - maxSep;
+  // Past straight down, tan() flips and the lens aims at the sky.
+  lookPitch = Math.max(-1.05, Math.min(0.45, lookPitch));
+  const dist = Math.max(26, horiz + 18);
+  return {
+    x,
+    y,
+    z,
+    lookX: x + (dx / horiz) * dist,
+    lookY: y + Math.tan(lookPitch) * dist,
+    lookZ: z + (dz / horiz) * dist,
+    fov,
+  };
+}
 
 /** Broadcast-style sequence for a full shot: watch it leave, chase it, then cut to where it lands. */
 export function shotCamStage(flightTime: number, landingTime: number, touchedDown: boolean): ShotCamStage {
   // Chips and punch shots are over too quickly for a cut to read.
   const cutsToLanding = landingTime > 2.2;
-  if (cutsToLanding && (touchedDown || flightTime >= landingTime - 1.7)) return "landing";
-  return flightTime < 0.75 ? "launch" : "chase";
+  if (cutsToLanding && (touchedDown || flightTime >= landingTime - 1.35)) return "landing";
+  return flightTime < 0.55 ? "launch" : "chase";
+}
+
+/**
+ * Auto flight camera: hold the address lens through the contact hitch, then launch, chase, and landing.
+ * `flightTime` does not advance during the hitch, so this stays on address until the ball is let go.
+ */
+export function broadcastCamStage(hitStop: number, flightTime: number, landingTime: number, touchedDown: boolean): BroadcastCamStage {
+  if (hitStop > 0.001 && flightTime < 0.02 && !touchedDown) return "hitch";
+  return shotCamStage(flightTime, landingTime, touchedDown);
 }
 
 /** Ground spot for the landing camera: ahead of or beside the touchdown, clear of trees, hazards and OB. */
@@ -173,7 +283,8 @@ export function groundHeight(hole: Hole, x: number, y: number): number {
   if (lie === "bunker") return -0.1 + n * 0.03;
   if (lie === "green" || onGreen(hole, p)) {
     const br = hole.greenBreak;
-    return 0.16 + (x - hole.green.cx) * br.x * 0.012 + (y - hole.green.cy) * br.y * 0.012 + n * 0.008;
+    // +greenBreak is downhill, the same direction the putt is pulled.
+    return 0.22 - (x - hole.green.cx) * br.x * GREEN_FALL - (y - hole.green.cy) * br.y * GREEN_FALL + n * 0.008;
   }
   if (lie === "tee") return 0.11 + n * 0.012;
   if (lie === "fairway") return 0.08 + n * 0.028 + n2 * 0.012;

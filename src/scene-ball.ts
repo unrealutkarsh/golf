@@ -58,7 +58,8 @@ export function makeGolfBallGeometry(radius = BALL_RADIUS): THREE.BufferGeometry
     const dent = dimpleIndent(n.x, n.y, n.z, dimples);
     const r = radius - dent * depth;
     pos.setXYZ(i, n.x * r, n.y * r, n.z * r);
-    const shade = 1 - dent * 0.34;
+    const belly = n.y > 0.2 ? 1 : 0.76 + 0.24 * ((n.y + 1) / 1.2);
+    const shade = (1 - dent * 0.34) * belly;
     colors[i * 3] = 0.995 * shade;
     colors[i * 3 + 1] = 0.99 * shade;
     colors[i * 3 + 2] = 0.97 * shade;
@@ -75,11 +76,11 @@ export function makeSoftShadowCard(): HTMLCanvasElement {
   c.height = 128;
   const ctx = c.getContext("2d");
   if (!ctx) return c;
-  const g = ctx.createRadialGradient(64, 64, 3, 64, 64, 62);
-  g.addColorStop(0, "rgba(28, 34, 18, 0.38)");
-  g.addColorStop(0.28, "rgba(28, 34, 18, 0.16)");
-  g.addColorStop(0.62, "rgba(28, 34, 18, 0.05)");
-  g.addColorStop(1, "rgba(28, 34, 18, 0)");
+  const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+  g.addColorStop(0, "rgba(16, 22, 10, 0.78)");
+  g.addColorStop(0.18, "rgba(18, 26, 12, 0.42)");
+  g.addColorStop(0.46, "rgba(20, 28, 14, 0.16)");
+  g.addColorStop(1, "rgba(20, 28, 14, 0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
   return c;
@@ -132,6 +133,7 @@ export function createGolfBallMesh(): THREE.Mesh {
     new THREE.SphereGeometry(BALL_RADIUS * 1.55, 16, 12),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false }),
   );
+  halo.name = "sit-halo";
   ball.add(halo);
   const marker = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -162,6 +164,46 @@ export function createGolfBallMesh(): THREE.Mesh {
   return ball;
 }
 
+/** Horizontal sun direction the contact disc slides along once the ball is airborne. */
+export const CONTACT_SHADOW_DIR = (() => {
+  const x = -160;
+  const z = 180;
+  const len = Math.hypot(x, z) || 1;
+  return { x: x / len, z: z / len };
+})();
+
+export interface ContactShadowPose {
+  coreScale: number;
+  coreOpacity: number;
+  softScale: number;
+  softOpacity: number;
+  /** Yards to slide the core along the sun, 0 when the ball is sitting. */
+  offset: number;
+}
+
+/** Tight dark core plus a wider pool. Both shrink once the ball leaves the turf. */
+export function contactShadowPose(ballZ: number): ContactShadowPose {
+  const air = Math.max(0, ballZ);
+  const lift = Math.min(1, air / 12);
+  return {
+    coreScale: Math.max(0.18, 0.5 - air * 0.015),
+    coreOpacity: 0.68 * (1 - lift) + 0.1,
+    softScale: Math.max(0.3, 1.32 - air * 0.04),
+    softOpacity: 0.42 * (1 - lift) + 0.06,
+    offset: Math.min(1.5, air * 0.2),
+  };
+}
+
+/** Center height above groundHeight. Seated on the turf, the old flight lift once airborne. */
+export function ballCenterLift(ballZ: number): number {
+  const air = Math.max(0, ballZ);
+  const seated = BALL_RADIUS + 0.03;
+  const flying = BALL_RADIUS + 0.05;
+  if (air >= 0.5) return flying;
+  const t = air / 0.5;
+  return seated + (flying - seated) * t * t;
+}
+
 export function createBallContactShadows(): { shadow: THREE.Mesh; softShadow: THREE.Mesh } {
   const softMap = new THREE.CanvasTexture(makeSoftShadowCard());
   const shadow = new THREE.Mesh(
@@ -176,6 +218,7 @@ export function createBallContactShadows(): { shadow: THREE.Mesh; softShadow: TH
     }),
   );
   shadow.rotation.x = -Math.PI / 2;
+  finishContactShadow(shadow);
   const softShadow = new THREE.Mesh(
     new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({
@@ -188,7 +231,17 @@ export function createBallContactShadows(): { shadow: THREE.Mesh; softShadow: TH
     }),
   );
   softShadow.rotation.x = -Math.PI / 2;
+  finishContactShadow(softShadow);
   return { shadow, softShadow };
+}
+
+function finishContactShadow(mesh: THREE.Mesh): void {
+  mesh.renderOrder = 4;
+  mesh.frustumCulled = false;
+  const mat = mesh.material as THREE.MeshBasicMaterial;
+  mat.polygonOffset = true;
+  mat.polygonOffsetFactor = -3;
+  mat.polygonOffsetUnits = -3;
 }
 
 /** Additive glow sprite for the ball in flight. */
@@ -211,6 +264,30 @@ export function createBallGlow(): THREE.Sprite {
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: tex, color: 0xfff4d6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+  );
+  sprite.visible = false;
+  return sprite;
+}
+
+/** Soft disc for a strike or landing puff. Color and size are set per lie. */
+export function createTurfBurst(): THREE.Sprite {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 1, size / 2, size / 2, size / 2);
+    g.addColorStop(0, "rgba(255,255,255,0.85)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.35)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, color: 0x6ea84a, transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }),
   );
   sprite.visible = false;
   return sprite;

@@ -3,6 +3,7 @@ import { lieAt, onGreen } from "./course";
 import { COURSE_PALETTE, courseColor } from "./art";
 import { fbm, grassTile, hashNoise, heightToNormal, NEUTRAL_DETAIL_COLORS, packNormalRgb } from "./look";
 import { ellipseRadial } from "./math";
+import { FAIRWAY_NEAR_GRAIN, getNearGrainTexture, GREEN_NEAR_GRAIN, NEAR_FADE_END, NEAR_FADE_START, type NearGrain } from "./near-turf";
 import { groundHeight } from "./terrain";
 import type { Hole } from "./types";
 
@@ -245,7 +246,7 @@ export function createTurfMaterial(): THREE.MeshStandardMaterial {
     envMapIntensity: 0.05,
     vertexColors: true,
   });
-  attachWorldUv(mat, 0.05);
+  attachWorldUv(mat, 0.05, FAIRWAY_NEAR_GRAIN);
   return mat;
 }
 
@@ -283,19 +284,35 @@ export function createGreenMaterial(): THREE.MeshPhysicalMaterial {
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-  attachWorldUv(mat, 0.12);
+  attachWorldUv(mat, 0.12, GREEN_NEAR_GRAIN);
   return mat;
 }
 
-/** Repeat albedo / normal / roughness in world XZ so a hole-sized mesh does not stretch one tile. */
-function attachWorldUv(mat: THREE.MeshStandardMaterial, scale: number): void {
+/**
+ * Repeat albedo in world XZ so a hole-sized mesh does not stretch one tile.
+ * Turf and green also get a camera-distance grain so the foreground is one
+ * continuous surface. Country and sand stay plain — no unread varyings.
+ */
+function attachWorldUv(mat: THREE.MeshStandardMaterial, scale: number, grain?: NearGrain): void {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uWorldScale = { value: scale };
-    shader.vertexShader = `uniform float uWorldScale;\n${shader.vertexShader}`;
+    let vertHead = "uniform float uWorldScale;\n";
+    let vertBody = "vec3 nearWorld = (modelMatrix * vec4(position, 1.0)).xyz;\n       vec2 worldUv = nearWorld.xz * uWorldScale;\n";
+    if (grain) {
+      shader.uniforms.uNearGrain = { value: getNearGrainTexture() };
+      shader.uniforms.uGrainScale = { value: grain.scale };
+      shader.uniforms.uGrainStrength = { value: grain.strength };
+      shader.uniforms.uGrainSheen = { value: grain.sheen };
+      shader.uniforms.uFade0 = { value: NEAR_FADE_START };
+      shader.uniforms.uFade1 = { value: NEAR_FADE_END };
+      vertHead += "varying vec3 vNearWorld;\n";
+      vertBody += "vNearWorld = nearWorld;\n";
+    }
+    shader.vertexShader = vertHead + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
       "#include <uv_vertex>",
       `#include <uv_vertex>
-       vec2 worldUv = (modelMatrix * vec4(position, 1.0)).xz * uWorldScale;
+       ${vertBody}
        #ifdef USE_MAP
          vMapUv = worldUv;
        #endif
@@ -309,8 +326,34 @@ function attachWorldUv(mat: THREE.MeshStandardMaterial, scale: number): void {
          vAoMapUv = worldUv;
        #endif`,
     );
+    if (!grain) return;
+    shader.fragmentShader =
+      `uniform sampler2D uNearGrain;
+       uniform float uGrainScale;
+       uniform float uGrainStrength;
+       uniform float uGrainSheen;
+       uniform float uFade0;
+       uniform float uFade1;
+       varying vec3 vNearWorld;
+      ` + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <map_fragment>",
+      `#include <map_fragment>
+       float ptgCamDist = distance(vNearWorld, cameraPosition);
+       float ptgNear = 1.0 - smoothstep(uFade0, uFade1, ptgCamDist);
+       vec3 ptgGrain = texture2D(uNearGrain, vNearWorld.xz * uGrainScale).rgb;
+       float ptgFine = ptgGrain.r - 0.5;
+       float ptgClump = ptgGrain.g - 0.5;
+       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), ptgNear * 0.35);
+       float ptgTintT = clamp(ptgFine * 2.0 + 0.5, 0.0, 1.0);
+       vec3 ptgTint = mix(vec3(0.90, 0.98, 0.88), vec3(1.08, 1.04, 0.92), ptgTintT);
+       ptgTint *= 1.0 + ptgClump * 0.85;
+       diffuseColor.rgb *= mix(vec3(1.0), ptgTint, ptgNear * uGrainStrength);
+       float ptgGrazing = pow(1.0 - clamp(normalize(cameraPosition - vNearWorld).y, 0.0, 1.0), 1.6);
+       diffuseColor.rgb += vec3(0.04, 0.055, 0.02) * ptgGrazing * ptgNear * uGrainSheen;`,
+    );
   };
-  mat.customProgramCacheKey = () => `ptg-world-uv-v2-${scale}`;
+  mat.customProgramCacheKey = () => (grain ? "ptg-world-uv-v3-grain" : `ptg-world-uv-v2-${scale}`);
 }
 
 export interface NapUniforms {
